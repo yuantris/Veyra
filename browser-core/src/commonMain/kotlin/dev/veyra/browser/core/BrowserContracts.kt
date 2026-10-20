@@ -316,3 +316,84 @@ interface DownloadController {
     suspend fun start(request: DownloadRequest): String
     suspend fun cancel(downloadId: String)
 }
+
+
+/** Versioned JS/native or extension/native message. Payload is JSON text validated by the receiver. */
+data class BridgeEnvelope(
+    val protocol: String = "veyra.bridge",
+    val version: Int = 1,
+    val id: RequestId,
+    val type: BridgeMessageType,
+    val method: String,
+    val payloadJson: String = "{}",
+    val context: BridgeMessageContext,
+)
+
+enum class BridgeMessageType {
+    REQUEST,
+    RESPONSE,
+    EVENT,
+}
+
+data class BridgeMessageContext(
+    val tabId: TabId,
+    /** Must be derived from trusted engine/frame metadata, never trusted from page JSON. */
+    val origin: String,
+    val extensionId: String? = null,
+    val frameId: String? = null,
+)
+
+sealed interface BridgeResult {
+    data class Success(val payloadJson: String = "{}") : BridgeResult
+    data class Failure(val code: BridgeErrorCode) : BridgeResult
+}
+
+enum class BridgeErrorCode {
+    INVALID_MESSAGE,
+    UNSUPPORTED_VERSION,
+    UNAUTHORIZED_ORIGIN,
+    PERMISSION_DENIED,
+    METHOD_NOT_FOUND,
+    TIMEOUT,
+    CANCELLED,
+    INTERNAL_ERROR,
+}
+
+interface NativeMessageEndpoint {
+    suspend fun send(message: BridgeEnvelope): BridgeResult
+}
+
+data class ExtensionInfo(
+    val id: String,
+    val name: String,
+    val version: String,
+    val enabled: Boolean,
+    val permissions: Set<String> = emptySet(),
+)
+
+enum class ExtensionInstallSource {
+    BUILT_IN,
+    SIGNED_PACKAGE,
+    PLATFORM_STORE,
+}
+
+sealed interface ExtensionOperationResult {
+    data class Success(val extension: ExtensionInfo) : ExtensionOperationResult
+    data class Failure(val code: ExtensionErrorCode, val message: String? = null) : ExtensionOperationResult
+}
+
+enum class ExtensionErrorCode {
+    UNSUPPORTED,
+    INVALID_PACKAGE,
+    SIGNATURE_REQUIRED,
+    PERMISSION_DENIED,
+    NOT_FOUND,
+    ENGINE_FAILURE,
+}
+
+interface WebExtensionController {
+    val installedExtensions: StateFlow<List<ExtensionInfo>>
+    suspend fun install(source: ExtensionInstallSource, location: String): ExtensionOperationResult
+    suspend fun setEnabled(extensionId: String, enabled: Boolean): ExtensionOperationResult
+    suspend fun uninstall(extensionId: String): ExtensionOperationResult
+}
