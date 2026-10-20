@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
@@ -62,11 +63,23 @@ fun App() {
         )
     }
     val engineState by engine.state.collectAsState()
-    LaunchedEffect(navigator.canGoBack, navigator.canGoForward) {
+    LaunchedEffect(
+        webState.lastLoadedUrl,
+        webState.pageTitle,
+        webState.isLoading,
+        navigator.canGoBack,
+        navigator.canGoForward,
+    ) {
         engine.publish(
+            url = webState.lastLoadedUrl,
+            title = webState.pageTitle,
+            isLoading = webState.isLoading,
             canGoBack = navigator.canGoBack,
             canGoForward = navigator.canGoForward,
         )
+    }
+    DisposableEffect(engine) {
+        onDispose { engine.dispose() }
     }
 
     fun openAddress(raw: String) {
