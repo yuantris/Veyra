@@ -18,7 +18,8 @@ Android real-page loading and desktop KCEF/Chromium initialization and page load
 - `BrowserSessionStore` owns tab metadata, active-tab selection, bookmarks and history.
 - Private tabs do not write visits to the shared history list.
 - Platform hosts should own a separate engine instance per tab and dispose it when a tab closes.
-- The shared UI still uses the WebView library directly; concrete engine adapters and full tab-engine integration remain future work.
+- `App.kt` now connects `BrowserSessionStore` to a tab strip and keeps one `WebViewBrowserEngine`, `WebViewState`, and navigator per tab host. Inactive surfaces are retained behind the active surface so switching tabs does not intentionally dispose their page state.
+- The adapter currently bridges the cross-platform WebView library; it is not yet a direct Android `WebView` or KCEF API implementation. Tab retention, loading callbacks, and navigation need runtime testing on Android and desktop.
 
 ## Engine direction
 
@@ -31,10 +32,10 @@ Android real-page loading and desktop KCEF/Chromium initialization and page load
 
 ## Next milestones
 
-1. Implement concrete Android and desktop `BrowserEngine` adapters.
-2. Route navigation and loading events through the shared engine contract.
-3. Integrate `BrowserSessionStore` with the CMP tab strip and keep independent engines per tab.
-4. Add bookmark/history UI and private-session policies.
+1. Validate multi-tab behavior on Android and desktop, including switching, closing active/inactive tabs, and loading-state updates.
+2. Replace the bridge with concrete platform adapters where that gives better lifecycle and capability control; retain the cross-platform wrapper where it is more stable.
+3. Add bookmark/history UI and a private-tab entry point; ensure private visits never enter history.
+4. Add downloads, permissions, and popup policies through platform-specific capability interfaces.
 5. Integrate the CPF HarmonyOS toolchain and validate compatible dependency versions.
 6. Add an iOS host project and verify native navigation.
 7. Validate desktop Chromium packaging and runtime updates.
