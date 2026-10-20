@@ -33,8 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -187,11 +185,13 @@ fun App() {
                     }
 
                     Box(Modifier.fillMaxWidth().weight(1f)) {
-                        sessionState.tabs.forEach { tab ->
+                        activeTab?.let { tab ->
                             BrowserTabHost(
                                 tab = tab,
-                                active = tab.id == sessionState.activeTabId,
                                 onEngineReady = { id, engine -> engines[id] = engine },
+                                onEngineDisposed = { id, engine ->
+                                    if (engines[id] === engine) engines.remove(id)
+                                },
                                 onStateChanged = { id, url, title, loading, back, forward ->
                                     session.updateTab(
                                         tabId = id,
@@ -238,8 +238,8 @@ fun App() {
 @Composable
 private fun BrowserTabHost(
     tab: BrowserTab,
-    active: Boolean,
     onEngineReady: (String, BrowserEngine) -> Unit,
+    onEngineDisposed: (String, BrowserEngine) -> Unit,
     onStateChanged: (String, String?, String?, Boolean?, Boolean?, Boolean?) -> Unit,
 ) {
     val webState = rememberWebViewState(tab.url)
@@ -283,6 +283,7 @@ private fun BrowserTabHost(
     }
     DisposableEffect(tab.id, engine) {
         onDispose {
+            onEngineDisposed(tab.id, engine)
             engine.dispose()
         }
     }
@@ -290,7 +291,7 @@ private fun BrowserTabHost(
     WebView(
         state = webState,
         navigator = navigator,
-        modifier = Modifier.fillMaxSize().zIndex(if (active) 1f else -1f).alpha(if (active) 1f else 0f),
+        modifier = Modifier.fillMaxSize(),
     )
 }
 
