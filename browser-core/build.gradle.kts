@@ -1,10 +1,11 @@
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    alias(libs.plugins.androidLibrary)
 }
 
 kotlin {
-    jvm()
     androidTarget()
+    jvm()
 
     listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach { target ->
         target.binaries.framework {
@@ -20,5 +21,13 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
+    }
+}
+
+android {
+    namespace = "dev.veyra.browser.core"
+    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    defaultConfig {
+        minSdk = libs.versions.android.minSdk.get().toInt()
     }
 }
