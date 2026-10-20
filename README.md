@@ -45,7 +45,7 @@ See `docs/HARMONYOS.md`. The HarmonyOS app host and CPF-specific build pipeline 
 
 ## Architecture
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for engine ownership, lifecycle rules, platform capabilities, extension architecture and implementation milestones. See [`docs/GECKOVIEW_ANDROID_PLAN.md`](docs/GECKOVIEW_ANDROID_PLAN.md) for the Android-first execution plan.
+See [`docs/BROWSER_CORE_ARCHITECTURE.md`](docs/BROWSER_CORE_ARCHITECTURE.md) for the normative core contracts, lifecycle rules, JS Bridge security, capability interfaces, platform matrix and acceptance tests. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) gives the architecture overview. See [`docs/GECKOVIEW_ANDROID_PLAN.md`](docs/GECKOVIEW_ANDROID_PLAN.md) for the Android-first execution plan.
 
 ## Known gaps
 
