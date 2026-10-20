@@ -22,12 +22,14 @@ class BrowserEngineManager(
     val registeredEngines: StateFlow<Map<TabId, BrowserEngineContract>> = _registeredEngines.asStateFlow()
 
     private val closingTabs = mutableSetOf<TabId>()
+    private var shuttingDown = false
 
     val size: Int
         get() = _registeredEngines.value.size
 
     suspend fun openTab(request: BrowserEngineCreateRequest): BrowserEngineContract =
         mutex.withLock {
+            check(!shuttingDown) { "Browser engine manager is shutting down." }
             check(request.tabId !in closingTabs) {
                 "Cannot open an engine for a tab while it is closing."
             }
@@ -90,10 +92,16 @@ class BrowserEngineManager(
         _registeredEngines.value = engines.toMap()
     }
 
-    /** Closes every tab even if one platform adapter fails to release its resources. */
+    /**
+     * Permanently shuts down this manager and closes every registered tab, continuing if an
+     * adapter fails. New tabs are rejected after shutdown begins.
+     */
     suspend fun closeAll() {
         val failures = mutableListOf<Throwable>()
-        val tabIds = mutex.withLock { engines.keys.toList() }
+        val tabIds = mutex.withLock {
+            shuttingDown = true
+            engines.keys.toList()
+        }
         tabIds.forEach { tabId ->
             try {
                 closeTab(tabId)
