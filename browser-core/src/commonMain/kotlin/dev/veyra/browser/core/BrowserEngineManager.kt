@@ -1,5 +1,8 @@
 package dev.veyra.browser.core
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -14,6 +17,10 @@ class BrowserEngineManager(
 ) {
     private val mutex = Mutex()
     private val engines = linkedMapOf<TabId, BrowserEngineContract>()
+    private val _registeredEngines = MutableStateFlow<Map<TabId, BrowserEngineContract>>(emptyMap())
+    /** Immutable snapshots of currently owned engines, safe for UI observation. */
+    val registeredEngines: StateFlow<Map<TabId, BrowserEngineContract>> = _registeredEngines.asStateFlow()
+
     private val closingTabs = mutableSetOf<TabId>()
 
     val size: Int
@@ -41,6 +48,7 @@ class BrowserEngineManager(
                     "Engine factory returned an engine for a different profile."
                 }
                 engines[request.tabId] = engine
+                publishEngines()
                 engine
             } catch (failure: Throwable) {
                 // A factory can allocate native resources before returning a mismatched engine.
@@ -49,9 +57,9 @@ class BrowserEngineManager(
             }
         }
 
-    fun get(tabId: TabId): BrowserEngineContract? = engines[tabId]
+    fun get(tabId: TabId): BrowserEngineContract? = _registeredEngines.value[tabId]
 
-    fun contains(tabId: TabId): Boolean = engines.containsKey(tabId)
+    fun contains(tabId: TabId): Boolean = _registeredEngines.value.containsKey(tabId)
 
     /**
      * Detaching or hiding a platform view does not release its engine/session.
@@ -64,6 +72,7 @@ class BrowserEngineManager(
     suspend fun closeTab(tabId: TabId): Boolean = mutex.withLock {
         if (tabId in closingTabs) return@withLock false
         val engine = engines.remove(tabId) ?: return@withLock false
+        publishEngines()
         closingTabs += tabId
         try {
             engine.close()
@@ -74,6 +83,10 @@ class BrowserEngineManager(
     }
 
     /** Closes every tab even if one platform adapter fails to release its resources. */
+    private fun publishEngines() {
+        _registeredEngines.value = engines.toMap()
+    }
+
     suspend fun closeAll() {
         val failures = mutableListOf<Throwable>()
         val tabIds = mutex.withLock { engines.keys.toList() }
@@ -85,9 +98,10 @@ class BrowserEngineManager(
             }
         }
         if (failures.isNotEmpty()) {
-            val first = failures.first()
-            failures.drop(1).forEach { first.addSuppressed(it) }
-            throw first
+            throw IllegalStateException(
+                "Failed to close ${failures.size} browser engine(s).",
+                failures.first(),
+            )
         }
     }
 }
