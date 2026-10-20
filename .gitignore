@@ -1,0 +1,29 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+local.properties
+.DS_Store
+
+# Android
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+
+# Native / signing
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+
+# HarmonyOS
+**/oh_modules/
+**/build-profile.json5
+**/local.properties
