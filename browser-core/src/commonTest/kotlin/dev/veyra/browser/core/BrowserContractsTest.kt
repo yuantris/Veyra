@@ -38,6 +38,24 @@ class BrowserContractsTest {
     }
 
     @Test
+    fun normalizedErrorPreservesLegacyFieldsAndAddsTypedCategory() {
+        val error = BrowserError(
+            code = "tls_error",
+            message = "Secure connection failed.",
+            category = BrowserErrorCategory.TLS,
+            nativeCode = "CERT_DATE_INVALID",
+            failingUrl = "https://example.com",
+            isMainFrame = true,
+            isRecoverable = false,
+        )
+
+        assertEquals("tls_error", error.code)
+        assertEquals(BrowserErrorCategory.TLS, error.category)
+        assertEquals("CERT_DATE_INVALID", error.nativeCode)
+        assertEquals(false, error.isRecoverable)
+    }
+
+    @Test
     fun unsupportedCapabilitiesAreExplicit() {
         val capabilities = BrowserCapabilities()
 
