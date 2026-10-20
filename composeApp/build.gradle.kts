@@ -47,7 +47,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Veyra"
-            packageVersion = "0.1.0"
+            packageVersion = "1.0.0"
         }
     }
 }
