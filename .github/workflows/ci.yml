@@ -29,4 +29,4 @@ jobs:
           gradle-version: '8.14'
 
       - name: Compile Android and Desktop
-        run: gradle :composeApp:compileDebugKotlinAndroid :composeApp:compileKotlinDesktop --stacktrace
+        run: bash gradlew :composeApp:compileDebugKotlinAndroid :composeApp:compileKotlinDesktop --stacktrace
