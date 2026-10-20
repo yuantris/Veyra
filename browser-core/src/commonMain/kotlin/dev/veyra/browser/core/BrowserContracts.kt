@@ -48,7 +48,13 @@ data class BrowserPageState(
     val error: BrowserError? = null,
     val isSecureConnection: Boolean? = null,
     val rendererHealthy: Boolean? = null,
-)
+) {
+    init {
+        require(progress == null || progress in 0..100) {
+            "Browser progress must be null or within 0..100."
+        }
+    }
+}
 
 /** Cross-platform error categories. Native diagnostics remain in platform logs. */
 enum class BrowserErrorCategory {
