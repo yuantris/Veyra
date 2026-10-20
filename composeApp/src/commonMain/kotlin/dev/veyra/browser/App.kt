@@ -26,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -186,29 +187,31 @@ fun App() {
 
                     Box(Modifier.fillMaxWidth().weight(1f)) {
                         activeTab?.let { tab ->
-                            BrowserTabHost(
-                                tab = tab,
-                                onEngineReady = { id, engine -> engines[id] = engine },
-                                onEngineDisposed = { id, engine ->
-                                    if (engines[id] === engine) engines.remove(id)
-                                },
-                                onStateChanged = { id, url, title, loading, back, forward ->
-                                    session.updateTab(
-                                        tabId = id,
-                                        url = url,
-                                        title = title,
-                                        isLoading = loading,
-                                        canGoBack = back,
-                                        canGoForward = forward,
-                                    )
-                                    if (id == session.state.value.activeTabId && !url.isNullOrBlank()) {
-                                        address = url
-                                    }
-                                    if (!url.isNullOrBlank() && url != "about:blank") {
-                                        session.recordVisit(id, url, title.orEmpty())
-                                    }
-                                },
-                            )
+                            key(tab.id) {
+                                BrowserTabHost(
+                                    tab = tab,
+                                    onEngineReady = { id, engine -> engines[id] = engine },
+                                    onEngineDisposed = { id, engine ->
+                                        if (engines[id] === engine) engines.remove(id)
+                                    },
+                                    onStateChanged = { id, url, title, loading, back, forward ->
+                                        session.updateTab(
+                                            tabId = id,
+                                            url = url,
+                                            title = title,
+                                            isLoading = loading,
+                                            canGoBack = back,
+                                            canGoForward = forward,
+                                        )
+                                        if (id == session.state.value.activeTabId && !url.isNullOrBlank()) {
+                                            address = url
+                                        }
+                                        if (!url.isNullOrBlank() && url != "about:blank") {
+                                            session.recordVisit(id, url, title.orEmpty())
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 } else {
