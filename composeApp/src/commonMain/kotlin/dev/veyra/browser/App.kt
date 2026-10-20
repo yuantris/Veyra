@@ -46,9 +46,9 @@ private val Accent = Color(0xFF496BEB)
 
 @Composable
 fun App() {
-    var address by remember { mutableStateOf("https://example.com") }
+    var address by remember { mutableStateOf("https://www.baidu.com") }
     var showBrowser by remember { mutableStateOf(false) }
-    val webState = rememberWebViewState("https://example.com")
+    val webState = rememberWebViewState("https://www.baidu.com")
     val navigator = rememberWebViewNavigator()
 
     fun openAddress(raw: String) {

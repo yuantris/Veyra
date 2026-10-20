@@ -42,7 +42,7 @@ android {
 }
 compose.desktop {
     application {
-        mainClass = "dev.veyra.browser.mainKt"
+        mainClass = "dev.veyra.browser.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb, TargetFormat.Dmg)
             packageName = "Veyra"
