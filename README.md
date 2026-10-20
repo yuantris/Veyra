@@ -4,14 +4,24 @@ A cross-platform browser experiment built with Kotlin Multiplatform + Compose Mu
 
 ## Current status
 
-- Android real webpage loading has been manually verified.
+- Android real webpage loading has been manually verified with the previous WebView prototype.
 - Desktop KCEF/Chromium initialization and real webpage loading have been manually verified.
-- Android and desktop Kotlin compilation passes in GitHub Actions.
-- `browser-core` is now a compiled Kotlin Multiplatform module containing the `BrowserEngine` contract and shared `BrowserSessionStore`.
-- Browser-core JVM tests pass in GitHub Actions.
-- The session store supports tab metadata, active-tab selection, bookmarks, history, and exclusion of private-tab visits from history.
+- Android and desktop Kotlin compilation passed in earlier GitHub Actions runs; every subsequent change must be checked against its own CI run.
+- `browser-core` is a Kotlin Multiplatform module containing the platform-neutral `BrowserEngine` contract and shared `BrowserSessionStore`.
+- Browser-core JVM tests cover tab/session metadata behavior.
+- The current UI still uses `compose-webview-multiplatform`; the Android implementation is being re-architected around GeckoView and native per-tab sessions.
+- GeckoView is the selected Android engine direction. Its dependency and native adapter have not yet been integrated.
 
-The current CMP UI still uses `compose-webview-multiplatform` directly. Concrete per-platform `BrowserEngine` adapters and full UI integration with independent tab engine instances are the next implementation step.
+## Platform direction
+
+| Platform | Engine direction | Priority |
+| --- | --- | --- |
+| Android | GeckoView | First |
+| iOS | WKWebView | Later |
+| HarmonyOS | ArkWeb | Later |
+| Desktop | KCEF / Chromium | Later |
+
+Shared Compose UI does not imply a shared browser engine. Native rendering, navigation delegates, request interception, downloads, file chooser, website permissions and extension runtime are implemented by platform adapters.
 
 ## Toolchain
 
@@ -35,8 +45,8 @@ See `docs/HARMONYOS.md`. The HarmonyOS app host and CPF-specific build pipeline 
 
 ## Architecture
 
-See `docs/ARCHITECTURE.md`.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for engine ownership, lifecycle rules, platform capabilities, extension architecture and implementation milestones. See [`docs/GECKOVIEW_ANDROID_PLAN.md`](docs/GECKOVIEW_ANDROID_PLAN.md) for the Android-first execution plan.
 
 ## Known gaps
 
-This is an experiment, not a production browser. Full engine-adapter integration, independent live tab instances, complete iOS hosting, HarmonyOS integration, bookmarks/history UI, downloads, private profiles and policies, request filtering, extension support, crash recovery, and production Chromium packaging/update strategy remain incomplete.
+This is an experiment, not a production browser. The GeckoView dependency/adapter, independent live tab sessions, complete iOS hosting, HarmonyOS integration, bookmarks/history persistence and UI, downloads, private-profile isolation, request filtering, extension manager, crash recovery and production engine update strategy remain incomplete.
