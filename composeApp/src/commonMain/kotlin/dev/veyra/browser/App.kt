@@ -22,7 +22,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +52,22 @@ fun App() {
     var showBrowser by remember { mutableStateOf(false) }
     val webState = rememberWebViewState("https://www.baidu.com")
     val navigator = rememberWebViewNavigator()
+    val engine = remember(navigator) {
+        WebViewBrowserEngine(
+            load = { navigator.loadUrl(it) },
+            back = { navigator.navigateBack() },
+            forward = { navigator.navigateForward() },
+            refresh = { navigator.reload() },
+            stop = { navigator.stopLoading() },
+        )
+    }
+    val engineState by engine.state.collectAsState()
+    LaunchedEffect(navigator.canGoBack, navigator.canGoForward) {
+        engine.publish(
+            canGoBack = navigator.canGoBack,
+            canGoForward = navigator.canGoForward,
+        )
+    }
 
     fun openAddress(raw: String) {
         val value = raw.trim()
@@ -61,7 +79,8 @@ fun App() {
         }
         address = target
         showBrowser = true
-        navigator.loadUrl(target)
+        engine.loadUrl(target)
+        engine.publish(url = target, canGoBack = navigator.canGoBack, canGoForward = navigator.canGoForward)
     }
 
     MaterialTheme {
@@ -105,9 +124,9 @@ fun App() {
                 if (showBrowser) {
                     Spacer(Modifier.height(12.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ToolText("‹", navigator.canGoBack) { navigator.navigateBack() }
-                        ToolText("›", navigator.canGoForward) { navigator.navigateForward() }
-                        ToolText("↻", true) { navigator.reload() }
+                        ToolText("‹", engineState.canGoBack) { engine.goBack() }
+                        ToolText("›", engineState.canGoForward) { engine.goForward() }
+                        ToolText("↻", true) { engine.reload() }
                         Spacer(Modifier.weight(1f))
                         Text("1 tab", Modifier.padding(6.dp), fontSize = 12.sp, color = Muted)
                     }
