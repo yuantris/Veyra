@@ -22,6 +22,7 @@ kotlin {
             implementation(libs.compose.webview)
         }
         androidMain.dependencies { implementation(libs.androidx.activity.compose) }
+        val desktopMain by getting
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kcef)
