@@ -3,7 +3,6 @@ package dev.veyra.browser.core
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 class BrowserContractsTest {
@@ -45,6 +44,5 @@ class BrowserContractsTest {
         assertEquals(RequestInterceptionScope.NONE, capabilities.requestInterception)
         assertEquals(false, capabilities.webExtensions)
         assertEquals(false, capabilities.privateProfiles)
-        assertIs<NavigationDecision.Cancel>(NavigationDecision.Cancel)
     }
 }
