@@ -86,11 +86,11 @@ class BrowserEngineManager(
         }
     }
 
-    /** Closes every tab even if one platform adapter fails to release its resources. */
     private fun publishEngines() {
         _registeredEngines.value = engines.toMap()
     }
 
+    /** Closes every tab even if one platform adapter fails to release its resources. */
     suspend fun closeAll() {
         val failures = mutableListOf<Throwable>()
         val tabIds = mutex.withLock { engines.keys.toList() }
