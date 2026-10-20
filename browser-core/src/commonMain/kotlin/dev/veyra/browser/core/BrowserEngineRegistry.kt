@@ -34,6 +34,7 @@ class BrowserEngineRegistry {
         if (current === engine) return
 
         if (current != null) {
+            engines.remove(tabId)
             current.dispose()
         }
         engines[tabId] = engine
@@ -47,8 +48,6 @@ class BrowserEngineRegistry {
      */
     fun detachSurface(tabId: TabId) {
         // Keep the native session registered; this is intentionally not a disposal boundary.
-        @Suppress("UNUSED_VARIABLE")
-        val retained = engines[tabId]
     }
 
     /**
