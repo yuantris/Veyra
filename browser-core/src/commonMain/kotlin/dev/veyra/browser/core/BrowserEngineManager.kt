@@ -24,7 +24,7 @@ class BrowserEngineManager(
     private val closingTabs = mutableSetOf<TabId>()
 
     val size: Int
-        get() = engines.size
+        get() = _registeredEngines.value.size
 
     suspend fun openTab(request: BrowserEngineCreateRequest): BrowserEngineContract =
         mutex.withLock {
@@ -69,16 +69,20 @@ class BrowserEngineManager(
         // Intentionally no-op: session ownership is not tied to surface attachment.
     }
 
-    suspend fun closeTab(tabId: TabId): Boolean = mutex.withLock {
-        if (tabId in closingTabs) return@withLock false
-        val engine = engines.remove(tabId) ?: return@withLock false
-        publishEngines()
-        closingTabs += tabId
-        try {
+    suspend fun closeTab(tabId: TabId): Boolean {
+        val engine = mutex.withLock {
+            if (tabId in closingTabs) return false
+            val owned = engines.remove(tabId) ?: return false
+            closingTabs += tabId
+            publishEngines()
+            owned
+        }
+
+        return try {
             engine.close()
             true
         } finally {
-            closingTabs -= tabId
+            mutex.withLock { closingTabs -= tabId }
         }
     }
 
