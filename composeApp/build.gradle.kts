@@ -14,6 +14,7 @@ kotlin {
     jvm("desktop")
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":browser-core"))
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)
