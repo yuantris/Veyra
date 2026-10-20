@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -289,7 +290,7 @@ private fun BrowserTabHost(
     WebView(
         state = webState,
         navigator = navigator,
-        modifier = Modifier.fillMaxSize().alpha(if (active) 1f else 0f),
+        modifier = Modifier.fillMaxSize().zIndex(if (active) 1f else -1f).alpha(if (active) 1f else 0f),
     )
 }
 
