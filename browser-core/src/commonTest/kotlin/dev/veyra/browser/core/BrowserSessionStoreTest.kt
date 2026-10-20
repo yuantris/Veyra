@@ -55,8 +55,6 @@ class BrowserSessionStoreTest {
         assertTrue(store.removeBookmark("https://example.com"))
         assertFalse(store.removeBookmark("https://example.com"))
     }
-}
-
 
     @Test
     fun closingActiveTabSelectsTheNearestRemainingTab() {
