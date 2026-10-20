@@ -2,7 +2,7 @@
 agp = "8.11.2"
 kotlin = "2.2.21"
 compose = "1.9.2"
-composeWebView = "2.0.4"
+composeWebView = "2.0.3"
 kcef = "2024.04.20.4"
 androidx-activity = "1.11.0"
 android-compileSdk = "36"

@@ -20,7 +20,6 @@ import com.multiplatform.webview.util.addTempDirectoryRemovalHook
 import dev.datlag.kcef.KCEF
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 fun main() = application {
     addTempDirectoryRemovalHook()
@@ -31,12 +30,12 @@ fun main() = application {
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 KCEF.init(builder = {
-                    installDir(File("kcef-bundle"))
+                    installDir(AppPaths.cefRuntime)
                     progress {
                         onDownloading { progress = it.coerceAtLeast(0f) }
                         onInitialized { initialized = true }
                     }
-                    settings { cachePath = File("veyra-cache").absolutePath }
+                    settings { cachePath = AppPaths.chromiumCache.absolutePath }
                 }, onError = { it?.printStackTrace() }, onRestartRequired = { restartRequired = true })
             }
         }

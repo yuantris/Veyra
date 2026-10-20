@@ -4,6 +4,12 @@ build/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 
+# 运行时数据已迁到用户数据目录（%LOCALAPPDATA%\Veyra 等），见 AppPaths.kt。
+# 下面两条仅作兜底，防止旧版本或误用相对路径时把 575MB 的 CEF 运行时提交上来。
+**/kcef-bundle/
+**/veyra-cache/
+**/chromium-cache/
+
 # IDE
 .idea/
 *.iml
@@ -27,3 +33,7 @@ captures/
 **/oh_modules/
 **/build-profile.json5
 **/local.properties
+
+.kotlin/
+/.workbuddy/
+/.github/

@@ -56,7 +56,7 @@ fun App() {
         if (value.isBlank()) return
         val target = when {
             value.startsWith("https://", true) || value.startsWith("http://", true) -> value
-            value.contains(" ") || !value.contains(".") -> "https://www.google.com/search?q=" + value.replace(" ", "+")
+            value.contains(" ") || !value.contains(".") -> "https://www.baidu.com/search?q=" + value.replace(" ", "+")
             else -> "https://$value"
         }
         address = target
