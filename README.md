@@ -2,44 +2,41 @@
 
 A cross-platform browser experiment built with Kotlin Multiplatform + Compose Multiplatform.
 
-The first milestone is to prove a shared CMP browser shell and real web content on Android, iOS and desktop. HarmonyOS is planned through CPF-KMP-CMP and ArkWeb.
+## Current status
 
-## Current prototype
+- Android real webpage loading has been manually verified.
+- Desktop KCEF/Chromium initialization and real webpage loading have been manually verified.
+- Android and desktop Kotlin compilation passes in GitHub Actions.
+- `browser-core` is now a compiled Kotlin Multiplatform module containing the `BrowserEngine` contract and shared `BrowserSessionStore`.
+- Browser-core JVM tests pass in GitHub Actions.
+- The session store supports tab metadata, active-tab selection, bookmarks, history, and exclusion of private-tab visits from history.
 
-- Shared CMP home screen and address bar.
-- URL entry, search fallback and quick links.
-- Basic back/forward/reload controls.
-- compose-webview-multiplatform for Android WebView, iOS WKWebView and desktop KCEF/Chromium.
-- Architecture notes for the later HarmonyOS adapter.
+The current CMP UI still uses `compose-webview-multiplatform` directly. Concrete per-platform `BrowserEngine` adapters and full UI integration with independent tab engine instances are the next implementation step.
 
 ## Toolchain
 
 - Kotlin 2.2.21
 - Compose Multiplatform 1.9.2
 - Android Gradle Plugin 8.11.2
-- Gradle 8.14.x
-- JDK 17 recommended
-
-These versions are a starting point aligned with the current CPF ecosystem; verify local toolchain and artifact availability before upgrading.
+- Gradle Wrapper 8.14.x
+- JDK 17
 
 ## Run
 
 1. Clone this repository and open its root in Android Studio.
 2. Use JDK 17 as the Gradle JDK and sync.
-3. Run :composeApp:assembleDebug for Android.
-4. Run the desktop target on Windows/macOS/Linux. First launch initializes the KCEF runtime, so allow network access and wait for initialization.
-5. For iOS, open an Xcode host project and link the Veyra framework. A complete Xcode host project is not included yet.
-
-The repository does not yet contain the Gradle wrapper JAR or a complete iOS/HarmonyOS host project. If Gradle is installed locally, generate the wrapper using gradle wrapper --gradle-version 8.14.3.
+3. Run `./gradlew :composeApp:assembleDebug` on macOS/Linux or `gradlew.bat :composeApp:assembleDebug` on Windows.
+4. Run the desktop target on Windows/macOS/Linux. On first launch, KCEF initializes its Chromium runtime; allow network access and wait for initialization.
+5. For iOS, an Xcode host project still needs to be created and linked to the Veyra framework.
 
 ## HarmonyOS
 
-See docs/HARMONYOS.md. The HarmonyOS app host and CPF-specific build pipeline are not yet included in this first commit.
+See `docs/HARMONYOS.md`. The HarmonyOS app host and CPF-specific build pipeline are not included yet.
 
 ## Architecture
 
-See docs/ARCHITECTURE.md.
+See `docs/ARCHITECTURE.md`.
 
 ## Known gaps
 
-This is an experiment, not a production browser. Tabs/sessions, bookmarks, history, downloads, private profiles, cookie policy, request filtering, extension support, crash recovery, and full Chromium packaging/update strategy are not implemented yet.
+This is an experiment, not a production browser. Full engine-adapter integration, independent live tab instances, complete iOS hosting, HarmonyOS integration, bookmarks/history UI, downloads, private profiles and policies, request filtering, extension support, crash recovery, and production Chromium packaging/update strategy remain incomplete.
