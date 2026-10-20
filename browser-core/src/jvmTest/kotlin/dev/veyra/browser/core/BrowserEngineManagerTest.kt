@@ -73,6 +73,22 @@ class BrowserEngineManagerTest {
         assertEquals(1, (second as FakeEngine).closeCount)
     }
 
+    @Test
+    fun shutdownRejectsLateTabCreation() = runBlocking {
+        val factory = FakeFactory()
+        val manager = BrowserEngineManager(factory)
+        manager.openTab(BrowserEngineCreateRequest(TabId("tab-1"), ProfileId("default")))
+        manager.closeAll()
+
+        val failure = runCatching {
+            manager.openTab(BrowserEngineCreateRequest(TabId("tab-2"), ProfileId("default")))
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalStateException)
+        assertEquals(1, factory.createCount)
+        assertEquals(0, manager.size)
+    }
+
     private class FakeFactory : BrowserEngineFactory {
         var createCount = 0
 
