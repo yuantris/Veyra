@@ -29,6 +29,12 @@ data class BrowserEngineState(
 )
 
 data class BrowserError(
+    /** Stable legacy identifier retained while adapters migrate to [category]. */
     val code: String,
     val message: String,
+    val category: BrowserErrorCategory = BrowserErrorCategory.UNKNOWN,
+    val nativeCode: String? = null,
+    val failingUrl: String? = null,
+    val isMainFrame: Boolean? = null,
+    val isRecoverable: Boolean = true,
 )
