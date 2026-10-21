@@ -103,11 +103,13 @@ The adapter emits normalized lifecycle events for navigations that actually proc
 
 ## 8. Capability reporting
 
-The current Compose WebView adapter remains conservative:
-- navigation policy: unsupported until pre-navigation cancellation is proven;
-- request interception: `NONE` unless a separate resource callback is verified;
-- private profiles: unsupported;
-- session restore: unsupported.
+The current Compose WebView adapter reports capabilities per target:
+- Android: `navigationPolicy = true` for the synchronous URL interception path and `requestInterception = MAIN_FRAME_NAVIGATION`; this is not broad resource interception.
+- iOS: `navigationPolicy = false` and `requestInterception = NONE` because the pinned adapter source does not wire `navigator.requestInterceptor` into a WKNavigationDelegate decision callback.
+- Desktop/KCEF: `navigationPolicy = false` and `requestInterception = NONE` because the pinned Desktop adapter does not wire the common `requestInterceptor` into a CEF request handler.
+- private profiles and session restore: unsupported on all three targets in the current adapter.
+
+These are capability declarations for the currently wired implementation, not a claim that the underlying native engines cannot support the feature. Android's policy flag must remain covered by integration tests that prove Reject blocks a main-frame load.
 
 Observing a URL change is state synchronization, not navigation interception. A working address-bar navigation path is also not proof that in-page navigation is governed by policy.
 
@@ -134,14 +136,14 @@ Observing a URL change is state synchronization, not navigation interception. A 
 
 ## 11. Verified dependency constraints (compose-webview-multiplatform 2.0.3)
 
-The pinned library source confirms that `RequestInterceptor.onInterceptUrlRequest` is synchronous and returns one of `WebRequestInterceptResult.Allow`, `Reject`, or `Modify`. `WebRequest` provides `isForMainFrame`, `isRedirect`, and `method`. The library README states that this request interceptor is supported on Android and iOS only; it does not establish equivalent Desktop enforcement.
+The pinned library source confirms that `RequestInterceptor.onInterceptUrlRequest` is synchronous and returns one of `WebRequestInterceptResult.Allow`, `Reject`, or `Modify`. `WebRequest` provides `isForMainFrame`, `isRedirect`, and `method`. In the inspected platform source, Android's `AccompanistWebViewClient.shouldOverrideUrlLoading` invokes the interceptor and maps `Reject` to native cancellation. The inspected iOS `IOSWebView` and Desktop `DesktopWebView` implementations do not wire the navigator interceptor into equivalent native navigation-decision callbacks.
 
 Consequences:
 - A suspend `NavigationPolicyHandler` cannot be called directly from this native callback without blocking the callback thread. Blocking is prohibited.
 - The core navigation decision used by the native callback must be synchronous and fast. It should perform deterministic policy checks only.
 - Any future decision requiring asynchronous user interaction or remote work must be a separate defer/cancel/reissue flow, with explicit limitations for POST bodies, headers, user gestures and redirect semantics. It must not be smuggled into this synchronous contract.
 - The interceptor sees resource requests as well as main-frame requests. The adapter must inspect `isForMainFrame`; subresource requests must not be routed through top-level navigation policy.
-- The shared API can be present in common code, but capability reporting must be platform-specific. Android/iOS can advertise navigation interception only after integration tests; Desktop must remain unsupported unless its native KCEF/CEF handler is wired and tested independently.
+- The shared API can be present in common code, but capability reporting must be platform-specific. The current implementation advertises the URL-interceptor path only on Android; iOS and Desktop remain unsupported until their native delegates/handlers are wired and tested independently.
 - Request interception and navigation policy remain separate capability claims even if they share the library callback.
 
 ## 12. Updated implementation order
