@@ -102,7 +102,7 @@ class BrowserController(
             ?: return NavigationDecision.Cancel
         val decision = navigationCoordinator.decide(request)
         if (decision == NavigationDecision.Allow) {
-            // Policy evaluation suspends; the tab may have been closed/replaced meanwhile.
+            // Re-check ownership before dispatch in case another caller closed/replaced the tab.
             if (engineManager.get(request.tabId) !== engine) return NavigationDecision.Cancel
             engine.navigate(request)
         }
