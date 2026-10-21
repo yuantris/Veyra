@@ -182,6 +182,7 @@ internal class ComposeWebViewEngine(
         }
         activeNavigationId = null
         activeNavigationUrl = null
+        activeNavigationPreviousUrl = null
         activeNavigationCommitted = false
         mutablePageState.value = mutablePageState.value.copy(
             loadPhase = BrowserLoadPhase.STOPPED,
@@ -277,6 +278,7 @@ internal class ComposeWebViewEngine(
             }
             activeNavigationId = null
             activeNavigationUrl = null
+            activeNavigationPreviousUrl = null
             activeNavigationCommitted = false
             mutablePageState.value = mutablePageState.value.copy(navigationId = null)
         }
