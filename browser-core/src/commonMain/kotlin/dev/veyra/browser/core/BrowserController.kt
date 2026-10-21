@@ -109,6 +109,18 @@ class BrowserController(
         return decision
     }
 
+    /**
+     * Evaluates a navigation initiated by the native page surface without dispatching a second
+     * navigation command. The platform callback must continue or cancel its original request
+     * according to this result.
+     */
+    fun decideSurfaceNavigation(request: NavigationRequest): NavigationDecision {
+        val engine = engineManager.get(request.tabId) ?: return NavigationDecision.Cancel
+        val decision = navigationCoordinator.decide(request)
+        if (engineManager.get(request.tabId) !== engine) return NavigationDecision.Cancel
+        return decision
+    }
+
     fun goBack(tabId: TabId): Boolean = engineManager.get(tabId)?.let {
         it.goBack()
         true
