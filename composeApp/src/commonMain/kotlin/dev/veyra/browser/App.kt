@@ -378,40 +378,12 @@ private fun BrowserTabHost(
     val webState = rememberWebViewState(engine.pageState.value.url)
     val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
     val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
-    val requestInterceptor = remember(engine) {
-        object : RequestInterceptor {
-            override fun onInterceptUrlRequest(
-                request: WebRequest,
-                navigator: com.multiplatform.webview.web.WebViewNavigator,
-            ): WebRequestInterceptResult {
-                // The library invokes this for resource requests too. Only top-level document
-                // navigations belong to BrowserNavigationCoordinator.
-                if (!request.isForMainFrame) return WebRequestInterceptResult.Allow
-
-                val source = if (request.isRedirect) NavigationSource.REDIRECT else NavigationSource.PAGE
-                return when (
-                    val decision = currentOnNavigationRequest(
-                        NavigationRequest(
-                            tabId = TabId(tab.id),
-                            url = request.url,
-                            source = source,
-                            isMainFrame = true,
-                        ),
-                    )
-                ) {
-                    NavigationDecision.Allow -> WebRequestInterceptResult.Allow
-                    NavigationDecision.Cancel -> WebRequestInterceptResult.Reject
-                    is NavigationDecision.OpenExternal -> {
-                        currentOnNavigationDecision(decision)
-                        WebRequestInterceptResult.Reject
-                    }
-                    is NavigationDecision.OpenInNewTab -> {
-                        currentOnNavigationDecision(decision)
-                        WebRequestInterceptResult.Reject
-                    }
-                }
-            }
-        }
+    val requestInterceptor = remember(engine, tab.id) {
+        BrowserNavigationRequestInterceptor(
+            tabId = TabId(tab.id),
+            onNavigationRequest = { currentOnNavigationRequest(it) },
+            onNavigationDecision = { currentOnNavigationDecision(it) },
+        )
     }
     val navigator = rememberWebViewNavigator(requestInterceptor = requestInterceptor)
     val surface = remember(navigator) {
