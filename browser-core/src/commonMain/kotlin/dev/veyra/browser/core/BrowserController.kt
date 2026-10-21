@@ -52,11 +52,35 @@ class BrowserController(
             )
             if (eventJobs[tabId] == null) {
                 eventJobs[tabId] = scope.launch {
+                    // Navigation IDs are opaque. Keep the latest started ID local to this
+                    // subscription so late commit/finish callbacks from an older page are dropped.
+                    var activeNavigationId: NavigationId? = null
                     engine.events.collect { event ->
-                        // A delayed callback from an engine that no longer owns this tab is ignored.
-                        if (engineManager.get(tabId) === engine && event.tabId == tabId) {
-                            eventHub.publish(event)
+                        if (engineManager.get(tabId) !== engine || event.tabId != tabId) {
+                            return@collect
                         }
+
+                        val isCurrentNavigationEvent = when (event) {
+                            is BrowserEvent.NavigationStarted -> {
+                                activeNavigationId = event.navigationId
+                                true
+                            }
+                            is BrowserEvent.NavigationCommitted ->
+                                event.navigationId == activeNavigationId
+                            is BrowserEvent.NavigationCompleted -> {
+                                val matches = event.navigationId == activeNavigationId
+                                if (matches) activeNavigationId = null
+                                matches
+                            }
+                            is BrowserEvent.NavigationFailed -> {
+                                val matches = event.navigationId == null ||
+                                    event.navigationId == activeNavigationId
+                                if (matches && event.navigationId != null) activeNavigationId = null
+                                matches
+                            }
+                            else -> true
+                        }
+                        if (isCurrentNavigationEvent) eventHub.publish(event)
                     }
                 }
             }
@@ -75,6 +99,8 @@ class BrowserController(
             ?: return NavigationDecision.Cancel
         val decision = navigationCoordinator.decide(request)
         if (decision == NavigationDecision.Allow) {
+            // Policy evaluation suspends; the tab may have been closed/replaced meanwhile.
+            if (engineManager.get(request.tabId) !== engine) return NavigationDecision.Cancel
             engine.navigate(request)
         }
         return decision
