@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -53,8 +54,12 @@ import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
+import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
+import com.multiplatform.webview.request.RequestInterceptor
+import com.multiplatform.webview.request.WebRequest
+import com.multiplatform.webview.request.WebRequestInterceptResult
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
@@ -68,6 +73,7 @@ private val Accent = Color(0xFF496BEB)
 @Composable
 fun App() {
     val session = remember { BrowserSessionStore() }
+    val uriHandler = LocalUriHandler.current
     val sessionState by session.state.collectAsState()
     val controllerScope = rememberCoroutineScope()
     val profileProvider: BrowserProfileProvider = remember { InMemoryBrowserProfileProvider() }
@@ -282,6 +288,35 @@ fun App() {
                                                     session.recordVisit(id, url, title.orEmpty())
                                                 }
                                             },
+                                            onNavigationRequest = controller::decideSurfaceNavigation,
+                                            onNavigationDecision = { decision ->
+                                                when (decision) {
+                                                    is NavigationDecision.OpenExternal -> {
+                                                        runCatching { uriHandler.openUri(decision.url) }
+                                                    }
+                                                    is NavigationDecision.OpenInNewTab -> {
+                                                        val newTab = session.openTab(url = "about:blank")
+                                                        showBrowser = true
+                                                        controllerScope.launch {
+                                                            val newTabId = TabId(newTab.id)
+                                                            controller.openTab(
+                                                                newTabId,
+                                                                ProfileId("default"),
+                                                                "about:blank",
+                                                            )
+                                                            controller.navigate(
+                                                                NavigationRequest(
+                                                                    newTabId,
+                                                                    decision.url,
+                                                                    NavigationSource.PAGE,
+                                                                ),
+                                                            )
+                                                        }
+                                                    }
+                                                    NavigationDecision.Allow,
+                                                    NavigationDecision.Cancel -> Unit
+                                                }
+                                            },
                                         )
                                     }
                                 }
@@ -337,9 +372,46 @@ private fun BrowserTabHost(
     tab: BrowserTab,
     engine: ComposeWebViewEngine,
     onStateChanged: (String, String?, String?, Boolean?, Boolean?, Boolean?) -> Unit,
+    onNavigationRequest: (NavigationRequest) -> NavigationDecision,
+    onNavigationDecision: (NavigationDecision) -> Unit,
 ) {
     val webState = rememberWebViewState(engine.pageState.value.url)
-    val navigator = rememberWebViewNavigator()
+    val requestInterceptor = remember(engine, onNavigationRequest, onNavigationDecision) {
+        object : RequestInterceptor {
+            override fun onInterceptUrlRequest(
+                request: WebRequest,
+                navigator: com.multiplatform.webview.web.WebViewNavigator,
+            ): WebRequestInterceptResult {
+                // The library invokes this for resource requests too. Only top-level document
+                // navigations belong to BrowserNavigationCoordinator.
+                if (!request.isForMainFrame) return WebRequestInterceptResult.Allow
+
+                val source = if (request.isRedirect) NavigationSource.REDIRECT else NavigationSource.PAGE
+                return when (
+                    val decision = onNavigationRequest(
+                        NavigationRequest(
+                            tabId = TabId(tab.id),
+                            url = request.url,
+                            source = source,
+                            isMainFrame = true,
+                        ),
+                    )
+                ) {
+                    NavigationDecision.Allow -> WebRequestInterceptResult.Allow
+                    NavigationDecision.Cancel -> WebRequestInterceptResult.Reject
+                    is NavigationDecision.OpenExternal -> {
+                        onNavigationDecision(decision)
+                        WebRequestInterceptResult.Reject
+                    }
+                    is NavigationDecision.OpenInNewTab -> {
+                        onNavigationDecision(decision)
+                        WebRequestInterceptResult.Reject
+                    }
+                }
+            }
+        }
+    }
+    val navigator = rememberWebViewNavigator(requestInterceptor = requestInterceptor)
     val surface = remember(navigator) {
         object : BrowserSurfacePort {
             override fun loadUrl(url: String) { navigator.loadUrl(url) }
