@@ -17,7 +17,7 @@ class BrowserEventHub(
     extraBufferCapacity: Int = DEFAULT_EXTRA_BUFFER_CAPACITY,
 ) {
     init {
-        require(extraBufferCapacity >= 0) { "Buffer capacity cannot be negative." }
+        require(extraBufferCapacity > 0) { "Buffer capacity must be positive when using DROP_OLDEST." }
     }
 
     private val mutableEvents = MutableSharedFlow<BrowserEvent>(
