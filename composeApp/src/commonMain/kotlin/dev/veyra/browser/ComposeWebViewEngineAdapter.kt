@@ -76,6 +76,7 @@ internal class ComposeWebViewEngine(
     private var navigationCounter = 0L
     private var activeNavigationId: NavigationId? = null
     private var activeNavigationUrl: String? = null
+    private var activeNavigationPreviousUrl: String? = null
     private var activeNavigationCommitted = false
     private var closed = false
 
@@ -88,6 +89,7 @@ internal class ComposeWebViewEngine(
             val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
             activeNavigationId = navigationId
             activeNavigationUrl = initialUrl
+            activeNavigationPreviousUrl = null
             activeNavigationCommitted = false
             mutablePageState.value = mutablePageState.value.copy(
                 loadPhase = BrowserLoadPhase.STARTING,
@@ -112,9 +114,11 @@ internal class ComposeWebViewEngine(
         if (target.isEmpty()) return
 
         initialNavigationPending = false
+        val previousUrl = mutablePageState.value.url
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
         activeNavigationUrl = target
+        activeNavigationPreviousUrl = previousUrl
         activeNavigationCommitted = false
         mutablePageState.value = mutablePageState.value.copy(
             url = target,
@@ -145,6 +149,7 @@ internal class ComposeWebViewEngine(
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
         activeNavigationUrl = currentUrl
+        activeNavigationPreviousUrl = currentUrl
         activeNavigationCommitted = false
         mutablePageState.value = mutablePageState.value.copy(
             loadPhase = BrowserLoadPhase.STARTING,
@@ -204,6 +209,7 @@ internal class ComposeWebViewEngine(
             navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
             activeNavigationId = navigationId
             activeNavigationUrl = observedUrl
+            activeNavigationPreviousUrl = previous.url
             activeNavigationCommitted = false
             mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, observedUrl))
         }
@@ -218,8 +224,10 @@ internal class ComposeWebViewEngine(
         } else {
             null
         }
-        val observedUrlMatchesNavigation = activeNavigationUrl == null ||
-            observedUrl == activeNavigationUrl
+        // A redirect is a valid commit too. Ignore only the old page URL while a requested
+        // navigation is still waiting for its target/redirect to appear.
+        val observedUrlMatchesNavigation = activeNavigationPreviousUrl == null ||
+            observedUrl != activeNavigationPreviousUrl || observedUrl == activeNavigationUrl
         val stateUrl = if (
             activeNavigationId != null && !activeNavigationCommitted && !observedUrlMatchesNavigation
         ) {
@@ -258,6 +266,7 @@ internal class ComposeWebViewEngine(
             mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, error))
             activeNavigationId = null
             activeNavigationUrl = null
+            activeNavigationPreviousUrl = null
             activeNavigationCommitted = false
         } else if (!isLoading && activeNavigationCommitted) {
             val completedNavigationId = activeNavigationId
@@ -281,6 +290,7 @@ internal class ComposeWebViewEngine(
         initialNavigationPending = false
         activeNavigationId = null
         activeNavigationUrl = null
+        activeNavigationPreviousUrl = null
         activeNavigationCommitted = false
     }
 }
