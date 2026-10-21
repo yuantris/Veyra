@@ -31,6 +31,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -375,7 +376,9 @@ private fun BrowserTabHost(
     onNavigationDecision: (NavigationDecision) -> Unit,
 ) {
     val webState = rememberWebViewState(engine.pageState.value.url)
-    val requestInterceptor = remember(engine, onNavigationRequest, onNavigationDecision) {
+    val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
+    val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
+    val requestInterceptor = remember(engine) {
         object : RequestInterceptor {
             override fun onInterceptUrlRequest(
                 request: WebRequest,
@@ -387,7 +390,7 @@ private fun BrowserTabHost(
 
                 val source = if (request.isRedirect) NavigationSource.REDIRECT else NavigationSource.PAGE
                 return when (
-                    val decision = onNavigationRequest(
+                    val decision = currentOnNavigationRequest(
                         NavigationRequest(
                             tabId = TabId(tab.id),
                             url = request.url,
@@ -399,11 +402,11 @@ private fun BrowserTabHost(
                     NavigationDecision.Allow -> WebRequestInterceptResult.Allow
                     NavigationDecision.Cancel -> WebRequestInterceptResult.Reject
                     is NavigationDecision.OpenExternal -> {
-                        onNavigationDecision(decision)
+                        currentOnNavigationDecision(decision)
                         WebRequestInterceptResult.Reject
                     }
                     is NavigationDecision.OpenInNewTab -> {
-                        onNavigationDecision(decision)
+                        currentOnNavigationDecision(decision)
                         WebRequestInterceptResult.Reject
                     }
                 }
