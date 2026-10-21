@@ -72,6 +72,7 @@ internal class ComposeWebViewEngine(
 
     private var surface: BrowserSurfacePort? = null
     private var pendingUrl: String? = null
+    private var initialNavigationPending = request.initialUrl != "about:blank"
     private var navigationCounter = 0L
     private var activeNavigationId: NavigationId? = null
     private var activeNavigationUrl: String? = null
@@ -81,6 +82,20 @@ internal class ComposeWebViewEngine(
     fun attachSurface(newSurface: BrowserSurfacePort) {
         check(!closed) { "Cannot attach a surface to a closed browser engine." }
         surface = newSurface
+        if (initialNavigationPending) {
+            initialNavigationPending = false
+            val initialUrl = mutablePageState.value.url
+            val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
+            activeNavigationId = navigationId
+            activeNavigationUrl = initialUrl
+            activeNavigationCommitted = false
+            mutablePageState.value = mutablePageState.value.copy(
+                loadPhase = BrowserLoadPhase.STARTING,
+                progress = 0,
+                navigationId = navigationId,
+            )
+            mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, initialUrl))
+        }
         pendingUrl?.let { url ->
             pendingUrl = null
             newSurface.loadUrl(url)
@@ -96,6 +111,7 @@ internal class ComposeWebViewEngine(
         val target = request.url.trim()
         if (target.isEmpty()) return
 
+        initialNavigationPending = false
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
         activeNavigationUrl = target
@@ -124,6 +140,7 @@ internal class ComposeWebViewEngine(
 
     override fun reload() {
         if (closed) return
+        initialNavigationPending = false
         val currentUrl = mutablePageState.value.url
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
@@ -261,6 +278,7 @@ internal class ComposeWebViewEngine(
         closed = true
         surface = null
         pendingUrl = null
+        initialNavigationPending = false
         activeNavigationId = null
         activeNavigationUrl = null
         activeNavigationCommitted = false
