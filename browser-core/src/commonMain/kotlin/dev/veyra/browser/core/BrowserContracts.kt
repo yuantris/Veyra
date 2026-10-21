@@ -218,7 +218,8 @@ sealed interface ResourceDecision {
 }
 
 interface NavigationPolicyHandler {
-    suspend fun decide(request: NavigationRequest): NavigationDecision
+    /** Must be fast and non-blocking: native navigation callbacks may be synchronous. */
+    fun decide(request: NavigationRequest): NavigationDecision
 }
 
 sealed interface NavigationDecision {
