@@ -22,5 +22,5 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
-      - name: Run browser core tests
-        run: bash gradlew :browser-core:jvmTest --stacktrace
+      - name: Run browser core and app adapter tests
+        run: bash gradlew :browser-core:jvmTest :composeApp:desktopTest --stacktrace
