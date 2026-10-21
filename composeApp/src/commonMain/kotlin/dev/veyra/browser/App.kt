@@ -2,6 +2,7 @@ package dev.veyra.browser
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +41,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import dev.veyra.browser.core.BrowserController
 import dev.veyra.browser.core.BrowserEngineManager
 import dev.veyra.browser.core.BrowserEventHub
@@ -81,7 +84,6 @@ fun App() {
     var address by remember { mutableStateOf(session.activeTab?.url.orEmpty()) }
     var showBrowser by remember { mutableStateOf(false) }
     val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
-    val activeEngine = activeTab?.let { engines[TabId(it.id)] as? ComposeWebViewEngine }
 
     LaunchedEffect(sessionState.tabs) {
         val liveTabIds = sessionState.tabs.map { TabId(it.id) }.toSet()
@@ -250,28 +252,40 @@ fun App() {
                     }
 
                     Box(Modifier.fillMaxWidth().weight(1f)) {
-                        activeTab?.let { tab ->
-                            activeEngine?.let { engine ->
-                                BrowserTabHost(
-                                    tab = tab,
-                                    engine = engine,
-                                    onStateChanged = { id, url, title, loading, back, forward ->
-                                        session.updateTab(
-                                            tabId = id,
-                                            url = url,
-                                            title = title,
-                                            isLoading = loading,
-                                            canGoBack = back,
-                                            canGoForward = forward,
+                        // Keep every tab's native WebView composed. Only the selected surface is
+                        // visible/on top, so switching tabs does not destroy its native history.
+                        sessionState.tabs.forEach { tab ->
+                            val selected = tab.id == sessionState.activeTabId
+                            val engine = engines[TabId(tab.id)] as? ComposeWebViewEngine
+                            if (engine != null) {
+                                key(tab.id) {
+                                    Box(
+                                        Modifier.fillMaxSize()
+                                            .alpha(if (selected) 1f else 0f)
+                                            .zIndex(if (selected) 1f else 0f),
+                                    ) {
+                                        BrowserTabHost(
+                                            tab = tab,
+                                            engine = engine,
+                                            onStateChanged = { id, url, title, loading, back, forward ->
+                                                session.updateTab(
+                                                    tabId = id,
+                                                    url = url,
+                                                    title = title,
+                                                    isLoading = loading,
+                                                    canGoBack = back,
+                                                    canGoForward = forward,
+                                                )
+                                                if (id == session.state.value.activeTabId && !url.isNullOrBlank()) {
+                                                    address = url
+                                                }
+                                                if (!url.isNullOrBlank() && url != "about:blank") {
+                                                    session.recordVisit(id, url, title.orEmpty())
+                                                }
+                                            },
                                         )
-                                        if (id == session.state.value.activeTabId && !url.isNullOrBlank()) {
-                                            address = url
-                                        }
-                                        if (!url.isNullOrBlank() && url != "about:blank") {
-                                            session.recordVisit(id, url, title.orEmpty())
-                                        }
-                                    },
-                                )
+                                    }
+                                }
                             }
                         }
                     }
