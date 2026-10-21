@@ -64,11 +64,7 @@ internal class ComposeWebViewEngine(
     private val mutableEvents = MutableSharedFlow<BrowserEvent>(extraBufferCapacity = 64)
     override val events: Flow<BrowserEvent> = mutableEvents.asSharedFlow()
 
-    override val capabilities = BrowserCapabilities(
-        navigationPolicy = false,
-        privateProfiles = false,
-        sessionRestore = false,
-    )
+    override val capabilities: BrowserCapabilities = composeWebViewPlatformCapabilities()
 
     private var surface: BrowserSurfacePort? = null
     private var pendingUrl: String? = null
