@@ -118,6 +118,19 @@ class BrowserControllerTest {
             ),
         )
         assertEquals(0, engine.navigateCount)
+        // Subframe navigation is not a top-level tab navigation and must bypass this policy.
+        assertEquals(
+            NavigationDecision.Allow,
+            controller.decideSurfaceNavigation(
+                NavigationRequest(
+                    tabId = TabId("tab-1"),
+                    url = "mailto:resource@example.com",
+                    source = NavigationSource.PAGE,
+                    isMainFrame = false,
+                ),
+            ),
+        )
+        assertEquals(0, engine.navigateCount)
         assertEquals(
             NavigationDecision.Cancel,
             controller.decideSurfaceNavigation(
