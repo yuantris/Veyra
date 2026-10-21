@@ -116,6 +116,10 @@ class BrowserController(
      */
     fun decideSurfaceNavigation(request: NavigationRequest): NavigationDecision {
         val engine = engineManager.get(request.tabId) ?: return NavigationDecision.Cancel
+        // This entry point governs top-level document navigation only. Subframes and resources
+        // are handled by their own adapter/security policy and must not be mistaken for a tab
+        // navigation merely because a platform callback surfaced them here.
+        if (!request.isMainFrame) return NavigationDecision.Allow
         val decision = navigationCoordinator.decide(request)
         if (engineManager.get(request.tabId) !== engine) return NavigationDecision.Cancel
         return decision
