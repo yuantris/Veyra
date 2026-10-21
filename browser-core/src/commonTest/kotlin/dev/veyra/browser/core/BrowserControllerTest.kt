@@ -1,16 +1,19 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -24,7 +27,7 @@ class BrowserControllerTest {
         val factory = FakeFactory()
         val manager = BrowserEngineManager(factory)
         val profiles = InMemoryBrowserProfileProvider()
-        val scope = CoroutineScope(SupervisorJob())
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         val controller = BrowserController(
             manager,
             profiles,
@@ -103,14 +106,49 @@ class BrowserControllerTest {
         )
         val engine = controller.openTab(TabId("tab-1")) as FakeEngine
         val expected = BrowserEvent.TitleChanged(TabId("tab-1"), "Example")
-        val received = async { hub.events.first() }
-        yield()
+        val received = async(start = CoroutineStart.UNDISPATCHED) { hub.events.first() }
         engine.emit(expected)
         assertEquals(expected, received.await())
 
         assertTrue(controller.closeTab(TabId("tab-1")))
         assertFalse(controller.closeTab(TabId("tab-1")))
         assertNull(controller.registeredEngines.value[TabId("tab-1")])
+        controller.close()
+        scope.cancel()
+    }
+
+    @Test
+    fun dropsLateCompletionFromPreviousNavigation() = runBlocking {
+        val factory = FakeFactory()
+        val hub = BrowserEventHub()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(),
+            hub,
+            scope,
+        )
+        val engine = controller.openTab(TabId("tab-1")) as FakeEngine
+        val received = mutableListOf<BrowserEvent>()
+        val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            hub.events.collect { received += it }
+        }
+        val oldId = NavigationId("old")
+        val currentId = NavigationId("current")
+
+        engine.emit(BrowserEvent.NavigationStarted(TabId("tab-1"), currentId, "https://current.example"))
+        engine.emit(BrowserEvent.NavigationCompleted(TabId("tab-1"), oldId, "https://old.example"))
+        engine.emit(BrowserEvent.NavigationCompleted(TabId("tab-1"), currentId, "https://current.example"))
+
+        assertEquals(
+            listOf(
+                BrowserEvent.NavigationStarted(TabId("tab-1"), currentId, "https://current.example"),
+                BrowserEvent.NavigationCompleted(TabId("tab-1"), currentId, "https://current.example"),
+            ),
+            received,
+        )
+        collector.cancel()
         controller.close()
         scope.cancel()
     }
