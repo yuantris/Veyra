@@ -123,20 +123,49 @@ internal class ComposeWebViewEngine(
     }
 
     override fun reload() {
-        if (!closed) {
-            mutablePageState.value = mutablePageState.value.copy(
-                loadPhase = BrowserLoadPhase.STARTING,
-                progress = 0,
-                error = null,
-            )
-            surface?.reload()
-        }
+        if (closed) return
+        val currentUrl = mutablePageState.value.url
+        val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
+        activeNavigationId = navigationId
+        activeNavigationUrl = currentUrl
+        activeNavigationCommitted = false
+        mutablePageState.value = mutablePageState.value.copy(
+            loadPhase = BrowserLoadPhase.STARTING,
+            progress = 0,
+            navigationId = navigationId,
+            error = null,
+        )
+        mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, currentUrl))
+        val currentSurface = surface
+        if (currentSurface == null) pendingUrl = currentUrl else currentSurface.reload()
     }
 
     override fun stop() {
         if (closed) return
         surface?.stop()
-        mutablePageState.value = mutablePageState.value.copy(loadPhase = BrowserLoadPhase.STOPPED)
+        val navigationId = activeNavigationId
+        if (navigationId != null) {
+            mutableEvents.tryEmit(
+                BrowserEvent.NavigationFailed(
+                    tabId = tabId,
+                    navigationId = navigationId,
+                    error = BrowserError(
+                        code = "navigation_cancelled",
+                        message = "Navigation was stopped.",
+                        category = BrowserErrorCategory.CANCELLED,
+                        failingUrl = mutablePageState.value.url,
+                    ),
+                ),
+            )
+        }
+        activeNavigationId = null
+        activeNavigationUrl = null
+        activeNavigationCommitted = false
+        mutablePageState.value = mutablePageState.value.copy(
+            loadPhase = BrowserLoadPhase.STOPPED,
+            progress = null,
+            navigationId = null,
+        )
     }
 
     /** Called by the Compose host when native WebView observations change. */
