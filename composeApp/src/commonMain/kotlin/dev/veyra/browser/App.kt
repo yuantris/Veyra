@@ -54,12 +54,8 @@ import dev.veyra.browser.core.BrowserTab
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
-import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
-import com.multiplatform.webview.request.RequestInterceptor
-import com.multiplatform.webview.request.WebRequest
-import com.multiplatform.webview.request.WebRequestInterceptResult
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
