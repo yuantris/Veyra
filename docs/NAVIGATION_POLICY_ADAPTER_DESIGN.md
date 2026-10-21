@@ -131,3 +131,24 @@ Observing a URL change is state synchronization, not navigation interception. A 
 - A delayed decision cannot navigate a tab that has since closed or been replaced.
 - Capability reporting reflects tested enforcement, not merely observed URL changes.
 - Browser Core tests and the application build pass on the latest commit.
+
+## 11. Verified dependency constraints (compose-webview-multiplatform 2.0.3)
+
+The pinned library source confirms that `RequestInterceptor.onInterceptUrlRequest` is synchronous and returns one of `WebRequestInterceptResult.Allow`, `Reject`, or `Modify`. `WebRequest` provides `isForMainFrame`, `isRedirect`, and `method`. The library README states that this request interceptor is supported on Android and iOS only; it does not establish equivalent Desktop enforcement.
+
+Consequences:
+- A suspend `NavigationPolicyHandler` cannot be called directly from this native callback without blocking the callback thread. Blocking is prohibited.
+- The core navigation decision used by the native callback must be synchronous and fast. It should perform deterministic policy checks only.
+- Any future decision requiring asynchronous user interaction or remote work must be a separate defer/cancel/reissue flow, with explicit limitations for POST bodies, headers, user gestures and redirect semantics. It must not be smuggled into this synchronous contract.
+- The interceptor sees resource requests as well as main-frame requests. The adapter must inspect `isForMainFrame`; subresource requests must not be routed through top-level navigation policy.
+- The shared API can be present in common code, but capability reporting must be platform-specific. Android/iOS can advertise navigation interception only after integration tests; Desktop must remain unsupported unless its native KCEF/CEF handler is wired and tested independently.
+- Request interception and navigation policy remain separate capability claims even if they share the library callback.
+
+## 12. Updated implementation order
+
+1. Convert the deterministic `NavigationPolicyHandler` and `BrowserNavigationCoordinator.decide` to synchronous APIs.
+2. Add a controller entry point for evaluating a surface-originated request without calling `engine.navigate`; verify that the same engine still owns the tab.
+3. Add common tests for the synchronous decision path and stale/closed tab behavior.
+4. Connect the request interceptor for main-frame requests only on platforms where the pinned library actually invokes it.
+5. Add explicit host routing for external and new-tab decisions; do not silently discard either result.
+6. Add platform-specific capability reporting and integration tests before advertising navigation-policy support.
