@@ -127,3 +127,4 @@ class BrowserSessionStoreTest {
         assertEquals(listOf("https://saved.example"), store.state.value.bookmarks.map { it.url })
         assertEquals(listOf("https://visited.example"), store.state.value.history.map { it.url })
     }
+}
