@@ -93,6 +93,42 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun surfaceNavigationEvaluatesPolicyWithoutDispatchingAnotherLoad() = runBlocking {
+        val factory = FakeFactory()
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(),
+            BrowserEventHub(),
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        )
+        val engine = controller.openTab(TabId("tab-1")) as FakeEngine
+
+        assertEquals(
+            NavigationDecision.Allow,
+            controller.decideSurfaceNavigation(
+                NavigationRequest(TabId("tab-1"), "https://example.com", NavigationSource.PAGE),
+            ),
+        )
+        assertEquals(0, engine.navigateCount)
+        assertEquals(
+            NavigationDecision.OpenExternal("mailto:help@example.com"),
+            controller.decideSurfaceNavigation(
+                NavigationRequest(TabId("tab-1"), "mailto:help@example.com", NavigationSource.PAGE),
+            ),
+        )
+        assertEquals(0, engine.navigateCount)
+        assertEquals(
+            NavigationDecision.Cancel,
+            controller.decideSurfaceNavigation(
+                NavigationRequest(TabId("closed"), "https://example.com", NavigationSource.PAGE),
+            ),
+        )
+        assertEquals(0, engine.navigateCount)
+        controller.close()
+    }
+
+    @Test
     fun forwardsEngineEventsWhileOwnedAndStopsAfterClose() = runBlocking {
         val factory = FakeFactory()
         val hub = BrowserEventHub()
