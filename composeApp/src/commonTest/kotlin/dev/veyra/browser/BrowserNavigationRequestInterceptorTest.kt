@@ -66,7 +66,7 @@ class BrowserNavigationRequestInterceptorTest {
         val interceptor = BrowserNavigationRequestInterceptor(
             tabId = TabId("tab-1"),
             onNavigationRequest = { NavigationDecision.OpenInNewTab(it.url) },
-            onNavigationDecision = hostDecisions::add,
+            onNavigationDecision = { hostDecisions += it },
         )
         val request = WebRequest(url = "https://new-tab.example", isForMainFrame = true)
 
