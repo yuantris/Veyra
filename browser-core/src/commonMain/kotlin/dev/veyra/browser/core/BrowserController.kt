@@ -3,6 +3,7 @@ package dev.veyra.browser.core
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -104,12 +105,11 @@ class BrowserController(
         engineManager.detachSurface(tabId)
     }
 
-    suspend fun closeTab(tabId: TabId): Boolean {
-        val job = lifecycleMutex.withLock {
-            eventJobs.remove(tabId)?.also { it.cancel() }
-        }
+    suspend fun closeTab(tabId: TabId): Boolean = lifecycleMutex.withLock {
+        val job = eventJobs.remove(tabId)
+        job?.cancel()
         val closedEngine = engineManager.closeTab(tabId)
-        return closedEngine || job != null
+        closedEngine || job != null
     }
 
     suspend fun close() {
