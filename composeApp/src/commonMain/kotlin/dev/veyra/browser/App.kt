@@ -222,7 +222,6 @@ fun App() {
                                     if (selected) Color.White else Color(0xFFE9EDF3),
                                     RoundedCornerShape(10.dp),
                                 ).clickable {
-                                    controller.detachSurface(TabId(sessionState.activeTabId))
                                     session.selectTab(tab.id)
                                     address = tab.url
                                 }.padding(horizontal = 8.dp, vertical = 9.dp),
