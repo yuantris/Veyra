@@ -221,7 +221,11 @@ Use independent interfaces instead of one giant engine interface:
 
 ```kotlin
 interface NavigationPolicyHandler {
-    suspend fun decide(request: NavigationRequest): NavigationDecision
+    /**
+     * Fast, deterministic and non-blocking: some native navigation callbacks are synchronous.
+     * Asynchronous user prompts must use a separate defer/cancel/reissue flow.
+     */
+    fun decide(request: NavigationRequest): NavigationDecision
 }
 
 interface RequestInterceptor {
@@ -251,6 +255,8 @@ interface NativeMessageEndpoint {
 These are illustrative contract shapes, not instructions to add every method to `BrowserEngine`. The factory exposes supported optional interfaces/capabilities for each engine. Unsupported operations return an explicit `UnsupportedCapability` result or are absent from the adapter surface.
 
 ### Navigation policy vs resource interception
+
+Navigation-policy evaluation must be synchronous and non-blocking because some native engines require a decision before their callback returns. Do not block a native callback to await a suspend function. Any future policy that requires user interaction or remote work needs an explicit asynchronous deferral protocol and must document whether the original request's method, body, headers, and user gesture can be preserved.
 
 These are distinct:
 - Navigation policy decides where a user/page navigation goes (allow, cancel, external app, new tab).
