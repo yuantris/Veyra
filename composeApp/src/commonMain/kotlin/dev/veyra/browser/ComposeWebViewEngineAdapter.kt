@@ -202,8 +202,13 @@ internal class ComposeWebViewEngine(
             mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, error))
             activeNavigationId = null
             activeNavigationCommitted = false
-        } else if (!isLoading && activeNavigationId != null && activeNavigationCommitted) {
-            mutableEvents.tryEmit(BrowserEvent.NavigationCompleted(tabId, activeNavigationId!!, observedUrl))
+        } else if (!isLoading && activeNavigationCommitted) {
+            val completedNavigationId = activeNavigationId
+            if (completedNavigationId != null) {
+                mutableEvents.tryEmit(
+                    BrowserEvent.NavigationCompleted(tabId, completedNavigationId, observedUrl),
+                )
+            }
             activeNavigationId = null
             activeNavigationCommitted = false
             mutablePageState.value = mutablePageState.value.copy(navigationId = null)
