@@ -52,7 +52,7 @@ class BrowserNavigationRequestInterceptorTest {
         val interceptor = BrowserNavigationRequestInterceptor(
             tabId = TabId("tab-1"),
             onNavigationRequest = { NavigationDecision.OpenExternal(it.url) },
-            onNavigationDecision = hostDecisions::add,
+            onNavigationDecision = { hostDecisions += it },
         )
         val request = WebRequest(url = "mailto:help@example.com", isForMainFrame = true)
 
