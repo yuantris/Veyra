@@ -74,6 +74,7 @@ internal class ComposeWebViewEngine(
     private var pendingUrl: String? = null
     private var navigationCounter = 0L
     private var activeNavigationId: NavigationId? = null
+    private var activeNavigationUrl: String? = null
     private var activeNavigationCommitted = false
     private var closed = false
 
@@ -97,6 +98,7 @@ internal class ComposeWebViewEngine(
 
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
+        activeNavigationUrl = target
         activeNavigationCommitted = false
         mutablePageState.value = mutablePageState.value.copy(
             url = target,
@@ -155,6 +157,7 @@ internal class ComposeWebViewEngine(
         if (observedUrl != previous.url && navigationId == null) {
             navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
             activeNavigationId = navigationId
+            activeNavigationUrl = observedUrl
             activeNavigationCommitted = false
             mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, observedUrl))
         }
@@ -169,10 +172,19 @@ internal class ComposeWebViewEngine(
         } else {
             null
         }
+        val observedUrlMatchesNavigation = activeNavigationUrl == null ||
+            observedUrl == activeNavigationUrl
+        val stateUrl = if (
+            activeNavigationId != null && !activeNavigationCommitted && !observedUrlMatchesNavigation
+        ) {
+            previous.url
+        } else {
+            observedUrl
+        }
 
         mutablePageState.value = previous.copy(
-            url = observedUrl,
-            displayUrl = observedUrl,
+            url = stateUrl,
+            displayUrl = stateUrl,
             title = title ?: previous.title,
             loadPhase = when {
                 error != null -> BrowserLoadPhase.FAILED
@@ -191,9 +203,7 @@ internal class ComposeWebViewEngine(
             error = error,
         )
 
-        if (navigationId != null && !activeNavigationCommitted &&
-            (observedUrl == mutablePageState.value.url)
-        ) {
+        if (navigationId != null && !activeNavigationCommitted && observedUrlMatchesNavigation) {
             activeNavigationCommitted = true
             mutableEvents.tryEmit(BrowserEvent.NavigationCommitted(tabId, navigationId, observedUrl))
         }
@@ -201,6 +211,7 @@ internal class ComposeWebViewEngine(
         if (error != null) {
             mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, error))
             activeNavigationId = null
+            activeNavigationUrl = null
             activeNavigationCommitted = false
         } else if (!isLoading && activeNavigationCommitted) {
             val completedNavigationId = activeNavigationId
@@ -210,6 +221,7 @@ internal class ComposeWebViewEngine(
                 )
             }
             activeNavigationId = null
+            activeNavigationUrl = null
             activeNavigationCommitted = false
             mutablePageState.value = mutablePageState.value.copy(navigationId = null)
         }
@@ -221,6 +233,7 @@ internal class ComposeWebViewEngine(
         surface = null
         pendingUrl = null
         activeNavigationId = null
+        activeNavigationUrl = null
         activeNavigationCommitted = false
     }
 }
