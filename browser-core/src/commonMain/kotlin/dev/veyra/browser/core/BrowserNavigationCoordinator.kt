@@ -10,7 +10,8 @@ package dev.veyra.browser.core
 class BrowserNavigationCoordinator(
     private val policyHandler: NavigationPolicyHandler? = null,
 ) {
-    suspend fun decide(request: NavigationRequest): NavigationDecision {
+    /** Synchronous by design so native callbacks can enforce the result without blocking. */
+    fun decide(request: NavigationRequest): NavigationDecision {
         if (request.url.isBlank()) return NavigationDecision.Cancel
 
         val scheme = request.url.substringBefore(':', missingDelimiterValue = "")
