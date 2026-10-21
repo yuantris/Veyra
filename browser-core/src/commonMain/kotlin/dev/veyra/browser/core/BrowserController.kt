@@ -1,6 +1,7 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
@@ -51,7 +52,9 @@ class BrowserController(
                 ),
             )
             if (eventJobs[tabId] == null) {
-                eventJobs[tabId] = scope.launch {
+                eventJobs[tabId] = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    // Subscribe before openTab returns, so an immediate first navigation event
+                    // cannot be lost on dispatchers that schedule launch asynchronously.
                     // Navigation IDs are opaque. Keep the latest started ID local to this
                     // subscription so late commit/finish callbacks from an older page are dropped.
                     var activeNavigationId: NavigationId? = null
