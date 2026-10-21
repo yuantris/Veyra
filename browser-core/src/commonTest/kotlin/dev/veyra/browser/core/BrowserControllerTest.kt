@@ -1,13 +1,16 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -87,7 +90,7 @@ class BrowserControllerTest {
     }
 
     @Test
-    fun forwardsEventsOnlyWhileEngineIsOwned() = runBlocking {
+    fun forwardsEngineEventsWhileOwnedAndStopsAfterClose() = runBlocking {
         val factory = FakeFactory()
         val hub = BrowserEventHub()
         val scope = CoroutineScope(SupervisorJob())
@@ -99,6 +102,12 @@ class BrowserControllerTest {
             scope,
         )
         val engine = controller.openTab(TabId("tab-1")) as FakeEngine
+        val expected = BrowserEvent.TitleChanged(TabId("tab-1"), "Example")
+        val received = async { hub.events.first() }
+        yield()
+        engine.emit(expected)
+        assertEquals(expected, received.await())
+
         assertTrue(controller.closeTab(TabId("tab-1")))
         assertFalse(controller.closeTab(TabId("tab-1")))
         assertNull(controller.registeredEngines.value[TabId("tab-1")])
@@ -124,6 +133,7 @@ class BrowserControllerTest {
         override val events: Flow<BrowserEvent> = mutableEvents
         override val capabilities = BrowserCapabilities()
         var navigateCount = 0
+        suspend fun emit(event: BrowserEvent) { mutableEvents.emit(event) }
         override fun navigate(request: NavigationRequest) { navigateCount++ }
         override fun goBack() = Unit
         override fun goForward() = Unit
