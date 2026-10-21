@@ -1,0 +1,124 @@
+package dev.veyra.browser.core
+
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Public facade that coordinates profiles, engine ownership, navigation policy and normalized
+ * event publication. UI code should depend on this facade rather than constructing engines.
+ *
+ * The supplied scope must outlive the controller and should be cancelled by the application owner.
+ * Platform adapters remain responsible for native view attachment and enforcing capabilities.
+ */
+class BrowserController(
+    private val engineManager: BrowserEngineManager,
+    private val profileProvider: BrowserProfileProvider,
+    private val navigationCoordinator: BrowserNavigationCoordinator,
+    private val eventHub: BrowserEventHub,
+    private val scope: CoroutineScope,
+) {
+    private val lifecycleMutex = Mutex()
+    private val eventJobs = mutableMapOf<TabId, Job>()
+    private var closed = false
+
+    val events: Flow<BrowserEvent>
+        get() = eventHub.events
+
+    val registeredEngines
+        get() = engineManager.registeredEngines
+
+    suspend fun openTab(
+        tabId: TabId,
+        profileId: ProfileId = profileProvider.defaultProfile().id,
+        initialUrl: String = "about:blank",
+    ): BrowserEngineContract {
+        val profile = profileProvider.get(profileId)
+            ?: throw IllegalArgumentException("Unknown browser profile: ${profileId.value}")
+
+        return lifecycleMutex.withLock {
+            check(!closed) { "Browser controller is closed." }
+            val engine = engineManager.openTab(
+                BrowserEngineCreateRequest(
+                    tabId = tabId,
+                    profileId = profile.id,
+                    isPrivate = profile.isPrivate,
+                    initialUrl = initialUrl,
+                ),
+            )
+            if (eventJobs[tabId] == null) {
+                eventJobs[tabId] = scope.launch {
+                    engine.events.collect { event ->
+                        // A delayed callback from an engine that no longer owns this tab is ignored.
+                        if (engineManager.get(tabId) === engine && event.tabId == tabId) {
+                            eventHub.publish(event)
+                        }
+                    }
+                }
+            }
+            engine
+        }
+    }
+
+    /**
+     * Runs the shared policy before issuing a top-level navigation.
+     *
+     * Only Allow is executed by this facade. OpenExternal/OpenInNewTab are returned to the caller
+     * for explicit routing; this keeps platform intents and tab creation out of the core module.
+     */
+    suspend fun navigate(request: NavigationRequest): NavigationDecision {
+        val engine = engineManager.get(request.tabId)
+            ?: return NavigationDecision.Cancel
+        val decision = navigationCoordinator.decide(request)
+        if (decision == NavigationDecision.Allow) {
+            engine.navigate(request)
+        }
+        return decision
+    }
+
+    fun goBack(tabId: TabId): Boolean = engineManager.get(tabId)?.let {
+        it.goBack()
+        true
+    } ?: false
+
+    fun goForward(tabId: TabId): Boolean = engineManager.get(tabId)?.let {
+        it.goForward()
+        true
+    } ?: false
+
+    fun reload(tabId: TabId): Boolean = engineManager.get(tabId)?.let {
+        it.reload()
+        true
+    } ?: false
+
+    fun stop(tabId: TabId): Boolean = engineManager.get(tabId)?.let {
+        it.stop()
+        true
+    } ?: false
+
+    /** Detaching a surface preserves its engine and event subscription. */
+    fun detachSurface(tabId: TabId) {
+        engineManager.detachSurface(tabId)
+    }
+
+    suspend fun closeTab(tabId: TabId): Boolean {
+        val job = lifecycleMutex.withLock {
+            eventJobs.remove(tabId)?.also { it.cancel() }
+        }
+        val closedEngine = engineManager.closeTab(tabId)
+        return closedEngine || job != null
+    }
+
+    suspend fun close() {
+        lifecycleMutex.withLock {
+            if (closed) return
+            closed = true
+            eventJobs.values.forEach(Job::cancel)
+            eventJobs.clear()
+        }
+        engineManager.closeAll()
+    }
+}
