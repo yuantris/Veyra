@@ -7,7 +7,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
@@ -39,7 +38,7 @@ internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
         engine: BrowserEngineContract,
         onNavigationRequest: (NavigationRequest) -> NavigationDecision,
         onNavigationDecision: (NavigationDecision) -> Unit,
-    ) {
+   ) {
         ComposeWebViewSurface(tab, engine, onNavigationRequest, onNavigationDecision)
     }
 }
