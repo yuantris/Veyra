@@ -88,6 +88,7 @@ fun App() {
         )
     }
     val engines by controller.registeredEngines.collectAsState()
+    val pageStates by controller.pageStates.collectAsState()
     var address by remember { mutableStateOf(session.activeTab?.url.orEmpty()) }
     var showBrowser by remember { mutableStateOf(false) }
     val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
@@ -110,6 +111,38 @@ fun App() {
                 if (controller.registeredEngines.value[tabId] == null) {
                     controller.openTab(tabId, ProfileId("default"), url)
                 }
+            }
+        }
+    }
+
+    // UI/session state is projected from the controller's platform-neutral page state,
+    // rather than being written directly by a concrete WebView adapter.
+    LaunchedEffect(pageStates) {
+        pageStates.values.forEach { page ->
+            val tabId = page.tabId.value
+            if (session.state.value.tabs.any { it.id == tabId }) {
+                session.updateTab(
+                    tabId = tabId,
+                    url = page.url,
+                    title = page.title.takeIf { it.isNotBlank() },
+                    isLoading = page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.STARTING ||
+                        page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.LOADING,
+                    canGoBack = page.canGoBack,
+                    canGoForward = page.canGoForward,
+                )
+                if (session.state.value.activeTabId == tabId && page.url.isNotBlank()) {
+                    address = page.url
+                }
+            }
+        }
+    }
+
+    // Navigation history is driven by normalized core events, not platform callbacks.
+    LaunchedEffect(controller) {
+        controller.events.collect { event ->
+            if (event is dev.veyra.browser.core.BrowserEvent.NavigationCompleted) {
+                val page = pageStates[event.tabId]
+                session.recordVisit(event.tabId.value, event.url, page?.title.orEmpty())
             }
         }
     }
@@ -281,22 +314,6 @@ fun App() {
                                         BrowserTabHost(
                                             tab = tab,
                                             engine = engine,
-                                            onStateChanged = { id, url, title, loading, back, forward ->
-                                                session.updateTab(
-                                                    tabId = id,
-                                                    url = url,
-                                                    title = title,
-                                                    isLoading = loading,
-                                                    canGoBack = back,
-                                                    canGoForward = forward,
-                                                )
-                                                if (id == session.state.value.activeTabId && !url.isNullOrBlank()) {
-                                                    address = url
-                                                }
-                                                if (!url.isNullOrBlank() && url != "about:blank") {
-                                                    session.recordVisit(id, url, title.orEmpty())
-                                                }
-                                            },
                                             onNavigationRequest = controller::decideSurfaceNavigation,
                                             onNavigationDecision = { decision ->
                                                 when (decision) {
@@ -380,7 +397,6 @@ fun App() {
 private fun BrowserTabHost(
     tab: BrowserTab,
     engine: ComposeWebViewEngine,
-    onStateChanged: (String, String?, String?, Boolean?, Boolean?, Boolean?) -> Unit,
     onNavigationRequest: (NavigationRequest) -> NavigationDecision,
     onNavigationDecision: (NavigationDecision) -> Unit,
 ) {
@@ -425,16 +441,6 @@ private fun BrowserTabHost(
             isLoading = webState.isLoading,
             canGoBack = navigator.canGoBack,
             canGoForward = navigator.canGoForward,
-        )
-        val page = engine.pageState.value
-        onStateChanged(
-            tab.id,
-            page.url,
-            page.title,
-            page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.STARTING ||
-                page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.LOADING,
-            page.canGoBack,
-            page.canGoForward,
         )
     }
 
