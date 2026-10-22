@@ -34,11 +34,33 @@ internal interface BrowserSurfacePort {
 }
 
 /**
+ * Surface-binding contract consumed by the Compose host.
+ *
+ * This is deliberately separate from [BrowserEngineContract]: controller code only sees the
+ * engine contract, while a rendering host uses this bridge to attach its command port and report
+ * observations. A future platform renderer can provide its own binding implementation.
+ */
+internal interface BrowserSurfaceBinding {
+    val pageState: StateFlow<BrowserPageState>
+
+    fun attachSurface(surface: BrowserSurfacePort)
+    fun detachSurface(surface: BrowserSurfacePort)
+    override fun observe(
+        url: String?,
+        title: String?,
+        isLoading: Boolean,
+        canGoBack: Boolean,
+        canGoForward: Boolean,
+        errorCode: String? = null,
+        errorMessage: String? = null,
+    )
+}
+
+/**
  * Logical engine/session adapter for the current compose-webview-multiplatform surface.
  *
  * The engine is owned by BrowserController; the Compose surface can detach and reattach without
- * closing this object. A future GeckoView/KCEF/ArkWeb adapter can implement the same contract
- * without changing browser-core or the app shell.
+ * closing this object. App code depends on [BrowserSurfaceBinding], not this implementation.
  */
 internal class ComposeWebViewEngineFactory : BrowserEngineFactory {
     override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract =
@@ -47,7 +69,7 @@ internal class ComposeWebViewEngineFactory : BrowserEngineFactory {
 
 internal class ComposeWebViewEngine(
     request: BrowserEngineCreateRequest,
-) : BrowserEngineContract {
+) : BrowserEngineContract, BrowserSurfaceBinding {
     override val tabId: TabId = request.tabId
     override val sessionId = SessionId("session-${request.tabId.value}")
     override val profileId: ProfileId = request.profileId
@@ -76,9 +98,9 @@ internal class ComposeWebViewEngine(
     private var activeNavigationCommitted = false
     private var closed = false
 
-    fun attachSurface(newSurface: BrowserSurfacePort) {
+    override fun attachSurface(surface: BrowserSurfacePort) {
         check(!closed) { "Cannot attach a surface to a closed browser engine." }
-        surface = newSurface
+        this.surface = surface
         if (initialNavigationPending) {
             initialNavigationPending = false
             val initialUrl = mutablePageState.value.url
@@ -96,12 +118,12 @@ internal class ComposeWebViewEngine(
         }
         pendingUrl?.let { url ->
             pendingUrl = null
-            newSurface.loadUrl(url)
+            surface.loadUrl(url)
         }
     }
 
-    fun detachSurface(detachedSurface: BrowserSurfacePort) {
-        if (surface === detachedSurface) surface = null
+    override fun detachSurface(surface: BrowserSurfacePort) {
+        if (this.surface === surface) this.surface = null
     }
 
     override fun navigate(request: NavigationRequest) {
