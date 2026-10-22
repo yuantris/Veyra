@@ -69,7 +69,7 @@ class DownloadPipelineAndroidTest {
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val received = AtomicReference<DownloadRequest?>()
         val invoked = CountDownLatch(1)
-        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        val scenario = ActivityScenario.launch(DownloadTestActivity::class.java)
         lateinit var webView: android.webkit.WebView
 
         try {
