@@ -75,6 +75,17 @@ enum class BrowserErrorCategory {
     UNKNOWN,
 }
 
+/** Normalized error shared by all engine adapters. Native diagnostics remain in platform logs. */
+data class BrowserError(
+    val code: String,
+    val message: String,
+    val category: BrowserErrorCategory = BrowserErrorCategory.UNKNOWN,
+    val nativeCode: String? = null,
+    val failingUrl: String? = null,
+    val isMainFrame: Boolean? = null,
+    val isRecoverable: Boolean = true,
+)
+
 /** High-level engine capabilities; false means unavailable, not merely unimplemented in UI. */
 data class BrowserCapabilities(
     val navigationPolicy: Boolean = false,
