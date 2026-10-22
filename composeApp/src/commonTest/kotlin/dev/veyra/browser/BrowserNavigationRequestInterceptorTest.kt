@@ -57,7 +57,9 @@ class BrowserNavigationRequestInterceptorTest {
         val request = WebRequest(url = "mailto:help@example.com", isForMainFrame = true)
 
         assertEquals(WebRequestInterceptResult.Reject, interceptor.intercept(request))
-        assertEquals(listOf(NavigationDecision.OpenExternal(request.url)), hostDecisions)
+        assertEquals(1, hostDecisions.size)
+        assertTrue(hostDecisions.single() is NavigationDecision.OpenExternal)
+        assertEquals(request.url, (hostDecisions.single() as NavigationDecision.OpenExternal).url)
     }
 
     @Test
@@ -71,7 +73,9 @@ class BrowserNavigationRequestInterceptorTest {
         val request = WebRequest(url = "https://new-tab.example", isForMainFrame = true)
 
         assertEquals(WebRequestInterceptResult.Reject, interceptor.intercept(request))
-        assertEquals(listOf(NavigationDecision.OpenInNewTab(request.url)), hostDecisions)
+        assertEquals(1, hostDecisions.size)
+        assertTrue(hostDecisions.single() is NavigationDecision.OpenInNewTab)
+        assertEquals(request.url, (hostDecisions.single() as NavigationDecision.OpenInNewTab).url)
     }
 
     @Test
