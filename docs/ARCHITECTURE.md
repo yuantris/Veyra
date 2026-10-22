@@ -11,14 +11,14 @@ Veyra is a cross-platform browser with a shared Compose Multiplatform UI and nat
 | HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/bridge |
 | Desktop | KCEF / Chromium | Later adapter after the core contract is validated |
 
-Do not expose `GeckoSession`, `GeckoView`, `WKWebView`, ArkWeb, or CEF types to `commonMain` or browser business logic.
+Do not expose Chromium runtime, `WKWebView`, ArkWeb, or CEF types to `commonMain` or browser business logic.
 
 ## Existing code and current gaps
 
 - `browser-core` is a Kotlin Multiplatform module with the platform-neutral `BrowserEngine` contract and `BrowserSessionStore`.
 - `BrowserSessionStore` owns tab metadata, active-tab selection, bookmarks and in-memory history. Private-tab visits are excluded from shared history.
 - The current `BrowserEngine` contract covers navigation basics, but not yet capability discovery, permission requests, downloads, popups, request policy or extensions.
-- `composeApp/src/commonMain/.../WebViewBrowserEngine.kt` currently bridges the cross-platform WebView library. It is a prototype adapter, not a native GeckoView implementation.
+- The current shared UI still uses `compose-webview-multiplatform` as a prototype renderer; the engine control and surface-binding contracts are being separated before native adapters are added.
 - The current UI mounts only the active WebView. Switching tabs can therefore recreate the renderer and reload its URL; live page state is not guaranteed to survive.
 - Android and desktop page loading were previously manually verified. Each future change must be validated by its own CI run and Android device/emulator test.
 
@@ -93,15 +93,13 @@ Logical boundaries (these do not need to be separate Gradle modules initially):
 - platform extension adapters: map Veyra operations to native extension APIs and report unsupported features.
 - `extension-ui`: management, detail, permission and settings screens, implemented in shared Compose where practical.
 
-GeckoView integration details:
+Android Chromium runtime selection details:
 
-- Use `GeckoRuntime.getWebExtensionController()` to manage extensions.
-- GeckoView supports signed external XPI installation and built-in extensions packaged in the APK. External installation must handle Mozilla signature requirements and permission prompts.
-- Built-in extensions can use native messaging; use a versioned, typed message protocol between the extension and Android host.
-- Treat a site's page content as untrusted. Do not expose unrestricted native messaging or privileged bridge operations to arbitrary websites.
-- Persist extension metadata and reconcile it with the runtime's installed-extension list; the runtime is authoritative for engine-level installation state.
-- Do not assume every Firefox Android extension or every WebExtensions API is supported identically by GeckoView.
-- The extension manager must display unsupported platform/API capabilities instead of silently claiming compatibility.
+- Treat Chromium as a family of embedders, not one interchangeable API. System WebView does not expose the full Chrome browser layer.
+- Require a working WebExtensions runtime as an explicit acceptance gate; Blink + V8 alone is not enough.
+- Verify extension installation/lifecycle, permissions, content scripts, background execution, storage, popup/action UI and native messaging on the exact runtime.
+- Bind privileged native messaging to trusted extension identities and validate a versioned, typed protocol.
+- Do not promise Chrome Web Store compatibility unless the runtime and the target extension APIs have been tested.
 
 Other platforms may implement only a subset of the Veyra extension API. A shared API means a shared product contract, not a promise that every extension binary runs on every engine.
 
