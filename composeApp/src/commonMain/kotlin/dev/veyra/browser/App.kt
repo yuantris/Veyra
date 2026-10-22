@@ -247,8 +247,11 @@ fun App() {
                         ToolText("›", activeTab?.canGoForward == true) {
                             activeTab?.let { controller.goForward(TabId(it.id)) }
                         }
-                        ToolText("↻", activeTab != null) {
-                            activeTab?.let { controller.reload(TabId(it.id)) }
+                        ToolText(if (activeTab?.isLoading == true) "■" else "↻", activeTab != null) {
+                            activeTab?.let { tab ->
+                                if (tab.isLoading) controller.stop(TabId(tab.id))
+                                else controller.reload(TabId(tab.id))
+                            }
                         }
                         Spacer(Modifier.weight(1f))
                         ToolText("+", true) {
