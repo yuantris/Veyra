@@ -303,7 +303,7 @@ fun App() {
                         // visible/on top, so switching tabs does not destroy its native history.
                         sessionState.tabs.forEach { tab ->
                             val selected = tab.id == sessionState.activeTabId
-                            val engine = engines[TabId(tab.id)] as? ComposeWebViewEngine
+                            val engine = engines[TabId(tab.id)] as? BrowserSurfaceBinding
                             if (engine != null) {
                                 key(tab.id) {
                                     Box(
@@ -396,7 +396,7 @@ fun App() {
 @Composable
 private fun BrowserTabHost(
     tab: BrowserTab,
-    engine: ComposeWebViewEngine,
+    engine: BrowserSurfaceBinding,
     onNavigationRequest: (NavigationRequest) -> NavigationDecision,
     onNavigationDecision: (NavigationDecision) -> Unit,
 ) {
