@@ -2,6 +2,9 @@ package dev.veyra.browser
 
 import android.content.Context
 import android.os.Environment
+import android.os.SystemClock
+import android.view.MotionEvent
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.veyra.browser.core.DownloadPhase
@@ -66,54 +69,78 @@ class DownloadPipelineAndroidTest {
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val received = AtomicReference<DownloadRequest?>()
         val invoked = CountDownLatch(1)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
         lateinit var webView: android.webkit.WebView
 
-        instrumentation.runOnMainSync {
-            webView = createWebView(
-                context = context,
-                tabId = TabId("download-tab"),
-                profileId = ProfileId("default"),
-                onDownloadRequested = { request ->
-                    received.set(request)
-                    invoked.countDown()
-                },
-                onNavigationRequest = { NavigationDecision.Allow },
-                onNavigationDecision = {},
-                onRendererGone = {},
-                observe = { _, _, _, _, _, _ -> },
-            )
-            webView.loadDataWithBaseURL(
-                "https://veyra.invalid/start",
-                DOWNLOAD_PAGE_HTML,
-                "text/html",
-                null,
-                null,
-            )
-        }
-
-        // loadDataWithBaseURL is asynchronous: poll the real document until the link exists.
-        val documentReady = CountDownLatch(1)
-        val deadline = System.currentTimeMillis() + 10_000
-        while (documentReady.count > 0L && System.currentTimeMillis() < deadline) {
-            instrumentation.runOnMainSync {
-                webView.evaluateJavascript("document.getElementById('file') ? 'ready' : ''") { result ->
-                    if (result.contains("ready")) documentReady.countDown()
-                }
+        try {
+            scenario.onActivity { activity ->
+                webView = createWebView(
+                    context = activity,
+                    tabId = TabId("download-tab"),
+                    profileId = ProfileId("default"),
+                    onDownloadRequested = { request ->
+                        received.set(request)
+                        invoked.countDown()
+                    },
+                    onNavigationRequest = { NavigationDecision.Allow },
+                    onNavigationDecision = {},
+                    onRendererGone = {},
+                    observe = { _, _, _, _, _, _ -> },
+                )
+                activity.setContentView(webView)
+                webView.loadDataWithBaseURL(
+                    "https://veyra.invalid/start",
+                    DOWNLOAD_PAGE_HTML,
+                    "text/html",
+                    null,
+                    null,
+                )
             }
-            documentReady.await(250, TimeUnit.MILLISECONDS)
-        }
-        assertTrue("Test document did not become ready", documentReady.count == 0L)
 
-        instrumentation.runOnMainSync {
-            webView.evaluateJavascript("document.getElementById('file').click()", null)
-        }
+            // Wait for a real attached WebView document before sending a physical-style tap.
+            val documentReady = CountDownLatch(1)
+            val deadline = System.currentTimeMillis() + 10_000
+            while (documentReady.count > 0L && System.currentTimeMillis() < deadline) {
+                instrumentation.runOnMainSync {
+                    webView.evaluateJavascript("document.getElementById('file') ? 'ready' : ''") { result ->
+                        if (result.contains("ready")) documentReady.countDown()
+                    }
+                }
+                documentReady.await(250, TimeUnit.MILLISECONDS)
+            }
+            assertTrue("Test document did not become ready", documentReady.count == 0L)
 
-        assertTrue("Production DownloadListener was not invoked", invoked.await(10, TimeUnit.SECONDS))
-        val request = received.get()!!
-        assertEquals("https://veyra.invalid/report.pdf", request.url)
-        assertEquals("download-tab", request.tabId.value)
-        assertEquals("default", request.profileId.value)
-        assertEquals("report.pdf", request.suggestedFileName)
+            instrumentation.runOnMainSync {
+                val location = IntArray(2)
+                webView.getLocationOnScreen(location)
+                val x = location[0] + 40f
+                val y = location[1] + 28f
+                val downTime = SystemClock.uptimeMillis()
+                val down = MotionEvent.obtain(
+                    downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0,
+                )
+                val up = MotionEvent.obtain(
+                    downTime, downTime + 80, MotionEvent.ACTION_UP, x, y, 0,
+                )
+                instrumentation.sendPointerSync(down)
+                instrumentation.sendPointerSync(up)
+                down.recycle()
+                up.recycle()
+            }
+
+            assertTrue(
+                "Production DownloadListener was not invoked after a real WebView tap",
+                invoked.await(10, TimeUnit.SECONDS),
+            )
+            val request = received.get()
+            assertTrue("Download callback did not provide a request", request != null)
+            assertEquals("https://veyra.invalid/report.pdf", request?.url)
+            assertEquals("download-tab", request?.tabId?.value)
+            assertEquals("default", request?.profileId?.value)
+            assertEquals("report.pdf", request?.suggestedFileName)
+        } finally {
+            scenario.close()
+        }
     }
 
     @Test
@@ -275,8 +302,9 @@ class DownloadPipelineAndroidTest {
         val DOWNLOAD_PAGE_HTML = """
             <!doctype html>
             <html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
-            <body>
-            <a id="file" href="https://veyra.invalid/report.pdf" download>report</a>
+            <body style="margin: 8px">
+            <a id="file" href="https://veyra.invalid/report.pdf" download
+               style="display: block; min-height: 48px; padding: 8px">Download report</a>
             </body></html>
         """.trimIndent()
     }
