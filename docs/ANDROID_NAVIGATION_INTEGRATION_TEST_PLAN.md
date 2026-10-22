@@ -2,7 +2,7 @@
 
 ## Status
 
-The shared `BrowserNavigationRequestInterceptor` has JVM/desktop unit coverage. That verifies decision mapping only; it does **not** prove Android WebView invokes the interceptor at the right time or honors `Reject`.
+The shared `BrowserNavigationRequestInterceptor` has JVM/desktop unit coverage. An Android instrumentation test now exercises the pinned Compose WebView + navigator interceptor path and verifies a rejected main-frame link leaves the current document loaded. The emulator CI run is still the acceptance gate; the broader cases below are not yet all covered.
 
 Until device/emulator integration tests pass, Android reports:
 - `navigationPolicy = false`
@@ -10,9 +10,11 @@ Until device/emulator integration tests pass, Android reports:
 
 Do not upgrade the capability based on common tests alone.
 
-## Required integration harness
+## Integration harness
 
-Add an Android instrumentation test source set and run tests on an emulator with a real Android `WebView`. Prefer a local in-process HTTP server or a deterministic test page over public websites. Tests should wait on explicit navigation/page-finish callbacks with bounded timeouts, never sleeps.
+Implemented initial harness: `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/BrowserNavigationRequestInterceptorAndroidTest.kt`. It uses a deterministic inline HTML document and a rejected same-origin-style link destination, with bounded latches rather than sleeps. `.github/workflows/core-tests.yml` runs `:composeApp:connectedDebugAndroidTest` on an API 35 emulator.
+
+The initial test covers rejection and current-document continuity. Add the remaining acceptance cases below incrementally; do not treat the entire matrix as covered yet.
 
 The harness must exercise the exact production wiring from `BrowserTabHost` through the pinned `compose-webview-multiplatform:2.0.3` `RequestInterceptor` and its Android `AccompanistWebViewClient`. A test that installs an unrelated custom `WebViewClient` only verifies Android platform behavior and is not sufficient.
 
