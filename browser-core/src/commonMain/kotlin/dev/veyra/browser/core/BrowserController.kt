@@ -25,6 +25,7 @@ class BrowserController(
     private val navigationCoordinator: BrowserNavigationCoordinator,
     private val eventHub: BrowserEventHub,
     private val scope: CoroutineScope,
+    private val downloadController: DownloadController? = null,
 ) {
     private val lifecycleMutex = Mutex()
     private val eventJobs = mutableMapOf<TabId, Job>()
@@ -40,6 +41,44 @@ class BrowserController(
 
     val registeredEngines
         get() = engineManager.registeredEngines
+
+    /** Download task state is available when a platform/application download controller is wired. */
+    val downloadTasks: StateFlow<List<DownloadTask>>?
+        get() = downloadController?.tasks
+
+    /**
+     * Starts a download only after the caller has explicitly accepted a DownloadRequested event.
+     * The browser core validates tab ownership and profile identity but leaves transport,
+     * authentication, destination selection and persistence to the injected controller.
+     */
+    suspend fun startDownload(request: DownloadRequest): String {
+        val controller = checkNotNull(downloadController) {
+            "No download controller is configured for this browser."
+        }
+        val engine = engineManager.get(request.tabId)
+            ?: throw IllegalArgumentException("Unknown browser tab: ${request.tabId.value}")
+        require(engine.capabilities.downloads) {
+            "The active browser engine does not support downloads."
+        }
+        require(request.profileId == engine.profileId) {
+            "Download profile does not match the owning browser tab."
+        }
+        require(request.url.isNotBlank()) { "Download URL must not be blank." }
+        require(request.requestId.value.isNotBlank()) { "Download request ID must not be blank." }
+
+        // Re-check ownership immediately before starting, as tab closure can race with caller work.
+        check(engineManager.get(request.tabId) === engine) {
+            "The browser tab was closed before the download could start."
+        }
+        return controller.start(request)
+    }
+
+    suspend fun cancelDownload(downloadId: String) {
+        val controller = checkNotNull(downloadController) {
+            "No download controller is configured for this browser."
+        }
+        controller.cancel(downloadId)
+    }
 
     suspend fun openTab(
         tabId: TabId,
