@@ -29,6 +29,13 @@ kotlin {
             implementation(libs.kcef)
         }
         commonTest.dependencies { implementation(kotlin("test")) }
+        val androidInstrumentedTest by getting {
+            dependencies {
+                implementation(libs.androidx.test.runner)
+                implementation(libs.androidx.test.ext.junit)
+                implementation(libs.androidx.compose.ui.test.junit4)
+            }
+        }
     }
 }
 android {
@@ -38,6 +45,7 @@ android {
         applicationId = "dev.veyra.browser"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 1
         versionName = "0.1.0"
     }
