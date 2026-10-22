@@ -33,7 +33,7 @@ These are logical responsibilities first. Keep the initial Gradle module count s
 
 | Boundary | Owns | Must not depend on |
 | --- | --- | --- |
-| `browser-core` | IDs, immutable models, engine/session contracts, events, errors, capabilities, policy request/result types | Compose UI, Android SDK, GeckoView, WebKit, ArkWeb, CEF |
+| `browser-core` | IDs, immutable models, engine/session contracts, events, errors, capabilities, policy request/result types | Compose UI, Android SDK, Chromium runtime APIs, WebKit, ArkWeb, CEF |
 | `browser-domain` (logical initially) | Navigation use cases, tab commands, permission decisions, download and extension use cases | Native engine classes |
 | `browser-session` (logical initially) | Tab-to-engine registry, active tab, lifecycle and disposal orchestration | Compose lifecycle as the owner of engine lifetime |
 | `browser-security` (logical initially) | URL/scheme validation, origin matching, bridge authorization and permission policy | Platform UI or engine internals |
@@ -286,7 +286,7 @@ A popup is a policy request, not an instruction to silently create a native view
 
 ### Principle
 
-Use GeckoView WebExtensions/native messaging for extension-to-host communication on Android. A general-purpose JavaScript bridge exposed to arbitrary pages is not the extension system and must not be treated as one.
+Use the selected Android runtime's authenticated extension/native-messaging APIs for extension-to-host communication. A general-purpose JavaScript bridge exposed to arbitrary pages is not the extension system and must not be treated as one.
 
 ### Envelope
 
@@ -349,20 +349,20 @@ Private profile must not inherit privileged grants or extension storage unless a
 
 ## 7. Extension contract
 
-- Android GeckoView is the initial WebExtensions implementation.
-- The core defines extension metadata, permissions, install source, lifecycle state, errors and capability requirements without importing GeckoView types.
-- The Android adapter maps those operations to `WebExtensionController`.
-- External XPI installation must respect Mozilla signing requirements and GeckoView permission prompts. Built-in extensions packaged in the APK are a separate trusted distribution path.
-- Runtime installed-extension state is authoritative for engine installation; Veyra storage keeps user preferences and UI metadata, then reconciles on startup.
+- Android WebExtensions support is a runtime-selection gate, not an assumption.
+- The core defines extension metadata, permissions, install source, lifecycle state, errors and capability requirements without importing engine-specific types.
+- The Android adapter maps those operations only to APIs verified in the chosen Chromium-based runtime.
+- The candidate must prove extension install/uninstall, enable/disable, permission prompts, content scripts, background execution, storage and native messaging before being called WebExtensions-capable.
+- Installed-extension state from the runtime is authoritative; Veyra storage keeps user preferences and UI metadata, then reconciles on startup.
 - Native messaging accepts messages only from the expected extension identity and validates protocol/version/payload.
-- Do not promise all Firefox add-ons work: compatibility depends on GeckoView support and each extension's APIs.
+- Do not promise Chrome Web Store compatibility unless the exact runtime and extension APIs have been tested.
 - iOS, ArkWeb and KCEF must report their actual extension capability. They may later support a Veyra-specific constrained plugin API, but that is a separate compatibility tier.
 
 ## 8. Platform capability matrix
 
 Legend: **Native** = supported by a documented native API; **Limited** = possible with constraints/adapter work; **Custom** = Veyra must build substantial product logic; **Unknown** = must be verified in a spike before promising it. This matrix is a planning baseline, not a substitute for testing the pinned SDK versions.
 
-| Capability | Android: GeckoView | iOS: WKWebView | HarmonyOS: ArkWeb | Desktop: KCEF/CEF |
+| Capability | Android: Chromium runtime (TBD) | iOS: WKWebView | HarmonyOS: ArkWeb | Desktop: KCEF/CEF |
 | --- | --- | --- | --- | --- |
 | Navigation callbacks/policy | Native delegates | Native `WKNavigationDelegate` | Native navigation callbacks; verify SDK level | Native CEF handlers |
 | Progress/title/loading | Native delegates/state | Native progress + delegates | Native callbacks; verify SDK level | Native handlers |
@@ -371,10 +371,10 @@ Legend: **Native** = supported by a documented native API; **Limited** = possibl
 | Website permissions + OS permissions | Native content permission delegate + Android permission broker | Native UI/permission callbacks; OS-specific constraints | ArkWeb callbacks + HarmonyOS permission broker | CEF callbacks + host OS permission broker |
 | Popups/new windows | Native delegate; map to tab policy | Native `WKUIDelegate` | Native window callbacks; verify | CEF lifespan handler |
 | JS-to-host messaging | WebExtensions/native messaging preferred; secure origin rules still apply | Message handlers; origin/frame policy must be enforced by Veyra | JS proxy/message API; scope and origin controls must be verified | Message router / process message; origin and frame checks required |
-| WebExtensions | Native GeckoView WebExtensions; API compatibility varies | No general Firefox WebExtensions runtime | No general Firefox WebExtensions runtime assumed | CEF does not automatically provide Chrome Web Store extensions; custom integration required |
+| WebExtensions | Unsupported until a real extension runtime is verified; Blink/V8 alone is insufficient | No general Firefox WebExtensions runtime | No general Firefox WebExtensions runtime assumed | CEF does not automatically provide Chrome Web Store extensions; custom integration required |
 | Private profile isolation | Native/runtime configuration must be designed and tested | Separate website data store configuration; test all storage classes | Separate profile/data isolation must be verified | Separate request context/cache/cookie store |
 | Renderer/process crash | Native runtime/session callbacks; recovery policy in Veyra | Web content process termination callback | Verify native crash/lifecycle hooks | CEF render-process handlers |
-| Native view detach/reattach without closing session | GeckoSession + GeckoView host lifecycle | WKWebView retained independently of Compose subtree | ArkWeb controller/view lifecycle | CefBrowser lifespan controlled outside Compose |
+| Native view detach/reattach without closing session | Chromium session/runtime-specific host lifecycle | WKWebView retained independently of Compose subtree | ArkWeb controller/view lifecycle | CefBrowser lifespan controlled outside Compose |
 | Session restore | Metadata can be persisted; live JS state not guaranteed after process death | Metadata/state restoration limited; no live JS heap restoration | Verify restoration semantics | CEF state/session recreation strategy |
 
 ### Required fallback behavior
@@ -421,11 +421,11 @@ Rules:
 - Capability-gated operations return explicit unsupported results.
 - Download and permission state transitions are deterministic.
 
-### Android GeckoView integration tests
+### Android Chromium runtime integration tests
 
 - Runtime is reused across tab changes and not created by Compose recomposition.
 - Two tabs keep separate URL/history/document state; switching away and back preserves a live page's in-memory state.
-- Closing one tab closes only its GeckoSession; other tabs continue running.
+- Closing one tab closes only its tab-scoped engine session; other tabs continue running.
 - Back/forward/reload/stop, redirects, progress, title and main-frame errors work on real pages.
 - Navigation policy handles external schemes, target=_blank/popups and blocked URLs.
 - Permission denial/cancellation and OS permission denial are handled without hangs.
@@ -441,9 +441,9 @@ Each adapter must run the shared core contract tests where possible plus native 
 
 ## 11. Implementation gates
 
-1. Review and approve this contract before adding GeckoView to the app.
+1. Review and approve this contract before selecting and integrating the Android Chromium runtime.
 2. Map the existing `BrowserEngine` and `BrowserSessionStore` onto this contract; preserve working behavior and identify API changes.
-3. Add the GeckoView dependency at a pinned stable version and validate build/package/startup on an Android device.
+3. Select a pinned Chromium-based runtime only after WebExtensions acceptance gates pass; validate build/package/startup on an Android device.
 4. Implement runtime owner, engine registry and one-session-per-live-tab host.
 5. Pass navigation and lifecycle tests before adding broad feature work.
 6. Add permission/download/popup/request policy adapters.
@@ -452,8 +452,8 @@ Each adapter must run the shared core contract tests where possible plus native 
 
 ## 12. Upstream API references
 
-- [GeckoView WebExtensions](https://mozilla.github.io/geckoview/consumer/docs/web-extensions)
-- [GeckoView WebExtensionController](https://mozilla.github.io/geckoview/javadoc/mozilla-central/org/mozilla/geckoview/WebExtensionController.html)
+- [Chromium Android WebView architecture](https://github.com/chromium/chromium/blob/main/android_webview/docs/architecture.md)
+- [Chromium supported products and platforms](https://chromium.googlesource.com/experimental/chromium/src/+/HEAD/docs/supported_platforms.md)
 - [Apple WKWebView](https://developer.apple.com/documentation/webkit/WKWebView)
 - [Apple WKNavigationDelegate](https://developer.apple.com/documentation/webkit/wknavigationdelegate)
 - [Apple WKUIDelegate](https://developer.apple.com/documentation/webkit/wkuidelegate)
