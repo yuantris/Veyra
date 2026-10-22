@@ -42,7 +42,13 @@ class BridgeAuthorizationTest {
         assertEquals(BridgeAuthorizationResult.Allowed, policy.authorize(caller(), message()))
         assertEquals(
             BridgeAuthorizationResult.Rejected(BridgeRejection.ORIGIN_NOT_ALLOWED),
-            policy.authorize(caller(documentOrigin = requireNotNull(BrowserOrigin.parse("https://sub.example.com"))), message()),
+            policy.authorize(
+                caller(
+                    documentOrigin = requireNotNull(BrowserOrigin.parse("https://sub.example.com")),
+                    frameOrigin = requireNotNull(BrowserOrigin.parse("https://sub.example.com")),
+                ),
+                message(),
+            ),
         )
         assertEquals(
             BridgeAuthorizationResult.Rejected(BridgeRejection.PROFILE_NOT_ALLOWED),
