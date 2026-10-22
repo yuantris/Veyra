@@ -62,7 +62,7 @@ internal interface BrowserSurfaceBinding {
  * The engine is owned by BrowserController; the Compose surface can detach and reattach without
  * closing this object. App code depends on [BrowserSurfaceBinding], not this implementation.
  */
-internal class ComposeWebViewEngineFactory : BrowserEngineFactory {
+internal class SurfaceBoundBrowserEngineFactory : BrowserEngineFactory {
     override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract =
         ComposeWebViewEngine(request)
 }
