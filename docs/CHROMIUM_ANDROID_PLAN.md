@@ -1,89 +1,11 @@
-# Android Chromium implementation plan
+# Android Chromium plan — historical decision record
 
-## Decision record
+> Superseded as the active Android engine plan by [the architecture baseline](ARCHITECTURE.md), which selects GeckoView as Veyra's Android engine direction. Keep this document only as a record of earlier Chromium/WebView investigation; do not use it to override the current platform decision.
 
-- **Android engine direction:** Chromium-based runtime using Blink + V8.
-- **Extension requirement:** a real WebExtensions implementation is mandatory; Blink + V8 alone does not satisfy this requirement.
-- **Shared contract:** `:browser-core` (`BrowserEngineContract`, `BrowserPageState`, `BrowserEvent`, `BrowserController`).
-- **Shared UI:** Compose Multiplatform, with renderer binding isolated from engine control.
-- **Current status:** Android uses a native `android.webkit.WebView` surface backed by the device's Chromium WebView provider. This is the first working Chromium surface adapter, not a bundled/pinned Chromium distribution. WebExtensions remain a later capability spike, not a prerequisite for getting the engine surface running.
+## Historical context
 
-## Critical distinction: Chromium is not one embeddable API
+The initial prototype used Android System WebView, backed by the device's Chromium provider. That proved basic webpage rendering but did not establish browser-runtime capabilities such as WebExtensions, isolated profiles, or broad request interception.
 
-Chromium is a browser project and rendering stack. Different embedders expose different APIs and capabilities. Android System WebView is a content embedder and does not expose the full Chrome browser layer. Do not infer WebExtensions support from the presence of Chromium, Blink or V8.
+Chromium, Blink and V8 do not by themselves imply a complete browser or WebExtensions runtime. Any future reconsideration of a Chromium-based Android engine must be a deliberate architecture decision and must validate the exact runtime's lifecycle, security model, capabilities, update strategy, licensing and distribution size before implementation.
 
-Official Chromium documentation describes Android WebView as an embedder based on `//content` and lower layers rather than the sibling `//chrome` layer:
-- [Chromium Android WebView architecture](https://github.com/chromium/chromium/blob/main/android_webview/docs/architecture.md)
-- [Chromium supported products and platforms](https://chromium.googlesource.com/experimental/chromium/src/+/HEAD/docs/supported_platforms.md)
-
-## Runtime selection gate
-
-Before integrating a candidate, create a small isolated Android spike and verify each item on a real device/emulator:
-
-1. Embedding API and native view lifecycle are suitable for an Android browser.
-2. The exact runtime includes a working WebExtensions host, not merely JavaScript injection.
-3. Extension install, enable/disable, uninstall and installed-extension enumeration work.
-4. Manifest permissions and user consent are enforced.
-5. Content scripts execute in the expected isolated world and match configured origins.
-6. Background execution/service-worker behavior is documented and tested.
-7. Extension storage, popup/action UI and native messaging are available or have explicit limitations.
-8. Native messaging is bound to trusted extension IDs and validates a versioned message schema.
-9. ABI support, minSdk, Android OS support, security updates, licensing, APK size and update distribution are acceptable.
-10. Navigation, request interception, downloads, popups, file chooser, website permissions, renderer crashes and private-profile isolation are measured separately.
-
-If a candidate cannot pass the WebExtensions gate, do not label it WebExtensions-capable. Re-evaluate the runtime rather than silently replacing extensions with arbitrary page scripts.
-
-## Proposed source-set boundaries
-
-Keep native engine classes out of `commonMain`. Exact package names can change as the selected runtime is validated.
-
-```text
-composeApp/src/androidMain/kotlin/dev/veyra/browser/
-  engine/
-    ChromiumRuntimeOwner.kt
-    ChromiumBrowserEngine.kt
-    ChromiumBrowserHost.kt
-    ChromiumEngineFactory.kt
-    ChromiumNavigationAdapter.kt
-  extensions/
-    ChromiumExtensionRuntime.kt
-    ChromiumExtensionPermissions.kt
-    ChromiumNativeMessaging.kt
-```
-
-These are proposed boundaries, not files that already exist.
-
-- `ChromiumRuntimeOwner`: owns the process/runtime lifecycle and profile strategy.
-- `ChromiumBrowserEngine`: adapts one tab's commands, state and events to `BrowserEngineContract`.
-- `ChromiumBrowserHost`: attaches/detaches the native rendering surface without owning tab metadata.
-- `ChromiumEngineFactory`: creates engines and reports verified capabilities.
-- `ChromiumExtensionRuntime`: wraps only extension APIs actually exposed by the selected runtime.
-
-## Lifecycle and dependency rules
-
-- `BrowserController` owns logical engine instances and normalized events.
-- `BrowserSessionStore` owns tab metadata and selection.
-- The renderer host owns view attachment only; view detachment must not implicitly close a tab.
-- Closing a tab closes its engine/session and releases tab-scoped native resources.
-- Runtime/profile owners outlive individual tabs when required by the selected runtime.
-- Platform-specific types remain in Android source sets.
-- The Compose UI consumes `BrowserEngineContract` and a renderer binding contract, never casts to a concrete engine class.
-- Capabilities remain false until native integration and tests prove the behavior.
-
-## First implementation sequence
-
-1. Complete shared renderer/engine decoupling and platform-specific factory selection.
-2. Use the native Android Chromium WebView surface to prove one live tab and lifecycle integration.
-3. Verify page state, back/forward/reload/stop and resource release on Android.
-4. Evaluate a bundled Chromium embedder separately if pinning the engine version becomes a requirement.
-5. Run the WebExtensions spike only after the base Chromium surface is stable: bundled test extension, content script, permission prompt, storage and native messaging.
-6. Add Android integration tests for tab switching, tab closure and navigation callbacks.
-7. Only then migrate more shared UI and add advanced features.
-
-## Exit criteria
-
-- The chosen runtime's update model is explicit (system-updated WebView for the initial adapter; bundled runtime is a separate decision).
-- WebExtensions support, if pursued, is demonstrated with an actual extension, not inferred from engine branding.
-- Core contracts and tests pass without Android SDK types in `browser-core`.
-- Tab switching preserves the engine session; closing a tab releases only its own resources.
-- Unsupported capabilities are reported honestly and are covered by tests.
+The current implementation sequence is defined in `docs/ARCHITECTURE.md` and `docs/BROWSER_CORE_ARCHITECTURE.md`.
