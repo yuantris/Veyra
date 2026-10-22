@@ -50,7 +50,7 @@ jobs:
             :composeApp:compileKotlinIosX64 \
             --stacktrace
 
-  android-navigation-integration:
+  android-emulator-integration:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,7 +66,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
-      - name: Run Android navigation integration test
+      - name: Run Android instrumentation suite (navigation and downloads)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -74,3 +74,14 @@ jobs:
           target: google_apis
           disable-linux-hw-accel: false
           script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
+      - name: Explicitly verify DownloadPipelineAndroidTest on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-linux-hw-accel: false
+          script: >-
+            bash gradlew :composeApp:connectedDebugAndroidTest
+            -Pandroid.testInstrumentationRunnerArguments.class=dev.veyra.browser.DownloadPipelineAndroidTest
+            --stacktrace
