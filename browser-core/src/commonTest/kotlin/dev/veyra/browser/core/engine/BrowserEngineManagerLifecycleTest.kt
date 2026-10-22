@@ -1,5 +1,15 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.engine
 
+import dev.veyra.browser.core.BrowserEngineContract
+import dev.veyra.browser.core.BrowserEngineCreateRequest
+import dev.veyra.browser.core.BrowserEngineFactory
+import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.BrowserCapabilities
+import dev.veyra.browser.core.BrowserPageState
+import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.SessionId
+import dev.veyra.browser.core.TabId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking

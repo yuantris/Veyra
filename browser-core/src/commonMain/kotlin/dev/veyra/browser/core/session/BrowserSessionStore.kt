@@ -1,4 +1,4 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.session
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

@@ -1,4 +1,7 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.security
+
+import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.TabId
 
 /**
  * Canonical HTTP(S) origin. It deliberately excludes path, query, fragment and credentials.

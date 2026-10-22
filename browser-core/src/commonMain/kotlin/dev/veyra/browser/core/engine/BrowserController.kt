@@ -1,5 +1,20 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.engine
 
+import dev.veyra.browser.core.BrowserEngineContract
+import dev.veyra.browser.core.BrowserEngineCreateRequest
+import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.BrowserEventHub
+import dev.veyra.browser.core.BrowserPageState
+import dev.veyra.browser.core.BrowserProfileProvider
+import dev.veyra.browser.core.DownloadController
+import dev.veyra.browser.core.DownloadRequest
+import dev.veyra.browser.core.DownloadTask
+import dev.veyra.browser.core.NavigationDecision
+import dev.veyra.browser.core.NavigationId
+import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.TabId
+import dev.veyra.browser.core.navigation.BrowserNavigationCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job

@@ -1,4 +1,4 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.session
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

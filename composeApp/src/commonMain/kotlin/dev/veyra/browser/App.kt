@@ -42,8 +42,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import dev.veyra.browser.core.BrowserSessionCoordinator
-import dev.veyra.browser.core.BrowserTab
+import dev.veyra.browser.core.session.BrowserSessionCoordinator
+import dev.veyra.browser.core.session.BrowserTab
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource

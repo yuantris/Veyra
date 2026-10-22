@@ -12,7 +12,7 @@ import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import dev.veyra.browser.core.BrowserEngineContract
-import dev.veyra.browser.core.BrowserTab
+import dev.veyra.browser.core.session.BrowserTab
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.TabId

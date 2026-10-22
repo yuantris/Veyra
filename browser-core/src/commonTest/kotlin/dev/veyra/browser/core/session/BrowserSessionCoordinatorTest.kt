@@ -1,5 +1,21 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.session
 
+import dev.veyra.browser.core.BrowserCapabilities
+import dev.veyra.browser.core.BrowserEngineContract
+import dev.veyra.browser.core.BrowserEngineCreateRequest
+import dev.veyra.browser.core.BrowserEngineFactory
+import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.BrowserEventHub
+import dev.veyra.browser.core.BrowserLoadPhase
+import dev.veyra.browser.core.BrowserPageState
+import dev.veyra.browser.core.InMemoryBrowserProfileProvider
+import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.SessionId
+import dev.veyra.browser.core.TabId
+import dev.veyra.browser.core.engine.BrowserController
+import dev.veyra.browser.core.engine.BrowserEngineManager
+import dev.veyra.browser.core.navigation.BrowserNavigationCoordinator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

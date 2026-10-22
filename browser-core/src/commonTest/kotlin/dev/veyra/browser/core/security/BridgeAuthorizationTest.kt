@@ -1,5 +1,7 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.security
 
+import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.TabId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

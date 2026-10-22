@@ -1,4 +1,8 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.navigation
+
+import dev.veyra.browser.core.NavigationDecision
+import dev.veyra.browser.core.NavigationPolicyHandler
+import dev.veyra.browser.core.NavigationRequest
 
 /**
  * Centralizes navigation-policy evaluation before a platform adapter starts a navigation.

@@ -1,5 +1,9 @@
-package dev.veyra.browser.core
+package dev.veyra.browser.core.navigation
 
+import dev.veyra.browser.core.NavigationDecision
+import dev.veyra.browser.core.NavigationPolicyHandler
+import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.TabId
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
