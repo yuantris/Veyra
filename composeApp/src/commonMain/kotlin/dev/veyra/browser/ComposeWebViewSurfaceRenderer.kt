@@ -31,6 +31,8 @@ internal interface BrowserSurfaceRenderer {
 }
 
 /** Current prototype renderer. Platform-specific Chromium/KCEF/WKWebView/ArkWeb renderers can replace it. */
+internal fun createBrowserSurfaceRenderer(): BrowserSurfaceRenderer = ComposeWebViewSurfaceRenderer
+
 internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
     @Composable
     override fun Render(
