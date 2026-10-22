@@ -7,6 +7,9 @@ import dev.veyra.browser.core.BrowserEventHub
 import dev.veyra.browser.core.BrowserLoadPhase
 import dev.veyra.browser.core.BrowserPageState
 import dev.veyra.browser.core.BrowserProfileProvider
+import dev.veyra.browser.core.DownloadController
+import dev.veyra.browser.core.DownloadRequest
+import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
@@ -35,12 +38,17 @@ import kotlinx.coroutines.withContext
  * BrowserController/BrowserEngineManager remain responsible for engine/session lifecycle.
  *
  * The supplied scope must outlive this coordinator and be cancelled by its application owner.
+ *
+ * @param downloadController optional download task owner wired at the composition root. When
+ *   present, accepted download candidates can be started and cancelled through this coordinator;
+ *   when absent, download commands fail closed instead of pretending downloads exist.
  */
 class BrowserSessionCoordinator(
     private val store: BrowserSessionStore,
     private val controller: BrowserController,
     private val profileProvider: BrowserProfileProvider,
     private val scope: CoroutineScope,
+    private val downloadController: DownloadController? = null,
 ) {
     private val mutex = Mutex()
     private var started = false
@@ -53,6 +61,10 @@ class BrowserSessionCoordinator(
     val engines: StateFlow<Map<TabId, BrowserEngineContract>> get() = controller.registeredEngines
     val pageStates: StateFlow<Map<TabId, BrowserPageState>> get() = controller.pageStates
     val events: Flow<BrowserEvent> get() = controller.events
+
+    /** Download task state when a download controller is wired; null when downloads are not configured. */
+    val downloadTasks: StateFlow<List<DownloadTask>>?
+        get() = downloadController?.tasks
 
     /** Installs the projections and opens engines for tabs restored in metadata. Safe to call twice. */
     suspend fun start() = mutex.withLock { startLocked() }
@@ -169,6 +181,21 @@ class BrowserSessionCoordinator(
     fun stop(tabId: TabId): Boolean = !closed && controller.stop(tabId)
     fun detachSurface(tabId: TabId) = controller.detachSurface(tabId)
 
+    /**
+     * Starts an explicitly accepted download.
+     *
+     * Returns null when this coordinator is closed. Delegates ownership validation to the
+     * controller, which rejects an unwired download controller, an unknown tab, an engine
+     * without download capability and a profile that does not match the owning tab.
+     */
+    suspend fun startDownload(request: DownloadRequest): String? =
+        if (closed) null else controller.startDownload(request)
+
+    /** Cancels a running or queued download. No-op once this coordinator is closed. */
+    suspend fun cancelDownload(downloadId: String) {
+        if (!closed) controller.cancelDownload(downloadId)
+    }
+
     fun updateTab(
         tabId: String,
         url: String? = null,
@@ -219,12 +246,16 @@ class BrowserSessionCoordinator(
         /**
          * Production assembly entry point. UI supplies only the platform factory; core creates and
          * owns the store/controller/coordinator graph so App.kt cannot become a lifecycle broker.
+         *
+         * @param downloadController optional platform download task owner. Wire it here when the
+         *   platform can execute downloads; leave it null where downloads are unsupported.
          */
         fun create(
             engineFactory: BrowserEngineFactory,
             scope: CoroutineScope,
             store: BrowserSessionStore = BrowserSessionStore(),
             profileProvider: BrowserProfileProvider = InMemoryBrowserProfileProvider(),
+            downloadController: DownloadController? = null,
         ): BrowserSessionCoordinator {
             val controller = BrowserController(
                 engineManager = BrowserEngineManager(engineFactory),
@@ -232,8 +263,9 @@ class BrowserSessionCoordinator(
                 navigationCoordinator = BrowserNavigationCoordinator(),
                 eventHub = BrowserEventHub(),
                 scope = scope,
+                downloadController = downloadController,
             )
-            return BrowserSessionCoordinator(store, controller, profileProvider, scope)
+            return BrowserSessionCoordinator(store, controller, profileProvider, scope, downloadController)
         }
     }
 }

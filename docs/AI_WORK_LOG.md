@@ -14,12 +14,12 @@
 
 - **Phase:** core-first. The C0–C9 acceptance gates in `docs/BROWSER_CORE_ARCHITECTURE.md` are not all evidenced yet; native engine integration has not started.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
-- **Recently completed (2026-10-22):** renamed `:download-core` to `:browser-download`; reorganized `:browser-core` into root contracts plus `engine` / `session` / `navigation` / `security` packages; fixed the iOS `@JvmInline` resolution gap and added a CI `ios-compile` job; hardened C1/C3 with six deterministic race and failure tests (54 browser-core tests total).
+- **Recently completed (2026-10-22):** renamed `:download-core` to `:browser-download`; reorganized `:browser-core` into root contracts plus `engine` / `session` / `navigation` / `security` packages; fixed the iOS `@JvmInline` resolution gap and added a CI `ios-compile` job; hardened C1/C3 with six deterministic race and failure tests; added the download composition seam (`BrowserSessionCoordinator.create(downloadController = ...)` + fail-closed download commands), five C7 race/cancellation tests, and the explicit download acceptance layer (`DownloadPolicy`, `DownloadRequestHandler`).
 - **Known open issues:**
   - `:browser-download` is built and tested but not yet depended on by `:composeApp`.
   - `composeApp` commonMain still mixes UI (`App.kt`) with common adapter code (`ComposeWebViewEngineAdapter`, `BrowserNavigationRequestInterceptor`, `ComposeWebViewSurfaceRenderer`, `ComposeWebViewPlatformCapabilities`) in one flat package.
 - **Next smallest safe steps:**
-  1. Wire `:browser-download` into the `composeApp` composition root behind the existing `DownloadController` contract, then add a close-vs-start race test.
+  1. Decide the platform `DownloadTransport` strategy (see task list), then wire `App.kt`: collect `BrowserEvent.DownloadRequested` → `DownloadRequestHandler` → `coordinator.startDownload`, and close the download controller at the composition root.
   2. Continue C-gate evidence: coordinator late-event/stale-callback cases and C4/C5 negative paths not yet covered by tests.
   3. Decide whether `composeApp` commonMain should split UI from common adapter code (same bar as the core split: only with a real boundary).
 
@@ -64,3 +64,16 @@
 - **Test evidence:** `:browser-core:jvmTest` 54 tests pass (48 before, 6 added); `:browser-download:jvmTest`, `:composeApp:desktopTest` pass; `:composeApp:compileDebugKotlinAndroid` and the three `compileKotlinIosArm64` tasks pass. No production code changed in this session; only tests and `.gitignore`.
 - **Next smallest safe step:** wire `:browser-download` into the `composeApp` composition root behind the existing `DownloadController` contract, then add a close-vs-start race test.
 - **Files:** `.gitignore`, `browser-core/src/commonTest/.../engine/BrowserEngineManagerConcurrencyTest.kt`, `browser-core/src/commonTest/.../engine/BrowserEngineManagerLifecycleTest.kt`, `browser-core/src/commonTest/.../session/BrowserSessionCoordinatorTest.kt`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-22 — Download wiring: composition seam, C7 evidence, acceptance layer
+
+- **Goal:** Continue the documented next step — make `:browser-download` usable from the app behind the existing `DownloadController` contract, and prove the C7 race/cancellation semantics with tests.
+- **Completed:**
+  - `BrowserSessionCoordinator.create(...)` gained an optional `downloadController` and threads it into `BrowserController`; the coordinator now exposes `downloadTasks` plus fail-closed `startDownload`/`cancelDownload`, so `App.kt` can use downloads without touching the controller directly.
+  - `DefaultDownloadControllerTest` gained five C7 cases: duplicate request ID reuse (no second transport run, mismatched payload rejected), cancel of a running task, cancel of a queued task (transport never invoked), close-vs-start race (close waits for the in-flight transfer, task ends cancelled, later starts rejected), and transport cancellation mapping to a cancelled task.
+  - composeApp gained the explicit acceptance layer required by C7: `DownloadPolicy` (HTTP/HTTPS only; a candidate is never auto-started) and `DownloadRequestHandler` (routes accepted candidates into the core API and reports Started/Rejected/Failed; cancellation is rethrown, never converted to a failure).
+  - Test-infrastructure notes worth remembering: JUnit4 requires test methods to return void (a trailing `assertIs`/`assertFailsWith` breaks the class); a controller on an `Unconfined` scope cancels in place, so "close waits for in-flight work" is only deterministically observable when the controller shares the test's event-loop scope.
+- **Test evidence:** `:browser-core:jvmTest` 56 tests pass; `:browser-download:jvmTest` 8 pass; `:composeApp:desktopTest` 17 pass; `:composeApp:compileDebugKotlinAndroid` and the three `compileKotlinIosArm64` tasks pass.
+- **Not done (awaiting decision):** the platform `DownloadTransport` implementation and the `App.kt` event-collection wiring. Only the Android adapter currently detects downloads (`DownloadListener` → `DownloadRequested`, `downloads = true`); desktop and iOS report no download capability. Options recorded in the task list: Android system `DownloadManager`, Ktor client, hand-rolled per-platform (HttpURLConnection + NSURLSession), or defer.
+- **Next smallest safe step:** decide the transport strategy, then wire `App.kt` to collect `BrowserEvent.DownloadRequested` through `DownloadRequestHandler` into `coordinator.startDownload`, and close the controller at the composition root.
+- **Files:** `browser-core/src/commonMain/.../session/BrowserSessionCoordinator.kt`, `browser-core/src/commonTest/.../session/BrowserSessionCoordinatorTest.kt`, `browser-download/src/commonTest/.../DefaultDownloadControllerTest.kt`, `composeApp/src/commonMain/.../DownloadPolicy.kt` (new), `composeApp/src/commonMain/.../DownloadRequestHandler.kt` (new), `composeApp/src/commonTest/.../DownloadRequestHandlerTest.kt` (new), `docs/AI_WORK_LOG.md`.

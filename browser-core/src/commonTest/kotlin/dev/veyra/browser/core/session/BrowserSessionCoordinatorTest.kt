@@ -8,9 +8,14 @@ import dev.veyra.browser.core.BrowserEvent
 import dev.veyra.browser.core.BrowserEventHub
 import dev.veyra.browser.core.BrowserLoadPhase
 import dev.veyra.browser.core.BrowserPageState
+import dev.veyra.browser.core.DownloadController
+import dev.veyra.browser.core.DownloadPhase
+import dev.veyra.browser.core.DownloadRequest
+import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.ProfileId
+import dev.veyra.browser.core.RequestId
 import dev.veyra.browser.core.SessionId
 import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.engine.BrowserController
@@ -31,6 +36,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BrowserSessionCoordinatorTest {
@@ -193,9 +199,93 @@ class BrowserSessionCoordinatorTest {
         coordinator.close()
         scope.cancel()
     }
+    @Test
+    fun wiredDownloadControllerStartsAndCancelsAcceptedDownloads() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val factory = CoordinatorTestFactory(BrowserCapabilities(downloads = true))
+        val downloads = RecordingDownloadController()
+        val coordinator = BrowserSessionCoordinator.create(
+            engineFactory = factory,
+            scope = scope,
+            downloadController = downloads,
+        )
+        coordinator.start()
+
+        val tab = coordinator.openTab("https://example.com")
+        val request = DownloadRequest(
+            requestId = RequestId("download-1"),
+            tabId = TabId(tab.id),
+            profileId = ProfileId("default"),
+            url = "https://example.com/file.zip",
+        )
+
+        assertEquals("download-1", coordinator.startDownload(request))
+        assertEquals(listOf(request), downloads.started)
+
+        coordinator.cancelDownload("download-1")
+        assertEquals(listOf("download-1"), downloads.cancelled)
+
+        // Closed coordinators fail closed instead of touching the download controller.
+        coordinator.close()
+        assertNull(coordinator.startDownload(request))
+        coordinator.cancelDownload("download-1")
+        assertEquals(listOf("download-1"), downloads.cancelled)
+        scope.cancel()
+    }
+
+    @Test
+    fun downloadCommandsFailClosedWhenNoControllerIsWired() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val coordinator = BrowserSessionCoordinator.create(
+            engineFactory = CoordinatorTestFactory(),
+            scope = scope,
+        )
+        coordinator.start()
+        val tab = coordinator.openTab("https://example.com")
+
+        // No download controller is configured: starting must fail loudly, not silently succeed.
+        val failure = assertFailsWith<IllegalStateException> {
+            coordinator.startDownload(
+                DownloadRequest(
+                    requestId = RequestId("download-1"),
+                    tabId = TabId(tab.id),
+                    profileId = ProfileId("default"),
+                    url = "https://example.com/file.zip",
+                ),
+            )
+        }
+        assertTrue(failure.message!!.contains("No download controller is configured"))
+
+        coordinator.close()
+        scope.cancel()
+    }
 }
 
-private class CoordinatorTestFactory : BrowserEngineFactory {
+private class RecordingDownloadController : DownloadController {
+    private val mutableTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    override val tasks: StateFlow<List<DownloadTask>> = mutableTasks
+    val started = mutableListOf<DownloadRequest>()
+    val cancelled = mutableListOf<String>()
+
+    override suspend fun start(request: DownloadRequest): String {
+        started += request
+        val id = "download-${started.size}"
+        mutableTasks.value = mutableTasks.value + DownloadTask(
+            id = id,
+            request = request,
+            phase = DownloadPhase.RUNNING,
+        )
+        return id
+    }
+
+    override suspend fun cancel(downloadId: String) {
+        cancelled += downloadId
+    }
+}
+
+private class CoordinatorTestFactory(
+    private val engineCapabilities: BrowserCapabilities = BrowserCapabilities(),
+) : BrowserEngineFactory {
     val requests = mutableListOf<BrowserEngineCreateRequest>()
     var failNextCreate = false
     private val closeFailures = mutableMapOf<String, Throwable>()
@@ -211,13 +301,14 @@ private class CoordinatorTestFactory : BrowserEngineFactory {
             failNextCreate = false
             throw IllegalStateException("Synthetic engine creation failure")
         }
-        return CoordinatorTestEngine(request) { closeFailures[request.tabId.value] }
+        return CoordinatorTestEngine(request, engineCapabilities) { closeFailures[request.tabId.value] }
     }
 }
 
 private class CoordinatorTestEngine(
     request: BrowserEngineCreateRequest,
-    private val closeError: () -> Throwable? = { null },
+    private val engineCapabilities: BrowserCapabilities,
+    private val closeError: () -> Throwable?,
 ) : BrowserEngineContract {
     override val tabId = request.tabId
     override val sessionId = SessionId("session-${request.tabId.value}")
@@ -226,7 +317,7 @@ private class CoordinatorTestEngine(
     override val pageState: StateFlow<BrowserPageState> = mutablePageState
     private val mutableEvents = MutableSharedFlow<BrowserEvent>(extraBufferCapacity = 16)
     override val events: Flow<BrowserEvent> = mutableEvents
-    override val capabilities = BrowserCapabilities()
+    override val capabilities = engineCapabilities
     var closed = false
         private set
 
