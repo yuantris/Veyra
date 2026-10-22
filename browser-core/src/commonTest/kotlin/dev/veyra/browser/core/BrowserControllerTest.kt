@@ -47,6 +47,38 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun exposesLatestPageStateAndRemovesItWhenTabCloses() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val controller = BrowserController(
+            BrowserEngineManager(FakeFactory()),
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(),
+            BrowserEventHub(),
+            scope,
+        )
+        val tabId = TabId("tab-state")
+        val engine = controller.openTab(tabId) as FakeEngine
+        assertEquals(BrowserPageState(tabId), controller.pageStates.value[tabId])
+
+        val loadedPage = BrowserPageState(
+            tabId = tabId,
+            url = "https://example.com",
+            displayUrl = "https://example.com",
+            title = "Example",
+            loadPhase = BrowserLoadPhase.SUCCEEDED,
+            progress = 100,
+            canGoBack = true,
+        )
+        engine.updatePageState(loadedPage)
+        assertEquals(loadedPage, controller.pageStates.value[tabId])
+
+        assertTrue(controller.closeTab(tabId))
+        assertFalse(controller.pageStates.value.containsKey(tabId))
+        controller.close()
+        scope.cancel()
+    }
+
+    @Test
     fun unknownProfileIsRejectedBeforeEngineCreation() = runBlocking {
         val factory = FakeFactory()
         val controller = BrowserController(
@@ -215,11 +247,13 @@ class BrowserControllerTest {
         override val profileId: ProfileId,
     ) : BrowserEngineContract {
         override val sessionId = SessionId("session-${tabId.value}")
-        override val pageState: StateFlow<BrowserPageState> = MutableStateFlow(BrowserPageState(tabId))
+        private val mutablePageState = MutableStateFlow(BrowserPageState(tabId))
+        override val pageState: StateFlow<BrowserPageState> = mutablePageState
         private val mutableEvents = MutableSharedFlow<BrowserEvent>()
         override val events: Flow<BrowserEvent> = mutableEvents
         override val capabilities = BrowserCapabilities()
         var navigateCount = 0
+        fun updatePageState(state: BrowserPageState) { mutablePageState.value = state }
         suspend fun emit(event: BrowserEvent) { mutableEvents.emit(event) }
         override fun navigate(request: NavigationRequest) { navigateCount++ }
         override fun goBack() = Unit
