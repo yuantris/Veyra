@@ -207,6 +207,7 @@ class BrowserController(
     }
 
     suspend fun closeTab(tabId: TabId): Boolean = lifecycleMutex.withLock {
+        if (closed) return@withLock false
         val eventJob = eventJobs.remove(tabId)
         eventJob?.cancel()
         val pageStateJob = pageStateJobs.remove(tabId)
@@ -216,16 +217,16 @@ class BrowserController(
         closedEngine || eventJob != null || pageStateJob != null
     }
 
-    suspend fun close() {
-        lifecycleMutex.withLock {
-            if (closed) return
-            closed = true
-            eventJobs.values.forEach(Job::cancel)
-            eventJobs.clear()
-            pageStateJobs.values.forEach(Job::cancel)
-            pageStateJobs.clear()
-            mutablePageStates.value = emptyMap()
-        }
+    suspend fun close() = lifecycleMutex.withLock {
+        if (closed) return@withLock
+        // Keep the lifecycle lock until engine shutdown completes. Otherwise a concurrent
+        // closeTab() can race with closeAll() after the controller has been marked closed.
+        closed = true
+        eventJobs.values.forEach(Job::cancel)
+        eventJobs.clear()
+        pageStateJobs.values.forEach(Job::cancel)
+        pageStateJobs.clear()
+        mutablePageStates.value = emptyMap()
         engineManager.closeAll()
     }
 }
