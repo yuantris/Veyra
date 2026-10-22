@@ -118,8 +118,31 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     }
 }
 
+/**
+ * Production DownloadListener wiring: normalizes the platform callback into a core
+ * [DownloadRequest] without starting any transfer. The candidate is only announced; the app
+ * acceptance policy decides what happens next.
+ */
+internal fun createDownloadListener(
+    tabId: TabId,
+    profileId: ProfileId,
+    onDownloadRequested: (DownloadRequest) -> Unit,
+): DownloadListener = DownloadListener { url, _, contentDisposition, mimeType, contentLength ->
+    onDownloadRequested(
+        DownloadRequest(
+            requestId = RequestId("download-${java.util.UUID.randomUUID()}"),
+            tabId = tabId,
+            profileId = profileId,
+            url = url,
+            suggestedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType),
+            mimeType = mimeType,
+            expectedBytes = contentLength.takeIf { it >= 0L },
+        ),
+    )
+}
+
 @SuppressLint("SetJavaScriptEnabled")
-private fun createWebView(
+internal fun createWebView(
     context: android.content.Context,
     tabId: TabId,
     profileId: ProfileId,
@@ -143,18 +166,11 @@ private fun createWebView(
     }
 
     setDownloadListener(
-        DownloadListener { url, _, contentDisposition, mimeType, contentLength ->
-            val request = dev.veyra.browser.core.DownloadRequest(
-                requestId = RequestId("download-${java.util.UUID.randomUUID()}"),
-                tabId = tabId,
-                profileId = profileId,
-                url = url,
-                suggestedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType),
-                mimeType = mimeType,
-                expectedBytes = contentLength.takeIf { it >= 0L },
-            )
-            onDownloadRequested(request)
-        },
+        createDownloadListener(
+            tabId = tabId,
+            profileId = profileId,
+            onDownloadRequested = onDownloadRequested,
+        ),
     )
 
     webChromeClient = object : WebChromeClient() {

@@ -51,4 +51,4 @@ The Android download pipeline is wired end-to-end in code — `DownloadListener`
 - closing the tab or the app while a transfer is in flight ends the task as cancelled without hanging;
 - a private tab's download keeps its profile attribution and never enters normal download history.
 
-When that test passes, flip `downloads` to true in `ComposeWebViewPlatformCapabilities.android.kt` and update the row above. iOS and Desktop keep `downloads = false` until their own detection and execution paths exist.
+`DownloadPipelineAndroidTest` (androidInstrumentedTest) implements exactly these checks against production code with MockWebServer as the transfer endpoint. It compiles and the unit-level components are green, but it has **not yet been executed on a device** — the emulator job in CI is the verification vehicle. When that job goes green, flip `downloads` to true in `ComposeWebViewPlatformCapabilities.android.kt` and update the row above. iOS and Desktop keep `downloads = false` until their own detection and execution paths exist.
