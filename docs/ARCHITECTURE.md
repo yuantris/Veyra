@@ -1,135 +1,121 @@
 # Veyra architecture
 
-## Product and platform direction
+**Status:** Normative architecture baseline  
+**Principle:** Prefer the smallest set of modules that creates real ownership and dependency boundaries. Package organization is not a reason by itself to create a Gradle module.
 
-Veyra is a cross-platform browser with a shared Compose Multiplatform UI and native browser-engine adapters. The product architecture is shared; rendering engines and platform callbacks are not.
+## 1. Product and platform direction
 
-| Platform | Engine direction | Priority |
+Veyra is a cross-platform browser built with Kotlin Multiplatform and Compose Multiplatform. UI and browser product behavior are shared where appropriate; rendering engines, native callbacks and platform resource ownership remain platform-specific.
+
+| Platform | Selected engine direction | Integration principle |
 | --- | --- | --- |
-| Android | Chromium-based embeddable runtime (TBD) | First; must prove WebExtensions support before selection |
-| iOS | WKWebView | Native adapter; extension compatibility is not assumed |
-| HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/bridge |
-| Desktop | KCEF / Chromium | Later adapter after the core contract is validated |
+| Android | GeckoView | First implementation priority; validate the exact runtime capabilities and lifecycle |
+| iOS | WKWebView | Native adapter |
+| HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/toolchain |
+| Desktop | KCEF / Chromium | Native adapter |
 
-Do not expose Chromium runtime, `WKWebView`, ArkWeb, or CEF types to `commonMain` or browser business logic.
+These are engine directions, not claims that every platform supports identical browser APIs or WebExtensions. Capability support must be verified and reported honestly. Do not expose GeckoView, WebKit, ArkWeb, CEF or platform UI types to `commonMain` browser-domain code.
 
-## Existing code and current gaps
+## 2. Initial Gradle module boundaries
 
-- `browser-core` is a Kotlin Multiplatform module with the platform-neutral `BrowserEngine` contract and `BrowserSessionStore`.
-- `BrowserSessionStore` owns tab metadata, active-tab selection, bookmarks and in-memory history. Private-tab visits are excluded from shared history.
-- The current `BrowserEngine` contract covers navigation basics, but not yet capability discovery, permission requests, downloads, popups, request policy or extensions.
-- The current shared UI still uses `compose-webview-multiplatform` as a prototype renderer; the engine control and surface-binding contracts are being separated before native adapters are added.
-- The current UI mounts only the active WebView. Switching tabs can therefore recreate the renderer and reload its URL; live page state is not guaranteed to survive.
-- Android and desktop page loading were previously manually verified. Each future change must be validated by its own CI run and Android device/emulator test.
+Keep the initial module count deliberately small:
 
-## Dependency direction
+| Module | Owns | Does not own |
+| --- | --- | --- |
+| `:composeApp` | App entry points, shared Compose UI, platform UI/surface adapters, dependency assembly | Browser policy implementations hidden inside UI; engine lifetime tied to recomposition |
+| `:browser-core` | Stable browser contracts and shared coordination: IDs, models, engine/session ownership, navigation, normalized events/errors, capabilities and policy interfaces | Native SDKs, Compose UI, file I/O, platform-specific downloads |
+| `:download-core` | Download task lifecycle, queue/concurrency, progress, cancellation, transport abstraction and task state | Browser tab ownership, native engine objects, concrete platform file APIs |
+
+Platform engine adapters initially live in the appropriate platform source sets and packages. Do not create a Gradle module for every logical subsystem. Navigation, tab metadata, JS bridge policy, permissions and extension use cases can begin as cohesive packages/contracts within the existing modules. Split them only when a demonstrated need exists—for example, independent dependency isolation, build/test isolation, publication, or a genuinely separate release lifecycle.
+
+A shared contract does not imply that every feature needs a shared implementation. Platform-specific behavior stays in platform adapters; unsupported capabilities are explicit.
+
+## 3. Dependency rules
 
 ```text
-Compose UI (commonMain)
-        |
-        v
-Browser application/use cases
-        |
-        +---- BrowserSessionStore (tab metadata and browser records)
-        |
-        +---- BrowserEngine contract + capability/policy contracts
-                    ^
-                    |
-        platform adapter factory (platform source sets)
-          |          |           |           |
-       Chromium  WKWebView     ArkWeb       KCEF
-        Android      iOS       HarmonyOS    Desktop
+                         composeApp
+                       /            \\
+                      v              v
+               browser-core      download-core
+                      ^              |
+                      |              | depends on download contracts
+              platform adapters ----+
+                      |
+             native engine SDKs
 ```
 
-Shared code may depend on `browser-core`. Platform adapters may depend on `browser-core` and their own native SDKs. `browser-core` must never depend on `composeApp` or any platform engine.
+The diagram shows ownership and assembly rather than requiring a strict linear dependency chain. The rules are:
 
-## Core ownership and lifecycle
+1. `:browser-core` never depends on `:composeApp`, platform SDKs or concrete engines.
+2. `:download-core` may depend on browser-owned download contracts; `:browser-core` must not depend on the download implementation.
+3. `:composeApp` is the composition root: it wires a controller, engine factory, optional subsystem controllers and platform adapters.
+4. Common code depends on platform-neutral interfaces. Native objects do not escape their adapter/source set.
+5. Dependencies point toward stable contracts. Avoid circular project dependencies and service-locator access to concrete platform implementations.
+6. Prefer a package over a new module when the code shares the same owner, dependency set, test lifecycle and release cadence.
 
-### Browser runtime
+## 4. Core contract convergence
 
-- Android will use a Chromium-based embeddable runtime, but the exact distribution and ownership model remain an explicit decision gate. Do not assume Android System WebView, CEF-derived products, or arbitrary Chromium builds expose the same browser APIs.
-- WebExtensions is a required capability gate. Blink + V8 alone does not imply a usable WebExtensions runtime or extension-management API; validate install, lifecycle, permissions, content scripts and native messaging on the exact candidate before committing to it.
-- Private browsing must use a deliberately configured private session/profile strategy. Do not assume tab metadata alone provides cookie, cache or storage isolation.
-- Each live tab maps to a platform session/engine instance attached to its native view only while displayed, unless a documented memory policy says otherwise.
-- Selecting another tab changes the displayed native view/session; it must not dispose the previous tab's session.
-- Closing a tab disposes its session and removes its engine registry entry. Closing a tab must not shut down the shared runtime.
-- Activity recreation, process death, renderer crash and app backgrounding are separate lifecycle cases. Persist restorable tab metadata, but do not claim that renderer memory/JavaScript state survives process death.
+The repository currently contains both the legacy `BrowserEngine` and the newer `BrowserEngineContract`. This is migration state, not the intended permanent design.
 
-### Engine contract
+Before adding another production engine adapter, review and converge the contracts into one clearly named engine/session abstraction. Preserve compatibility only where an existing adapter demonstrably needs it; do not keep two competing sources of truth for navigation, state, events or disposal. The target contract must cover:
 
-Keep `BrowserEngine` platform-neutral. It should represent user intent and observable browser state, not native objects. Its stable responsibilities are:
+- stable `TabId`, `SessionId`, `NavigationId`, `RequestId` and `ProfileId` identities;
+- navigation commands and normalized page state/events/errors;
+- capability reporting for optional platform features;
+- explicit engine/session ownership, surface attach/detach and idempotent close;
+- a clear distinction between tab metadata and the live native renderer/session;
+- private-profile isolation as an engine/runtime policy, not merely a boolean on tab metadata.
 
-- navigate to a URL, back, forward, reload and stop;
-- expose URL, title, loading/progress, back/forward availability and normalized failures;
-- expose lifecycle/disposal semantics;
-- report a platform capability snapshot so UI/use cases can hide or explain unsupported features.
+The engine manager owns live engine instances. Selecting or detaching a tab must not implicitly dispose its engine. Closing a tab closes only its owned session. Runtime objects shared across tabs must have a separate owner and lifecycle.
 
-Do not force all engines to implement every native feature through fake universal methods. Model optional capabilities explicitly and put specialized behavior behind capability-specific interfaces.
+## 5. Subsystem boundaries
 
-### Native interaction and policies
+### Navigation and policy
+Navigation decisions must be fast and deterministic when invoked from synchronous native callbacks. Separate navigation decisions from resource interception; do not claim broad interception where a platform only supports top-level navigation callbacks.
 
-Native adapters own navigation delegates, web-content UI callbacks, file chooser callbacks, permission callbacks, downloads, popups, request interception and renderer/runtime errors. They translate native callbacks into typed core events and translate core decisions back into native actions.
+### Downloads
+A platform download callback only announces a candidate request; it does not imply user consent or start network I/O. The app/policy layer explicitly accepts or rejects the request. `download-core` owns task state and scheduling, while an injected transport owns HTTP behavior, cookies/authentication, destination creation, persistence and cleanup. Platform capabilities and limitations must be explicit.
 
-Distinguish:
-- navigation policy (allow, cancel, external app, new tab);
-- website permission (camera, microphone, location, notifications);
-- operating-system runtime permission;
-- download decisions and progress;
-- popup/new-window requests;
-- resource interception and request blocking.
+### JS/native bridge and extensions
+Bridge messages are versioned and validated. The receiver derives origin/frame identity from trusted engine metadata rather than trusting fields supplied by page JavaScript. Privileged methods require origin/extension identity checks and explicit permission policy. Do not treat arbitrary script injection as equivalent to a WebExtensions runtime. Extension contracts can begin in browser-core packages; a separate Gradle module is not justified until dependency or release boundaries require it.
 
-A single boolean such as `interceptEveryRequest()` is not a sufficient cross-platform abstraction. Request interception differs by engine and platform; capability declarations must be explicit.
+### Permissions, popups and interception
+Keep website permission requests, operating-system runtime permissions, popups, downloads and request interception as distinct decisions. Optional features should use focused interfaces or explicit capability-specific adapters instead of bloating the base engine interface.
 
-## Extension architecture (required direction)
+## 6. Platform adapter rules
 
-Android's Chromium-based candidate must prove extension-runtime support before it is selected. Chromium's rendering stack (Blink + V8) is not by itself a WebExtensions implementation. Prefer a real extension runtime with lifecycle, permission and messaging APIs; do not treat ad-hoc JavaScript injection as equivalent to extensions.
+- Android / GeckoView is the first adapter and should validate the architecture before other platform work expands.
+- iOS uses WKWebView; HarmonyOS uses ArkWeb; desktop uses KCEF.
+- Each adapter translates native callbacks into normalized state/events and maps core decisions back to native actions.
+- Capabilities remain unavailable until the exact implementation is tested.
+- A platform adapter owns native surface attachment; the browser session owner owns engine lifetime.
+- Do not create fake implementations that silently report success for unsupported features.
 
-Logical boundaries (these do not need to be separate Gradle modules initially):
+## 7. Testing and quality gates
 
-- `extension-api`: normalized extension metadata, identifiers, versions, permission requests and capability requirements.
-- `extension-runtime`: install, uninstall, enable, disable, enumerate and update use cases.
-- `extension-permissions`: user-facing permission decisions and least-privilege policy.
-- `extension-storage`: Veyra-owned settings and extension preferences; native engines may also maintain their own extension storage.
-- platform extension adapters: map Veyra operations to native extension APIs and report unsupported features.
-- `extension-ui`: management, detail, permission and settings screens, implemented in shared Compose where practical.
+Every architectural change must pass the relevant module tests and build checks. The CI test workflow must include both `:browser-core:jvmTest` and `:download-core:jvmTest`, plus the existing app adapter tests. Add focused tests for lifecycle, navigation race handling, event normalization, download state transitions, cancellation and unsupported capabilities.
 
-Android Chromium runtime selection details:
+Before marking a platform feature complete, test it against the real native engine (emulator/device where applicable), not only a fake transport or mocked contract.
 
-- Treat Chromium as a family of embedders, not one interchangeable API. System WebView does not expose the full Chrome browser layer.
-- Require a working WebExtensions runtime as an explicit acceptance gate; Blink + V8 alone is not enough.
-- Verify extension installation/lifecycle, permissions, content scripts, background execution, storage, popup/action UI and native messaging on the exact runtime.
-- Bind privileged native messaging to trusted extension identities and validate a versioned, typed protocol.
-- Do not promise Chrome Web Store compatibility unless the runtime and the target extension APIs have been tested.
+## 8. Implementation sequence
 
-Other platforms may implement only a subset of the Veyra extension API. A shared API means a shared product contract, not a promise that every extension binary runs on every engine.
+1. Treat this document and `BROWSER_CORE_ARCHITECTURE.md` as the architectural baseline.
+2. Audit and converge the legacy/new engine contracts before adding more engine-specific behavior.
+3. Verify BrowserController, engine manager, session ownership and event delivery with focused tests.
+4. Integrate Android/GeckoView first through a platform adapter that obeys the stable contract.
+5. Complete download transport as a platform adapter and wire it at the app composition root.
+6. Add iOS, HarmonyOS and desktop adapters against the same contract, documenting capability differences.
+7. Introduce more Gradle modules only when an observed dependency/build/release boundary justifies them.
 
-## Security baseline
+## 9. Change review checklist
 
-- Never expose arbitrary native methods directly to web pages.
-- Bind privileged extension/native messages to known extension IDs and validate message shape, origin/context, permissions and request IDs.
-- Request only the permissions needed by a feature; show permission prompts for install and permission changes.
-- Keep private browsing data, extension storage and browsing history policy explicitly separated. Private visits must not enter normal history.
-- Validate schemes and URLs before external-app launches or privileged operations.
-- Treat remote extension packages, manifests, page messages and intercepted response data as untrusted input.
+For every new class or module, answer:
 
-## Delivery plan
+- Which single responsibility and owner does it belong to?
+- Why is a package insufficient if a new Gradle module is proposed?
+- Does the dependency direction point toward stable contracts?
+- Who owns cancellation, native resources and shutdown?
+- How is the behavior tested, including failure and unsupported-platform cases?
+- Does this make another platform or feature easier to implement without creating needless abstraction?
 
-1. **Architecture contract (this stage):** document platform ownership, engine/session lifecycle, capability reporting, extension boundaries and security invariants.
-2. **Android Chromium spike:** compare candidate embedders and choose one only after verifying WebExtensions support, ABI/minSdk, update model, package size, licensing and maintenance cost.
-3. **Android engine adapter:** implement `BrowserEngineContract` and a native host that retains one live engine session per tab. Wire tab select/close and test page-state retention.
-4. **Native browser callbacks:** normalize navigation, load progress/errors, popup, file chooser, website permissions and downloads. Mark unsupported behavior explicitly.
-5. **Extension foundation:** install/list/enable/disable/uninstall a bundled test extension and verify permission prompts, content scripts, background behavior and native messaging on the chosen runtime.
-6. **Shared UI integration:** route UI actions through core use cases; remove direct WebView-library usage from shared browser business logic.
-7. **Other platform adapters:** WKWebView, ArkWeb and KCEF; each advertises its own capability set.
-8. **Production hardening:** process-death recovery, private profile isolation, crash recovery, storage policy, security tests, engine update strategy and distribution-size review.
-
-## Validation checklist
-
-- Switching tabs preserves a live page session; closing a tab disposes only that session.
-- Browser runtime is not created/destroyed by recomposition.
-- Back/forward/reload/stop and loading state work against real pages.
-- Unsupported native features are surfaced as capabilities, not fake successes.
-- Private visits do not enter regular history.
-- A bundled WebExtension can be installed idempotently and communicate through the native-messaging contract.
-- External extension installation verifies signatures and presents permission prompts.
-- Untrusted web content cannot invoke privileged extension/native operations.
+If these questions cannot be answered clearly, do not add the abstraction yet.
