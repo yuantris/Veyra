@@ -11,11 +11,24 @@ data class BrowserOrigin(
 ) {
     init {
         require(scheme == "http" || scheme == "https")
-        require(host.isNotBlank())
+        require(host == host.lowercase()) { "Origin host must be canonical lowercase." }
+        require(isValidHost(host)) { "Origin host is malformed." }
         require(port in 1..65535)
     }
 
     companion object {
+        private val DNS_HOST_PATTERN = Regex(
+            "(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*",
+        )
+        private val IPV6_HOST_PATTERN = Regex("\\[[0-9a-f:.]+]")
+
+        private fun isValidHost(host: String): Boolean =
+            if (host.startsWith("[") || host.endsWith("]")) {
+                IPV6_HOST_PATTERN.matches(host) && host.contains(':')
+            } else {
+                host.length <= 253 && DNS_HOST_PATTERN.matches(host)
+            }
+
         fun parse(value: String): BrowserOrigin? {
             if (value.isBlank() || value != value.trim() || value.any { it.isWhitespace() || it.isISOControl() }) {
                 return null
@@ -53,9 +66,7 @@ data class BrowserOrigin(
                 }
             }
 
-            if (host.isBlank() || host.startsWith(".") || host.endsWith(".") ||
-                host.contains("..") || host.any { !(it.isLetterOrDigit() || it == '.' || it == '-' || it == '[' || it == ']' || it == ':') }
-            ) return null
+            if (!isValidHost(host)) return null
 
             val port = if (explicitPort == null) {
                 if (scheme == "https") 443 else 80
