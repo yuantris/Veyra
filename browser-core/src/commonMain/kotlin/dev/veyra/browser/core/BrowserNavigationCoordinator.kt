@@ -10,21 +10,57 @@ package dev.veyra.browser.core
 class BrowserNavigationCoordinator(
     private val policyHandler: NavigationPolicyHandler? = null,
 ) {
-    /** Synchronous by design so native callbacks can enforce the result without blocking. */
+    /**
+     * Synchronous by design so native callbacks can enforce the result without blocking.
+     * Basic syntax and script-URL checks run before custom policy to prevent a permissive host
+     * policy from accidentally turning malformed or executable URL input into a navigation.
+     */
     fun decide(request: NavigationRequest): NavigationDecision {
-        if (request.url.isBlank()) return NavigationDecision.Cancel
+        val url = request.url
+        if (url.isBlank() || url != url.trim() || url.any { it.isWhitespace() || it.isISOControl() }) {
+            return NavigationDecision.Cancel
+        }
 
-        val scheme = request.url.substringBefore(':', missingDelimiterValue = "")
+        val scheme = url.substringBefore(':', missingDelimiterValue = "")
             .lowercase()
-        if (scheme.isBlank()) return NavigationDecision.Cancel
+        if (!SCHEME_PATTERN.matches(scheme)) return NavigationDecision.Cancel
 
-        val handler = policyHandler ?: return defaultDecision(request.url, scheme)
-        return handler.decide(request)
+        // Never route script URLs to the host or allow them as top-level navigations.
+        if (scheme == "javascript" || scheme == "vbscript") return NavigationDecision.Cancel
+
+        if (scheme == "http" || scheme == "https") {
+            if (!url.startsWith("$scheme://", ignoreCase = true)) {
+                return NavigationDecision.Cancel
+            }
+            val authority = url.substringAfter("://").substringBeforeAny('/', '?', '#')
+            if (authority.isBlank() || authority.startsWith(":")) {
+                return NavigationDecision.Cancel
+            }
+        }
+
+        if (scheme == "about" && !url.equals("about:blank", ignoreCase = true)) {
+            return NavigationDecision.Cancel
+        }
+
+        val handler = policyHandler
+        if (handler != null) return handler.decide(request)
+        return defaultDecision(url, scheme)
     }
 
     private fun defaultDecision(url: String, scheme: String): NavigationDecision =
         when (scheme) {
-            "http", "https", "about", "file", "data", "blob" -> NavigationDecision.Allow
+            "http", "https", "about" -> NavigationDecision.Allow
+            // These schemes require explicit product/profile policy; they are not safe defaults.
+            "file", "data", "blob", "content", "intent" -> NavigationDecision.Cancel
             else -> NavigationDecision.OpenExternal(url)
         }
+
+    private fun String.substringBeforeAny(vararg delimiters: Char): String {
+        val index = indexOfAny(delimiters)
+        return if (index < 0) this else substring(0, index)
+    }
+
+    private companion object {
+        val SCHEME_PATTERN = Regex("[a-z][a-z0-9+.-]*")
+    }
 }
