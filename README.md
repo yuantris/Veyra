@@ -9,15 +9,15 @@ A cross-platform browser experiment built with Kotlin Multiplatform + Compose Mu
 - Android and desktop Kotlin compilation passed in earlier GitHub Actions runs; every subsequent change must be checked against its own CI run.
 - `browser-core` is a Kotlin Multiplatform module containing the platform-neutral `BrowserEngine` contract and shared `BrowserSessionStore`.
 - Browser-core JVM tests cover tab/session metadata behavior.
-- The current shared UI still uses `compose-webview-multiplatform` as a prototype renderer. The engine control contract is being separated from the renderer so Android can move to a dedicated Chromium-based adapter.
-- Android engine direction has changed from GeckoView to Chromium (Blink + V8). No Android Chromium runtime/adapter has been selected or integrated yet.
-- WebExtensions support is a hard engine-selection gate, not an assumed property of every Chromium embedder.
+- The shared UI now selects its renderer and engine factory through platform-specific source-set implementations.
+- Android has a dedicated native `android.webkit.WebView` surface using the device's Chromium provider (Blink + V8). This first adapter uses system-updated WebView rather than bundling a standalone Chromium build.
+- WebExtensions are a possible follow-up capability, not a prerequisite for the base Android surface; support will be evaluated against a real runtime and extension test.
 
 ## Platform direction
 
 | Platform | Engine direction | Priority |
 | --- | --- | --- |
-| Android | Chromium-based embeddable runtime (TBD; WebExtensions support must be verified) | First |
+| Android | Chromium via native Android WebView surface (system provider; bundled runtime may be evaluated later) | First |
 | iOS | WKWebView | Later |
 | HarmonyOS | ArkWeb | Later |
 | Desktop | KCEF / Chromium | Later |
