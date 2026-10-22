@@ -172,9 +172,28 @@ class DownloadPipelineAndroidTest {
             assertTrue("Expected a started download, got $outcome", outcome is DownloadRequestHandler.Outcome.Started)
 
             val task = withTimeout(20_000) {
-                controller.tasks.first { list -> list.any { it.phase == DownloadPhase.COMPLETED } }
-                    .first { it.phase == DownloadPhase.COMPLETED }
+                controller.tasks.first { list ->
+                    list.any {
+                        it.phase in setOf(
+                            DownloadPhase.COMPLETED,
+                            DownloadPhase.FAILED,
+                            DownloadPhase.CANCELLED,
+                        )
+                    }
+                }.first {
+                    it.phase in setOf(
+                        DownloadPhase.COMPLETED,
+                        DownloadPhase.FAILED,
+                        DownloadPhase.CANCELLED,
+                    )
+                }
             }
+            assertEquals(
+                "Download reached terminal state without completing; error=" + task.errorCode +
+                    ", requests=" + server.requestCount,
+                DownloadPhase.COMPLETED,
+                task.phase,
+            )
 
             // Private attribution survives the whole pipeline.
             assertEquals("private", task.request.profileId.value)
