@@ -118,8 +118,7 @@ class BrowserSessionCoordinator(
             }
         }
         if (closeFailure != null) throw closeFailure as Throwable
-        // A metadata-only tab with no engine is not considered a successfully closed browser tab.
-        tab.id.isNotBlank()
+        true
     }
 
     suspend fun navigate(request: NavigationRequest): NavigationDecision = mutex.withLock {
@@ -187,5 +186,27 @@ class BrowserSessionCoordinator(
         eventJob?.cancel()
         eventJob = null
         controller.close()
+    }
+
+    companion object {
+        /**
+         * Production assembly entry point. UI supplies only the platform factory; core creates and
+         * owns the store/controller/coordinator graph so App.kt cannot become a lifecycle broker.
+         */
+        fun create(
+            engineFactory: BrowserEngineFactory,
+            scope: CoroutineScope,
+            store: BrowserSessionStore = BrowserSessionStore(),
+            profileProvider: BrowserProfileProvider = InMemoryBrowserProfileProvider(),
+        ): BrowserSessionCoordinator {
+            val controller = BrowserController(
+                engineManager = BrowserEngineManager(engineFactory),
+                profileProvider = profileProvider,
+                navigationCoordinator = BrowserNavigationCoordinator(),
+                eventHub = BrowserEventHub(),
+                scope = scope,
+            )
+            return BrowserSessionCoordinator(store, controller, profileProvider, scope)
+        }
     }
 }
