@@ -54,6 +54,9 @@ internal interface BrowserSurfaceBinding {
         errorCode: String? = null,
         errorMessage: String? = null,
     )
+
+    /** Reports loss of the native content renderer without exposing platform types to core. */
+    fun reportRendererCrashed(recoverable: Boolean)
 }
 
 internal expect fun createPlatformBrowserEngineFactory(): BrowserEngineFactory
@@ -103,6 +106,12 @@ internal class ComposeWebViewEngine(
     override fun attachSurface(surface: BrowserSurfacePort) {
         check(!closed) { "Cannot attach a surface to a closed browser engine." }
         this.surface = surface
+        if (mutablePageState.value.rendererHealthy == false) {
+            mutablePageState.value = mutablePageState.value.copy(
+                rendererHealthy = true,
+                error = null,
+            )
+        }
         if (initialNavigationPending) {
             initialNavigationPending = false
             val initialUrl = mutablePageState.value.url
@@ -209,6 +218,32 @@ internal class ComposeWebViewEngine(
             progress = null,
             navigationId = null,
         )
+    }
+
+    override fun reportRendererCrashed(recoverable: Boolean) {
+        if (closed) return
+        val previous = mutablePageState.value
+        val error = BrowserError(
+            code = "content_process_crashed",
+            message = "The page renderer stopped unexpectedly.",
+            category = BrowserErrorCategory.CONTENT_PROCESS_CRASHED,
+            failingUrl = previous.url,
+            isRecoverable = recoverable,
+        )
+        val navigationId = activeNavigationId
+        mutablePageState.value = previous.copy(
+            loadPhase = BrowserLoadPhase.FAILED,
+            progress = null,
+            navigationId = null,
+            error = error,
+            rendererHealthy = false,
+        )
+        mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, error))
+        mutableEvents.tryEmit(BrowserEvent.RendererCrashed(tabId, recoverable))
+        activeNavigationId = null
+        activeNavigationUrl = null
+        activeNavigationPreviousUrl = null
+        activeNavigationCommitted = false
     }
 
     /** Called by the Compose host when native WebView observations change. */
