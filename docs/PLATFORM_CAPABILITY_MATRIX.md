@@ -16,11 +16,11 @@
 | Website permission broker | Unsupported | Unsupported | Unsupported | No normalized permission request flow connected yet. |
 | Popup/new-window interception | Unsupported | Unsupported | Unsupported | A core event type alone is not a platform implementation. |
 | Native messaging / JS bridge policy | Unsupported | Unsupported | Unsupported | No origin-bound permissioned bridge is connected to Browser Core. |
-| WebExtensions | Unsupported | Unsupported | Unsupported | Do not infer extension support from CEF or native engine capabilities. |
+| WebExtensions | Unsupported | Unsupported | Unsupported | Do not infer extension support from Blink/V8 or Chromium branding alone. |
 
 ## Architecture targets (not yet implemented by this prototype)
 
-The normative architecture document describes possible adapters such as GeckoView, WKWebView, ArkWeb, and KCEF/CEF. These are target choices, not a claim that the current Compose WebView implementation already provides their features.
+The normative architecture document describes a Chromium-based Android runtime, WKWebView, ArkWeb, and KCEF/CEF as targets. The exact Android Chromium embedder remains unselected, and WebExtensions support must be verified on the chosen runtime. These targets do not imply that the current Compose WebView prototype already provides their features.
 
 Each adapter must:
 1. Publish an immutable capability snapshot that matches its real native integration.
