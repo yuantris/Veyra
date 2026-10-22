@@ -210,7 +210,7 @@ internal class ComposeWebViewEngine(
     }
 
     /** Called by the Compose host when native WebView observations change. */
-    fun observe(
+    override fun observe(
         url: String?,
         title: String?,
         isLoading: Boolean,
