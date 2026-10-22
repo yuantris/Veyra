@@ -99,13 +99,13 @@ class BrowserSessionCoordinator(
     suspend fun closeTab(tabId: String): Boolean = mutex.withLock {
         if (closed) return false
         val tab = store.state.value.tabs.firstOrNull { it.id == tabId } ?: return@withLock false
-        var closeFailure: Throwable? = null
+        val closeFailures = mutableListOf<Throwable>()
         try {
             controller.closeTab(TabId(tabId))
         } catch (failure: Throwable) {
             // The manager removes the tab from its registry before native disposal. Metadata must
             // still follow that terminal transition, while the disposal failure remains observable.
-            closeFailure = failure
+            closeFailures += failure
         }
         store.closeTab(tabId)
         val remaining = store.state.value.tabs
@@ -114,12 +114,16 @@ class BrowserSessionCoordinator(
                 try {
                     ensureEngineLocked(replacement)
                 } catch (failure: Throwable) {
-                    if (closeFailure == null) closeFailure = failure
-                    else closeFailure?.addSuppressed(failure)
+                    closeFailures += failure
                 }
             }
         }
-        if (closeFailure != null) throw closeFailure as Throwable
+        closeFailures.firstOrNull()?.let { failure ->
+            throw IllegalStateException(
+                "Tab $tabId was removed from metadata, but ${closeFailures.size} lifecycle operation(s) failed.",
+                failure,
+            )
+        }
         true
     }
 
