@@ -18,6 +18,8 @@ import dev.veyra.browser.core.BrowserEngineContract
 import dev.veyra.browser.core.BrowserTab
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.NavigationSource
+import dev.veyra.browser.core.TabId
 
 /**
  * Android Chromium-backed surface using the platform WebView provider.
@@ -35,7 +37,12 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val context = LocalContext.current
         val initialUrl = binding.pageState.value.url
         val webView = remember(tab.id, context, binding) {
-            createWebView(context) { view, url, title, loading, errorCode, errorMessage ->
+            createWebView(
+                context = context,
+                tabId = TabId(tab.id),
+                onNavigationRequest = onNavigationRequest,
+                onNavigationDecision = onNavigationDecision,
+            ) { view, url, title, loading, errorCode, errorMessage ->
                 binding.observe(
                     url = url,
                     title = title,
@@ -83,6 +90,9 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
 @SuppressLint("SetJavaScriptEnabled")
 private fun createWebView(
     context: android.content.Context,
+    tabId: TabId,
+    onNavigationRequest: (NavigationRequest) -> NavigationDecision,
+    onNavigationDecision: (NavigationDecision) -> Unit,
     observe: (WebView, String?, String?, Boolean, String?, String?) -> Unit,
 ): WebView = WebView(context).apply {
     settings.javaScriptEnabled = true
@@ -99,6 +109,22 @@ private fun createWebView(
     }
 
     webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+            view: WebView,
+            request: WebResourceRequest,
+        ): Boolean {
+            if (!request.isForMainFrame) return false
+            val decision = onNavigationRequest(
+                NavigationRequest(
+                    tabId = tabId,
+                    url = request.url.toString(),
+                    source = NavigationSource.PAGE,
+                ),
+            )
+            onNavigationDecision(decision)
+            return decision != NavigationDecision.Allow
+        }
+
         override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
             observe(view, url, view.title, true, null, null)
         }
