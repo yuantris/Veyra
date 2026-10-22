@@ -4,6 +4,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -25,7 +28,12 @@ class BrowserController(
 ) {
     private val lifecycleMutex = Mutex()
     private val eventJobs = mutableMapOf<TabId, Job>()
+    private val pageStateJobs = mutableMapOf<TabId, Job>()
+    private val mutablePageStates = MutableStateFlow<Map<TabId, BrowserPageState>>(emptyMap())
     private var closed = false
+
+    /** Latest normalized page state for every engine currently owned by this controller. */
+    val pageStates: StateFlow<Map<TabId, BrowserPageState>> = mutablePageStates.asStateFlow()
 
     val events: Flow<BrowserEvent>
         get() = eventHub.events
@@ -51,6 +59,15 @@ class BrowserController(
                     initialUrl = initialUrl,
                 ),
             )
+            if (pageStateJobs[tabId] == null) {
+                pageStateJobs[tabId] = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                    engine.pageState.collect { state ->
+                        if (engineManager.get(tabId) === engine) {
+                            mutablePageStates.value = mutablePageStates.value + (tabId to state)
+                        }
+                    }
+                }
+            }
             if (eventJobs[tabId] == null) {
                 eventJobs[tabId] = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     // Subscribe before openTab returns, so an immediate first navigation event
@@ -151,10 +168,13 @@ class BrowserController(
     }
 
     suspend fun closeTab(tabId: TabId): Boolean = lifecycleMutex.withLock {
-        val job = eventJobs.remove(tabId)
-        job?.cancel()
+        val eventJob = eventJobs.remove(tabId)
+        eventJob?.cancel()
+        val pageStateJob = pageStateJobs.remove(tabId)
+        pageStateJob?.cancel()
+        mutablePageStates.value = mutablePageStates.value - tabId
         val closedEngine = engineManager.closeTab(tabId)
-        closedEngine || job != null
+        closedEngine || eventJob != null || pageStateJob != null
     }
 
     suspend fun close() {
@@ -163,6 +183,9 @@ class BrowserController(
             closed = true
             eventJobs.values.forEach(Job::cancel)
             eventJobs.clear()
+            pageStateJobs.values.forEach(Job::cancel)
+            pageStateJobs.clear()
+            mutablePageStates.value = emptyMap()
         }
         engineManager.closeAll()
     }
