@@ -69,6 +69,23 @@ class DownloadPipelineAndroidTest {
         val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
         val received = AtomicReference<DownloadRequest?>()
         val invoked = CountDownLatch(1)
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "text/html; charset=utf-8")
+                .setBody(
+                    """<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+                       <body style="margin:8px"><a id="file" href="/report.pdf"
+                       style="display:block;min-height:48px;padding:8px">Download report</a></body></html>""".trimIndent(),
+                ),
+        )
+        server.enqueue(
+            MockResponse()
+                .setHeader("Content-Type", "application/pdf")
+                .setHeader("Content-Disposition", """attachment; filename="report.pdf"""")
+                .setBody("fake pdf payload"),
+        )
+        server.start()
         val scenario = ActivityScenario.launch(DownloadTestActivity::class.java)
         lateinit var webView: android.webkit.WebView
 
@@ -88,16 +105,9 @@ class DownloadPipelineAndroidTest {
                     observe = { _, _, _, _, _, _ -> },
                 )
                 activity.setContentView(webView)
-                webView.loadDataWithBaseURL(
-                    "https://veyra.invalid/start",
-                    DOWNLOAD_PAGE_HTML,
-                    "text/html",
-                    null,
-                    null,
-                )
+                webView.loadUrl(server.url("/start").toString())
             }
 
-            // Wait for a real attached WebView document before sending a physical-style tap.
             val documentReady = CountDownLatch(1)
             val deadline = System.currentTimeMillis() + 10_000
             while (documentReady.count > 0L && System.currentTimeMillis() < deadline) {
@@ -111,14 +121,12 @@ class DownloadPipelineAndroidTest {
             assertTrue("Test document did not become ready", documentReady.count == 0L)
 
             instrumentation.runOnMainSync {
-                val x = 40f
-                val y = 28f
                 val downTime = SystemClock.uptimeMillis()
                 val down = MotionEvent.obtain(
-                    downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0,
+                    downTime, downTime, MotionEvent.ACTION_DOWN, 40f, 28f, 0,
                 )
                 val up = MotionEvent.obtain(
-                    downTime, downTime + 80, MotionEvent.ACTION_UP, x, y, 0,
+                    downTime, downTime + 80, MotionEvent.ACTION_UP, 40f, 28f, 0,
                 )
                 try {
                     webView.dispatchTouchEvent(down)
@@ -130,17 +138,18 @@ class DownloadPipelineAndroidTest {
             }
 
             assertTrue(
-                "Production DownloadListener was not invoked after a real WebView tap",
+                "Production DownloadListener was not invoked after tapping an attachment response",
                 invoked.await(10, TimeUnit.SECONDS),
             )
             val request = received.get()
             assertTrue("Download callback did not provide a request", request != null)
-            assertEquals("https://veyra.invalid/report.pdf", request?.url)
+            assertEquals(server.url("/report.pdf").toString(), request?.url)
             assertEquals("download-tab", request?.tabId?.value)
             assertEquals("default", request?.profileId?.value)
             assertEquals("report.pdf", request?.suggestedFileName)
         } finally {
             scenario.close()
+            server.shutdown()
         }
     }
 
