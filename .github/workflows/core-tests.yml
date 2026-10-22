@@ -75,6 +75,7 @@ jobs:
           disable-linux-hw-accel: false
           script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
       - name: Explicitly verify DownloadPipelineAndroidTest on emulator
+        if: always()
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
