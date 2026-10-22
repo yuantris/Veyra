@@ -155,6 +155,12 @@ sealed interface BrowserEvent {
         val hasUserGesture: Boolean?,
     ) : BrowserEvent
 
+    /** A platform detected a download; policy and persistence are owned by the caller. */
+    data class DownloadRequested(
+        override val tabId: TabId,
+        val request: DownloadRequest,
+    ) : BrowserEvent
+
     data class RendererCrashed(
         override val tabId: TabId,
         val recoverable: Boolean,
