@@ -316,6 +316,8 @@ data class DownloadTask(
     val receivedBytes: Long = 0,
     val totalBytes: Long? = request.expectedBytes,
     val errorCode: String? = null,
+    /** Opaque location returned by the platform transport after a successful download. */
+    val destination: String? = null,
 )
 
 interface DownloadController {
