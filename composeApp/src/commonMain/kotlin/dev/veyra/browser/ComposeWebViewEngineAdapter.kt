@@ -45,7 +45,7 @@ internal interface BrowserSurfaceBinding {
 
     fun attachSurface(surface: BrowserSurfacePort)
     fun detachSurface(surface: BrowserSurfacePort)
-    override fun observe(
+    fun observe(
         url: String?,
         title: String?,
         isLoading: Boolean,
