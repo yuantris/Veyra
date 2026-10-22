@@ -43,15 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import dev.veyra.browser.core.BrowserController
-import dev.veyra.browser.core.BrowserEngineManager
-import dev.veyra.browser.core.BrowserEventHub
-import dev.veyra.browser.core.BrowserNavigationCoordinator
-import dev.veyra.browser.core.BrowserProfileProvider
 import dev.veyra.browser.core.BrowserSessionCoordinator
-import dev.veyra.browser.core.BrowserSessionStore
 import dev.veyra.browser.core.BrowserTab
-import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
@@ -65,25 +58,12 @@ private val Accent = Color(0xFF496BEB)
 
 @Composable
 fun App() {
-    val sessionStore = remember { BrowserSessionStore() }
     val uriHandler = LocalUriHandler.current
     val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
     val controllerScope = rememberCoroutineScope()
-    val profileProvider: BrowserProfileProvider = remember { InMemoryBrowserProfileProvider() }
-    val controller = remember {
-        BrowserController(
-            engineManager = BrowserEngineManager(createPlatformBrowserEngineFactory()),
-            profileProvider = profileProvider,
-            navigationCoordinator = BrowserNavigationCoordinator(),
-            eventHub = BrowserEventHub(),
-            scope = controllerScope,
-        )
-    }
     val coordinator = remember {
-        BrowserSessionCoordinator(
-            store = sessionStore,
-            controller = controller,
-            profileProvider = profileProvider,
+        BrowserSessionCoordinator.create(
+            engineFactory = createPlatformBrowserEngineFactory(),
             scope = controllerScope,
         )
     }
