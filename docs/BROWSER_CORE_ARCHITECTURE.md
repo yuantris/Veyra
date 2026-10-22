@@ -483,6 +483,16 @@ The common core now contains `BridgeAuthorizationPolicy` and `BrowserOrigin` as 
 
 This is only the platform-neutral authorization primitive. It is **not yet an end-to-end JavaScript bridge**. Before a platform may advertise native messaging, its adapter must prove that document/frame origins are taken from trusted engine callbacks rather than page-provided JSON, must route every bridge call through this policy, must enforce website/extension permissions separately, and must test cancellation, timeout, duplicate request IDs and reply lifecycle. Until then, `nativeMessaging` remains false.
 
+### BrowserSessionCoordinator implementation boundary
+
+`BrowserSessionCoordinator` is the application-facing tab/session orchestration layer. It owns the serialized workflow that joins metadata operations in `BrowserSessionStore` with engine operations exposed by `BrowserController`; it projects page-state/navigation events back into metadata and resolves each tab's profile before engine creation. Compose should observe coordinator state and forward commands only.
+
+The coordinator does not replace `BrowserEngineManager`: the manager remains the sole live-engine registry and the controller remains the engine command facade. The coordinator is not a second engine map and must never infer session lifetime from Compose surface attachment.
+
+The production assembly entry point is `BrowserSessionCoordinator.create(engineFactory, scope)`. Platform UI may inject its platform factory, but must not independently create a store/controller/manager graph or reconcile their flows. Tests may inject the individual dependencies.
+
+Initial implementation covers startup of metadata tabs, open/select/close, navigation and history/page-state projection, profile selection, and rollback of a newly added tab when engine creation fails. This is a first coordination slice, not proof that every C0–C9 gate passes. Continue to add deterministic tests for close failures, cancellation, rapid open/close, late events, profile mismatch and controller/manager concurrency before native engine integration.
+
 ### Exit criteria
 
 The core skeleton is ready for native-engine integration only when:
