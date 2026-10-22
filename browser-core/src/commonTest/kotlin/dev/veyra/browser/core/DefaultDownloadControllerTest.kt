@@ -35,8 +35,8 @@ class DefaultDownloadControllerTest {
             tasks.firstOrNull { it.id == id }?.phase == DownloadPhase.COMPLETED
         }.first { it.id == id }
 
-        assertEquals(10, completed.receivedBytes)
-        assertEquals(10, completed.totalBytes)
+        assertEquals(10L, completed.receivedBytes)
+        assertEquals(10L, completed.totalBytes)
         assertEquals("file-token://download-1", completed.destination)
         assertEquals(null, completed.errorCode)
         controller.close()
@@ -98,6 +98,7 @@ class DefaultDownloadControllerTest {
 
         assertEquals(first, duplicate)
         assertEquals(1, controller.tasks.value.size)
+        assertEquals(1, transportCalls)
         assertTrue(controller.tasks.value.single().phase in setOf(DownloadPhase.COMPLETED, DownloadPhase.RUNNING))
         assertFailsWith<IllegalArgumentException> {
             runBlocking { controller.start(request.copy(url = "https://different.example/file")) }
