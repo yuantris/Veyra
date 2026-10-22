@@ -6,7 +6,7 @@ Veyra is a cross-platform browser with a shared Compose Multiplatform UI and nat
 
 | Platform | Engine direction | Priority |
 | --- | --- | --- |
-| Android | GeckoView | First implementation and extension-capability reference |
+| Android | Chromium-based embeddable runtime (TBD) | First; must prove WebExtensions support before selection |
 | iOS | WKWebView | Native adapter; extension compatibility is not assumed |
 | HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/bridge |
 | Desktop | KCEF / Chromium | Later adapter after the core contract is validated |
@@ -37,7 +37,7 @@ Browser application/use cases
                     |
         platform adapter factory (platform source sets)
           |          |           |           |
-       GeckoView  WKWebView     ArkWeb       KCEF
+       Chromium  WKWebView     ArkWeb       KCEF
         Android      iOS       HarmonyOS    Desktop
 ```
 
@@ -47,9 +47,10 @@ Shared code may depend on `browser-core`. Platform adapters may depend on `brows
 
 ### Browser runtime
 
-- Android owns one application/process-scoped `GeckoRuntime` for the normal profile, initialized by an explicit engine/runtime owner rather than by a composable.
-- Private browsing must use a deliberately configured private session/profile strategy. Do not assume a normal `GeckoSession` becomes private just because its tab metadata says `isPrivate = true`.
-- Each live tab maps to a platform session/engine instance. For GeckoView, this means a `GeckoSession` attached to a `GeckoView` only while that tab is displayed.
+- Android will use a Chromium-based embeddable runtime, but the exact distribution and ownership model remain an explicit decision gate. Do not assume Android System WebView, CEF-derived products, or arbitrary Chromium builds expose the same browser APIs.
+- WebExtensions is a required capability gate. Blink + V8 alone does not imply a usable WebExtensions runtime or extension-management API; validate install, lifecycle, permissions, content scripts and native messaging on the exact candidate before committing to it.
+- Private browsing must use a deliberately configured private session/profile strategy. Do not assume tab metadata alone provides cookie, cache or storage isolation.
+- Each live tab maps to a platform session/engine instance attached to its native view only while displayed, unless a documented memory policy says otherwise.
 - Selecting another tab changes the displayed native view/session; it must not dispose the previous tab's session.
 - Closing a tab disposes its session and removes its engine registry entry. Closing a tab must not shut down the shared runtime.
 - Activity recreation, process death, renderer crash and app backgrounding are separate lifecycle cases. Persist restorable tab metadata, but do not claim that renderer memory/JavaScript state survives process death.
@@ -81,7 +82,7 @@ A single boolean such as `interceptEveryRequest()` is not a sufficient cross-pla
 
 ## Extension architecture (required direction)
 
-Android GeckoView is the first extension-capable implementation. Use Mozilla WebExtensions support rather than inventing a JavaScript injection system as a substitute for extensions.
+Android's Chromium-based candidate must prove extension-runtime support before it is selected. Chromium's rendering stack (Blink + V8) is not by itself a WebExtensions implementation. Prefer a real extension runtime with lifecycle, permission and messaging APIs; do not treat ad-hoc JavaScript injection as equivalent to extensions.
 
 Logical boundaries (these do not need to be separate Gradle modules initially):
 
@@ -116,10 +117,10 @@ Other platforms may implement only a subset of the Veyra extension API. A shared
 ## Delivery plan
 
 1. **Architecture contract (this stage):** document platform ownership, engine/session lifecycle, capability reporting, extension boundaries and security invariants.
-2. **Android GeckoView spike:** add a pinned stable GeckoView version and Mozilla Maven repository; verify app startup, one live session, navigation delegates, runtime reuse and Android packaging before refactoring all UI.
-3. **Android engine adapter:** implement `BrowserEngine` and a native host that retains one `GeckoSession` per live tab. Wire tab select/close and test page state retention.
+2. **Android Chromium spike:** compare candidate embedders and choose one only after verifying WebExtensions support, ABI/minSdk, update model, package size, licensing and maintenance cost.
+3. **Android engine adapter:** implement `BrowserEngineContract` and a native host that retains one live engine session per tab. Wire tab select/close and test page-state retention.
 4. **Native browser callbacks:** normalize navigation, load progress/errors, popup, file chooser, website permissions and downloads. Mark unsupported behavior explicitly.
-5. **Extension foundation:** first install/list/enable/disable/uninstall a bundled test extension, then add signed XPI import/source handling, permission prompts and native messaging.
+5. **Extension foundation:** install/list/enable/disable/uninstall a bundled test extension and verify permission prompts, content scripts, background behavior and native messaging on the chosen runtime.
 6. **Shared UI integration:** route UI actions through core use cases; remove direct WebView-library usage from shared browser business logic.
 7. **Other platform adapters:** WKWebView, ArkWeb and KCEF; each advertises its own capability set.
 8. **Production hardening:** process-death recovery, private profile isolation, crash recovery, storage policy, security tests, engine update strategy and distribution-size review.
