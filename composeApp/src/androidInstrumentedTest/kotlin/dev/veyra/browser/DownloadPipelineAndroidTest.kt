@@ -110,23 +110,23 @@ class DownloadPipelineAndroidTest {
             }
             assertTrue("Test document did not become ready", documentReady.count == 0L)
 
-            val location = IntArray(2)
-            instrumentation.runOnMainSync { webView.getLocationOnScreen(location) }
-            val x = location[0] + 40f
-            val y = location[1] + 28f
-            val downTime = SystemClock.uptimeMillis()
-            val down = MotionEvent.obtain(
-                downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0,
-            )
-            val up = MotionEvent.obtain(
-                downTime, downTime + 80, MotionEvent.ACTION_UP, x, y, 0,
-            )
-            try {
-                instrumentation.sendPointerSync(down)
-                instrumentation.sendPointerSync(up)
-            } finally {
-                down.recycle()
-                up.recycle()
+            instrumentation.runOnMainSync {
+                val x = 40f
+                val y = 28f
+                val downTime = SystemClock.uptimeMillis()
+                val down = MotionEvent.obtain(
+                    downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0,
+                )
+                val up = MotionEvent.obtain(
+                    downTime, downTime + 80, MotionEvent.ACTION_UP, x, y, 0,
+                )
+                try {
+                    webView.dispatchTouchEvent(down)
+                    webView.dispatchTouchEvent(up)
+                } finally {
+                    down.recycle()
+                    up.recycle()
+                }
             }
 
             assertTrue(
