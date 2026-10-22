@@ -311,6 +311,7 @@ fun App() {
                                         surfaceRenderer.Render(
                                             tab = tab,
                                             engine = engine,
+                                            isVisible = selected,
                                             onNavigationRequest = controller::decideSurfaceNavigation,
                                             onNavigationDecision = { decision ->
                                                 when (decision) {
