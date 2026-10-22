@@ -2,7 +2,7 @@
 
 **Status:** Proposed normative contract  
 **Scope:** Shared browser domain model and platform adapter contracts  
-**First implementation:** Android + GeckoView  
+**First implementation:** Android + a Chromium-based runtime (selection gated on verified WebExtensions support)  
 **Decision rule:** Platform adapters must either satisfy a contract or explicitly report that the capability is unsupported/limited. They must never silently fake success.
 
 This document is the source of truth for core architecture. The platform implementation plan is subordinate to this contract.
@@ -19,7 +19,7 @@ This document is the source of truth for core architecture. The platform impleme
 
 ### Non-goals
 
-- Do not pretend GeckoView, WKWebView, ArkWeb and CEF have identical APIs.
+- Do not pretend Chromium embedders, WKWebView, ArkWeb and CEF have identical APIs.
 - Do not require every platform to run every WebExtension.
 - Do not implement a generic “intercept every network request” API if a platform cannot provide it.
 - Do not persist renderer memory or claim that JavaScript heap state survives process death.
@@ -55,7 +55,7 @@ Browser use cases + BrowserSessionCoordinator
              |
   platform adapter factory + implementations
     |          |          |          |
- GeckoView  WKWebView    ArkWeb     KCEF
+ Chromium  WKWebView    ArkWeb     KCEF
  Android      iOS       HarmonyOS  Desktop
 ```
 
@@ -121,7 +121,7 @@ A browser session is the lifetime boundary for a tab's engine state. A coordinat
 - Closing a tab removes it from the registry and closes exactly its engine.
 - Closing the last tab creates a fresh empty tab according to product policy; it does not reuse the already-closed engine.
 - Engine close must be idempotent. Duplicate UI events must not double-release native resources.
-- Runtime lifetime is above individual tabs. Closing one GeckoSession must not shut down the shared GeckoRuntime.
+- Runtime lifetime is above individual tabs where the chosen engine exposes a shared runtime. Closing one tab must not shut down a process/profile-scoped runtime used by other tabs.
 - A detached session remains live unless a platform explicitly evicts it under a documented memory policy. Any eviction must be surfaced as a recoverable session-loss event.
 - Process death is not a tab close. Persist restorable metadata separately; recreate engines after process restart and do not claim in-memory JavaScript state survived.
 
