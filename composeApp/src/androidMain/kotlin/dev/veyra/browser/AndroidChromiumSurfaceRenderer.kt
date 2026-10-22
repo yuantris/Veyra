@@ -10,12 +10,14 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.webkit.WebSettings
+import android.webkit.RenderProcessGoneDetail
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,12 +47,21 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val initialUrl = binding.pageState.value.url
         val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
         val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
-        val webView = remember(tab.id, context, binding) {
+        val rendererGenerationState = remember(tab.id, binding) { mutableIntStateOf(0) }
+        val rendererGeneration = rendererGenerationState.intValue
+        val webView = remember(tab.id, context, binding, rendererGeneration) {
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
                 onNavigationRequest = { currentOnNavigationRequest(it) },
                 onNavigationDecision = { currentOnNavigationDecision(it) },
+                onRendererGone = {
+                    binding.reportRendererCrashed(recoverable = true)
+                    // Changing the key replaces the dead WebView while preserving the tab engine.
+                    if (rendererGenerationState.intValue == rendererGeneration) {
+                        rendererGenerationState.intValue += 1
+                    }
+                },
             ) { view, url, title, loading, errorCode, errorMessage ->
                 binding.observe(
                     url = url,
@@ -106,6 +117,7 @@ private fun createWebView(
     tabId: TabId,
     onNavigationRequest: (NavigationRequest) -> NavigationDecision,
     onNavigationDecision: (NavigationDecision) -> Unit,
+    onRendererGone: () -> Unit,
     observe: (WebView, String?, String?, Boolean, String?, String?) -> Unit,
 ): WebView = WebView(context).apply {
     settings.javaScriptEnabled = true
@@ -132,6 +144,16 @@ private fun createWebView(
     }
 
     webViewClient = object : WebViewClient() {
+        override fun onRenderProcessGone(
+            view: WebView,
+            detail: RenderProcessGoneDetail,
+        ): Boolean {
+            // A WebView whose renderer is gone must not be reused. Returning true marks the
+            // failure handled; the Compose host creates a replacement surface for this tab.
+            onRendererGone()
+            return true
+        }
+
         override fun onReceivedSslError(
             view: WebView,
             handler: SslErrorHandler,
