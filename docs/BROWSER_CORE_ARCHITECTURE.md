@@ -2,7 +2,7 @@
 
 **Status:** Proposed normative contract  
 **Scope:** Shared browser domain model and platform adapter contracts  
-**First implementation:** Android + a Chromium-based runtime (selection gated on verified WebExtensions support)  
+**First implementation:** Android + a Chromium-based runtime (concrete embedding selected against capability, lifecycle, licensing and packaging gates)  
 **Decision rule:** Platform adapters must either satisfy a contract or explicitly report that the capability is unsupported/limited. They must never silently fake success.
 
 This document is the source of truth for core architecture. The platform implementation plan is subordinate to this contract.
