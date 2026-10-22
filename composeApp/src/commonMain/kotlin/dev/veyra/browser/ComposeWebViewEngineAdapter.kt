@@ -9,6 +9,7 @@ import dev.veyra.browser.core.BrowserErrorCategory
 import dev.veyra.browser.core.BrowserEvent
 import dev.veyra.browser.core.BrowserLoadPhase
 import dev.veyra.browser.core.BrowserPageState
+import dev.veyra.browser.core.DownloadRequest
 import dev.veyra.browser.core.NavigationId
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.ProfileId
@@ -57,6 +58,9 @@ internal interface BrowserSurfaceBinding {
 
     /** Reports loss of the native content renderer without exposing platform types to core. */
     fun reportRendererCrashed(recoverable: Boolean)
+
+    /** Emits a download intent; does not start the transfer. */
+    fun reportDownloadRequested(request: DownloadRequest)
 }
 
 internal expect fun createPlatformBrowserEngineFactory(): BrowserEngineFactory
@@ -218,6 +222,11 @@ internal class ComposeWebViewEngine(
             progress = null,
             navigationId = null,
         )
+    }
+
+    override fun reportDownloadRequested(request: DownloadRequest) {
+        if (closed || request.tabId != tabId || request.profileId != profileId) return
+        mutableEvents.tryEmit(BrowserEvent.DownloadRequested(tabId, request))
     }
 
     override fun reportRendererCrashed(recoverable: Boolean) {
