@@ -5,6 +5,8 @@ import android.os.Build
 import android.webkit.SslErrorHandler
 import android.net.http.SslError
 import android.webkit.WebChromeClient
+import android.webkit.DownloadListener
+import android.webkit.URLUtil
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -27,6 +29,9 @@ import dev.veyra.browser.core.BrowserTab
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
+import dev.veyra.browser.core.DownloadRequest
+import dev.veyra.browser.core.RequestId
+import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
 
 /**
@@ -53,6 +58,8 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
+                profileId = engine.profileId,
+                onDownloadRequested = binding::reportDownloadRequested,
                 onNavigationRequest = { currentOnNavigationRequest(it) },
                 onNavigationDecision = { currentOnNavigationDecision(it) },
                 onRendererGone = {
@@ -115,6 +122,8 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
 private fun createWebView(
     context: android.content.Context,
     tabId: TabId,
+    profileId: ProfileId,
+    onDownloadRequested: (DownloadRequest) -> Unit,
     onNavigationRequest: (NavigationRequest) -> NavigationDecision,
     onNavigationDecision: (NavigationDecision) -> Unit,
     onRendererGone: () -> Unit,
@@ -132,6 +141,21 @@ private fun createWebView(
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         settings.safeBrowsingEnabled = true
     }
+
+    setDownloadListener(
+        DownloadListener { url, _, contentDisposition, mimeType, contentLength ->
+            val request = dev.veyra.browser.core.DownloadRequest(
+                requestId = RequestId("download-${java.util.UUID.randomUUID()}"),
+                tabId = tabId,
+                profileId = profileId,
+                url = url,
+                suggestedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType),
+                mimeType = mimeType,
+                expectedBytes = contentLength.takeIf { it >= 0L },
+            )
+            onDownloadRequested(request)
+        },
+    )
 
     webChromeClient = object : WebChromeClient() {
         override fun onReceivedTitle(view: WebView, title: String?) {
