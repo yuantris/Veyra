@@ -12,7 +12,7 @@
 | Broad resource interception | Unsupported | Unsupported | Unsupported | Separate capability from navigation policy. |
 | Private profiles | Unsupported | Unsupported | Unsupported | Current adapter does not isolate cookies/cache/storage per profile. |
 | Session restore | Unsupported | Unsupported | Unsupported | Current adapter does not serialize and restore engine session state. |
-| Downloads | Wired; capability held false pending device verification | Unsupported | Unsupported | Android has the full pipeline in code (DownloadListener → app acceptance policy → core task model → Ktor transport → app-specific files dir) with unit tests at every component, but no emulator/device test has proven the path yet, so `downloads` stays false per the gate below. iOS has no page download API; desktop detection is unverified. |
+| Downloads | Verified in Android Emulator for the current compose-webview prototype | Unsupported | Unsupported | Android's DownloadListener → app acceptance policy → core task model → Ktor transport → app-specific files dir passed `DownloadPipelineAndroidTest` in CI. This does not claim GeckoView integration is complete. iOS has no page download API; desktop detection is unverified. |
 | Website permission broker | Unsupported | Unsupported | Unsupported | No normalized permission request flow connected yet. |
 | Popup/new-window interception | Unsupported | Unsupported | Unsupported | A core event type alone is not a platform implementation. |
 | Native messaging / JS bridge policy | Unsupported | Unsupported | Unsupported | No origin-bound permissioned bridge is connected to Browser Core. |
@@ -40,15 +40,8 @@ The Android adapter deliberately keeps `navigationPolicy = false` until an Andro
 
 Until those tests exist and pass, the Android callback remains wired for development, but the public capability stays false. iOS and Desktop must remain false until their own native delegate/handler path and tests are added.
 
-## Current downloads verification gate
+## Current downloads verification result
 
-The Android download pipeline is wired end-to-end in code — `DownloadListener` → `BrowserEvent.DownloadRequested` → app acceptance policy (`DownloadPolicy`) → `DownloadRequestHandler` → core task model → `KtorDownloadTransport` → app-specific external files directory — with unit tests for the transport, the task controller races and the acceptance policy. The capability is still held at `downloads = false` until an Android integration test proves on a real WebView that:
+The Android download pipeline passed `DownloadPipelineAndroidTest` in the GitHub Actions Android Emulator job (run [39820740225](https://github.com/yuantris/Veyra/actions/runs/39820740225)). The test exercises the current compose-webview prototype's production download callback, acceptance policy, transfer completion and destination, cancellation/partial-file cleanup, controller shutdown, and private-profile attribution.
 
-- a download candidate reaches the app as a `DownloadRequested` event;
-- the acceptance policy starts the transfer only for accepted HTTP(S) candidates;
-- the file lands in the app-specific Downloads directory and the task reports progress and completion;
-- cancelling the task stops the transfer and leaves no partial file;
-- closing the tab or the app while a transfer is in flight ends the task as cancelled without hanging;
-- a private tab's download keeps its profile attribution and never enters normal download history.
-
-`DownloadPipelineAndroidTest` (androidInstrumentedTest) implements exactly these checks against production code with MockWebServer as the transfer endpoint. It compiles and the unit-level components are green, but it has **not yet been executed on a device** — the emulator job in CI is the verification vehicle. When that job goes green, flip `downloads` to true in `ComposeWebViewPlatformCapabilities.android.kt` and update the row above. iOS and Desktop keep `downloads = false` until their own detection and execution paths exist.
+Accordingly, Android's `downloads` capability is now `true` for this verified prototype adapter. iOS and Desktop remain unsupported. This result does **not** claim the separately selected GeckoView Android engine has been implemented or verified; its adapter must run its own integration tests before inheriting this capability.
