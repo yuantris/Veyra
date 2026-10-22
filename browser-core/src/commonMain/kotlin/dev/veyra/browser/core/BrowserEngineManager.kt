@@ -1,15 +1,21 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Owns BrowserEngineContract instances independently of Compose surface lifetimes.
- * Switching tabs or detaching a surface must not close the engine/session.
+ *
+ * Factory creation and native disposal run outside the registry mutex. This prevents a slow native
+ * startup or shutdown from blocking unrelated registry operations. Tab metadata and surfaces are
+ * not owned here: detaching a surface must never close its engine/session.
  */
 class BrowserEngineManager(
     private val factory: BrowserEngineFactory,
@@ -19,40 +25,87 @@ class BrowserEngineManager(
     private val _registeredEngines = MutableStateFlow<Map<TabId, BrowserEngineContract>>(emptyMap())
     val registeredEngines: StateFlow<Map<TabId, BrowserEngineContract>> = _registeredEngines.asStateFlow()
 
+    private val creatingTabs = mutableMapOf<TabId, Creation>()
     private val closingTabs = mutableMapOf<TabId, CompletableDeferred<Result<Unit>>>()
     private var shuttingDown = false
 
     val size: Int get() = _registeredEngines.value.size
 
-    suspend fun openTab(request: BrowserEngineCreateRequest): BrowserEngineContract =
-        mutex.withLock {
+    suspend fun openTab(request: BrowserEngineCreateRequest): BrowserEngineContract {
+        val claim = mutex.withLock {
             check(!shuttingDown) { "Browser engine manager is shutting down." }
             check(request.tabId !in closingTabs) {
                 "Cannot open an engine for a tab while it is closing."
             }
+
             engines[request.tabId]?.let { existing ->
                 require(existing.profileId == request.profileId) {
                     "Tab ${request.tabId.value} is already bound to a different profile."
                 }
-                return@withLock existing
+                return@withLock OpenClaim.Existing(existing)
             }
 
-            val engine = factory.create(request)
-            try {
-                require(engine.tabId == request.tabId) {
-                    "Engine factory returned an engine for a different tab."
+            creatingTabs[request.tabId]?.let { creation ->
+                require(creation.profileId == request.profileId) {
+                    "Tab ${request.tabId.value} is already being created for a different profile."
                 }
-                require(engine.profileId == request.profileId) {
-                    "Engine factory returned an engine for a different profile."
+                return@withLock OpenClaim.Wait(creation.completion)
+            }
+
+            val creation = Creation(
+                profileId = request.profileId,
+                completion = CompletableDeferred(),
+            )
+            creatingTabs[request.tabId] = creation
+            OpenClaim.Create(creation)
+        }
+
+        return when (claim) {
+            is OpenClaim.Existing -> claim.engine
+            is OpenClaim.Wait -> claim.completion.await().getOrThrow()
+            is OpenClaim.Create -> createAndRegister(request, claim.creation)
+        }
+    }
+
+    private suspend fun createAndRegister(
+        request: BrowserEngineCreateRequest,
+        creation: Creation,
+    ): BrowserEngineContract {
+        var createdEngine: BrowserEngineContract? = null
+        try {
+            val engine = factory.create(request)
+            createdEngine = engine
+            require(engine.tabId == request.tabId) {
+                "Engine factory returned an engine for a different tab."
+            }
+            require(engine.profileId == request.profileId) {
+                "Engine factory returned an engine for a different profile."
+            }
+
+            mutex.withLock {
+                check(!shuttingDown) { "Browser engine manager shut down during engine creation." }
+                check(creatingTabs[request.tabId] === creation) {
+                    "Engine creation reservation was lost."
                 }
                 engines[request.tabId] = engine
+                creatingTabs.remove(request.tabId)
                 publishEngines()
-                engine
-            } catch (failure: Throwable) {
-                runCatching { engine.close() }
-                throw failure
+                creation.completion.complete(Result.success(engine))
             }
+            return engine
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                if (createdEngine != null) runCatching { createdEngine.close() }
+                mutex.withLock {
+                    if (creatingTabs[request.tabId] === creation) {
+                        creatingTabs.remove(request.tabId)
+                    }
+                    creation.completion.complete(Result.failure(failure))
+                }
+            }
+            throw failure
         }
+    }
 
     fun get(tabId: TabId): BrowserEngineContract? = _registeredEngines.value[tabId]
     fun contains(tabId: TabId): Boolean = _registeredEngines.value.containsKey(tabId)
@@ -76,15 +129,23 @@ class BrowserEngineManager(
                 false
             }
             is CloseClaim.Own -> {
-                val result = runCatching { claim.engine.close() }
-                mutex.withLock {
-                    if (closingTabs[tabId] === claim.completion) closingTabs.remove(tabId)
-                    claim.completion.complete(result)
-                }
+                val result = closeAndComplete(claim.engine, claim.completion)
                 result.getOrThrow()
                 true
             }
         }
+    }
+
+    private suspend fun closeAndComplete(
+        engine: BrowserEngineContract,
+        completion: CompletableDeferred<Result<Unit>>,
+    ): Result<Unit> = withContext(NonCancellable) {
+        val result = runCatching { engine.close() }
+        mutex.withLock {
+            if (closingTabs[engine.tabId] === completion) closingTabs.remove(engine.tabId)
+            completion.complete(result)
+        }
+        result
     }
 
     private fun publishEngines() {
@@ -92,12 +153,18 @@ class BrowserEngineManager(
     }
 
     /**
-     * Stops accepting new tabs, closes all registered engines, and waits for closes that were
-     * already underway. A single adapter failure does not prevent other engines from closing.
+     * Rejects new sessions, waits for in-flight creations, then closes every registered session and
+     * waits for tab closes already in progress. One disposal failure never skips other sessions.
      */
     suspend fun closeAll() {
-        val claimsAndWaiters = mutex.withLock {
+        val creations = mutex.withLock {
             shuttingDown = true
+            creatingTabs.values.map { it.completion }
+        }
+        // A failed/cancelled creation is not a disposal failure; its opener receives that failure.
+        creations.forEach { completion -> runCatching { completion.await() } }
+
+        val claimsAndWaiters = mutex.withLock {
             val registered = engines.toList()
             engines.clear()
             val owned = registered.map { (tabId, engine) ->
@@ -115,13 +182,9 @@ class BrowserEngineManager(
 
         val failures = mutableListOf<Throwable>()
         claimsAndWaiters.first.forEach { claim ->
-            val result = runCatching { claim.engine.close() }
-            mutex.withLock {
-                val tabId = claim.engine.tabId
-                if (closingTabs[tabId] === claim.completion) closingTabs.remove(tabId)
-                claim.completion.complete(result)
-            }
-            result.exceptionOrNull()?.let(failures::add)
+            closeAndComplete(claim.engine, claim.completion)
+                .exceptionOrNull()
+                ?.let(failures::add)
         }
         claimsAndWaiters.second.forEach { completion ->
             completion.await().exceptionOrNull()?.let(failures::add)
@@ -133,6 +196,17 @@ class BrowserEngineManager(
                 failures.first(),
             )
         }
+    }
+
+    private data class Creation(
+        val profileId: ProfileId,
+        val completion: CompletableDeferred<Result<BrowserEngineContract>>,
+    )
+
+    private sealed interface OpenClaim {
+        data class Existing(val engine: BrowserEngineContract) : OpenClaim
+        data class Wait(val completion: CompletableDeferred<Result<BrowserEngineContract>>) : OpenClaim
+        data class Create(val creation: Creation) : OpenClaim
     }
 
     private sealed interface CloseClaim {
