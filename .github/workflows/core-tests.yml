@@ -22,8 +22,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
-      - name: Run browser core and app adapter tests
-        run: bash gradlew :browser-core:jvmTest :composeApp:desktopTest --stacktrace
+      - name: Run core and app adapter tests
+        run: bash gradlew :browser-core:jvmTest :download-core:jvmTest :composeApp:desktopTest --stacktrace
 
   android-navigation-integration:
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.14'
-      - name: Run Android WebView navigation integration test
+      - name: Run Android navigation integration test
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
