@@ -2,6 +2,7 @@ package dev.veyra.browser
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -30,8 +31,8 @@ internal interface BrowserSurfaceRenderer {
     )
 }
 
-/** Current prototype renderer. Platform-specific Chromium/KCEF/WKWebView/ArkWeb renderers can replace it. */
-internal fun createBrowserSurfaceRenderer(): BrowserSurfaceRenderer = ComposeWebViewSurfaceRenderer
+/** Platform source sets select the renderer; common UI never chooses a concrete engine surface. */
+internal expect fun createBrowserSurfaceRenderer(): BrowserSurfaceRenderer
 
 internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
     @Composable
