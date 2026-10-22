@@ -31,7 +31,6 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,9 +56,6 @@ import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
-import com.multiplatform.webview.web.WebView
-import com.multiplatform.webview.web.rememberWebViewNavigator
-import com.multiplatform.webview.web.rememberWebViewState
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -303,7 +299,7 @@ fun App() {
                         // visible/on top, so switching tabs does not destroy its native history.
                         sessionState.tabs.forEach { tab ->
                             val selected = tab.id == sessionState.activeTabId
-                            val engine = engines[TabId(tab.id)] as? BrowserSurfaceBinding
+                            val engine = engines[TabId(tab.id)]
                             if (engine != null) {
                                 key(tab.id) {
                                     Box(
@@ -311,7 +307,7 @@ fun App() {
                                             .alpha(if (selected) 1f else 0f)
                                             .zIndex(if (selected) 1f else 0f),
                                     ) {
-                                        BrowserTabHost(
+                                        ComposeWebViewSurfaceRenderer.Render(
                                             tab = tab,
                                             engine = engine,
                                             onNavigationRequest = controller::decideSurfaceNavigation,
@@ -391,64 +387,6 @@ fun App() {
             controllerScope.launch { controller.close() }
         }
     }
-}
-
-@Composable
-private fun BrowserTabHost(
-    tab: BrowserTab,
-    engine: BrowserSurfaceBinding,
-    onNavigationRequest: (NavigationRequest) -> NavigationDecision,
-    onNavigationDecision: (NavigationDecision) -> Unit,
-) {
-    val webState = rememberWebViewState(engine.pageState.value.url)
-    val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
-    val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
-    val requestInterceptor = remember(engine, tab.id) {
-        BrowserNavigationRequestInterceptor(
-            tabId = TabId(tab.id),
-            onNavigationRequest = { currentOnNavigationRequest(it) },
-            onNavigationDecision = { currentOnNavigationDecision(it) },
-        )
-    }
-    val navigator = rememberWebViewNavigator(requestInterceptor = requestInterceptor)
-    val surface = remember(navigator) {
-        object : BrowserSurfacePort {
-            override fun loadUrl(url: String) { navigator.loadUrl(url) }
-            override fun goBack() { navigator.navigateBack() }
-            override fun goForward() { navigator.navigateForward() }
-            override fun reload() { navigator.reload() }
-            override fun stop() { navigator.stopLoading() }
-        }
-    }
-
-    DisposableEffect(engine, surface) {
-        engine.attachSurface(surface)
-        onDispose { engine.detachSurface(surface) }
-    }
-
-    LaunchedEffect(
-        tab.id,
-        webState.lastLoadedUrl,
-        webState.pageTitle,
-        webState.isLoading,
-        navigator.canGoBack,
-        navigator.canGoForward,
-    ) {
-        val url = webState.lastLoadedUrl ?: engine.pageState.value.url
-        engine.observe(
-            url = url,
-            title = webState.pageTitle,
-            isLoading = webState.isLoading,
-            canGoBack = navigator.canGoBack,
-            canGoForward = navigator.canGoForward,
-        )
-    }
-
-    WebView(
-        state = webState,
-        navigator = navigator,
-        modifier = Modifier.fillMaxSize(),
-    )
 }
 
 @Composable
