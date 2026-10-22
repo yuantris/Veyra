@@ -141,7 +141,7 @@ fun App() {
     LaunchedEffect(controller) {
         controller.events.collect { event ->
             if (event is dev.veyra.browser.core.BrowserEvent.NavigationCompleted) {
-                val page = pageStates[event.tabId]
+                val page = controller.pageStates.value[event.tabId]
                 session.recordVisit(event.tabId.value, event.url, page?.title.orEmpty())
             }
         }
