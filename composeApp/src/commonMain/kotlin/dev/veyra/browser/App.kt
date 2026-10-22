@@ -77,7 +77,7 @@ fun App() {
     val profileProvider: BrowserProfileProvider = remember { InMemoryBrowserProfileProvider() }
     val controller = remember {
         BrowserController(
-            engineManager = BrowserEngineManager(ComposeWebViewEngineFactory()),
+            engineManager = BrowserEngineManager(createPlatformBrowserEngineFactory()),
             profileProvider = profileProvider,
             navigationCoordinator = BrowserNavigationCoordinator(),
             eventHub = BrowserEventHub(),
