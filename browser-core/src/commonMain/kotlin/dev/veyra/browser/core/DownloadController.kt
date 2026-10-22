@@ -1,6 +1,7 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -94,7 +95,7 @@ class DefaultDownloadController(
                 phase = DownloadPhase.QUEUED,
             )
             mutableTasks.value = mutableTasks.value + task
-            val job = scope.launch(kotlinx.coroutines.CoroutineStart.LAZY) {
+            val job = scope.launch(start = CoroutineStart.LAZY) {
                 execute(id, request)
             }
             jobs[id] = job
