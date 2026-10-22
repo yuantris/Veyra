@@ -55,9 +55,7 @@ The diagram shows ownership and assembly rather than requiring a strict linear d
 
 ## 4. Core contract convergence
 
-The repository currently contains both the legacy `BrowserEngine` and the newer `BrowserEngineContract`. This is migration state, not the intended permanent design.
-
-Before adding another production engine adapter, review and converge the contracts into one clearly named engine/session abstraction. Preserve compatibility only where an existing adapter demonstrably needs it; do not keep two competing sources of truth for navigation, state, events or disposal. The target contract must cover:
+The single active engine/session abstraction is `BrowserEngineContract`. The previous `BrowserEngine` / `BrowserEngineRegistry` path and its Compose adapter have been removed; new adapters must implement the active contract rather than reintroducing a parallel API. The contract must cover:
 
 - stable `TabId`, `SessionId`, `NavigationId`, `RequestId` and `ProfileId` identities;
 - navigation commands and normalized page state/events/errors;
