@@ -81,14 +81,21 @@ class BrowserNavigationRequestInterceptorAndroidTest {
             )
         }
 
-        composeRule.runOnIdle {
-            navigatorRef.get()!!.evaluateJavaScript(
-                "document.getElementById('status').textContent",
-            ) {
-                if (it.contains("ready")) pageReady.countDown()
+        // loadHtml() is asynchronous: the navigation event is queued first, but the
+        // WebView may not have committed the document when the test thread resumes.
+        // Poll through the real navigator until the DOM is available instead of issuing
+        // a single JavaScript evaluation that can race the initial page load.
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.runOnIdle {
+                navigatorRef.get()?.evaluateJavaScript(
+                    "document.getElementById('status')?.textContent ?: ''",
+                ) {
+                    if (it.contains("ready")) pageReady.countDown()
+                }
             }
+            pageReady.count == 0L
         }
-        assertTrue("Test document did not become ready", pageReady.await(10, TimeUnit.SECONDS))
+        assertTrue("Test document did not become ready", pageReady.await(1, TimeUnit.SECONDS))
 
         composeRule.runOnIdle {
             navigatorRef.get()!!.evaluateJavaScript(
