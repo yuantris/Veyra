@@ -13,6 +13,7 @@ import dev.veyra.browser.core.DownloadPhase
 import dev.veyra.browser.core.DownloadRequest
 import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
+import dev.veyra.browser.core.NavigationId
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.RequestId
@@ -30,7 +31,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -255,6 +258,63 @@ class BrowserSessionCoordinatorTest {
             )
         }
         assertTrue(failure.message!!.contains("No download controller is configured"))
+
+        coordinator.close()
+        scope.cancel()
+    }
+    @Test
+    fun lateEventForClosedTabDoesNotWriteHistoryOrMetadata() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val factory = CoordinatorTestFactory()
+        val profiles = InMemoryBrowserProfileProvider()
+        // The test owns the hub so it can inject an event the controller filter did not drop,
+        // which is the defense-in-depth path the coordinator projection must survive.
+        val hub = BrowserEventHub()
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            profiles,
+            BrowserNavigationCoordinator(),
+            hub,
+            scope,
+        )
+        val store = BrowserSessionStore("about:blank")
+        val coordinator = BrowserSessionCoordinator(store, controller, profiles, scope)
+        coordinator.start()
+
+        val first = coordinator.openTab("https://first.example")
+        val second = coordinator.openTab("https://second.example")
+        coordinator.closeTab(second.id)
+
+        hub.publish(
+            BrowserEvent.NavigationCompleted(
+                tabId = TabId(second.id),
+                navigationId = NavigationId("late"),
+                url = "https://late.example",
+            ),
+        )
+        // A valid event for a live tab acts as the positive control: once its effect is visible,
+        // the collector has already processed the late event published before it.
+        hub.publish(
+            BrowserEvent.NavigationCompleted(
+                tabId = TabId(first.id),
+                navigationId = NavigationId("current"),
+                url = "https://first.example/done",
+            ),
+        )
+        withTimeout(5_000) {
+            store.state.first { state -> state.history.any { it.url == "https://first.example/done" } }
+        }
+
+        val state = store.state.value
+        assertTrue(
+            state.tabs.none { it.id == second.id },
+            "Closed tab must not reappear in metadata",
+        )
+        assertTrue(
+            state.history.none { it.url == "https://late.example" },
+            "Late event must not write history for a closed tab",
+        )
+        assertTrue(controller.registeredEngines.value.containsKey(TabId(first.id)))
 
         coordinator.close()
         scope.cancel()

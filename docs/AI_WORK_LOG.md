@@ -102,3 +102,11 @@
 - **Deliberately not claimed:** the gate is **not closed**. `downloads` stays `false` on Android until the CI emulator job runs this test green. The matrix now says exactly that.
 - **Next smallest safe step:** after CI confirms `DownloadPipelineAndroidTest`, flip Android `downloads = true`; meanwhile continue C-gate evidence — the coordinator-level late-event path (a late `NavigationCompleted` after `closeTab` must not write history/metadata for the closed tab) is untested.
 - **Files:** `composeApp/src/androidMain/.../AndroidChromiumSurfaceRenderer.kt` (listener extracted, `createWebView` internal), `composeApp/src/androidInstrumentedTest/.../DownloadPipelineAndroidTest.kt` (new), `gradle/libs.versions.toml`, `composeApp/build.gradle.kts` (mockwebserver), `docs/PLATFORM_CAPABILITY_MATRIX.md`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-23 — C3 evidence: coordinator late-event projection
+
+- **Goal:** Close the C3 test gap recorded in the previous entry: the coordinator's projection of `NavigationCompleted` into history/metadata had no test for a closed tab.
+- **Completed:** `lateEventForClosedTabDoesNotWriteHistoryOrMetadata` in `BrowserSessionCoordinatorTest`. The test owns the event hub so it can inject an event the controller filter did not drop (defense in depth), and uses a valid event for a live tab as a positive control: once that event's effect is visible, the collector has provably processed the late event published before it — no sleeps, fully deterministic.
+- **Test evidence:** `:browser-core:jvmTest` green (57 tests; coordinator class now 8); `:browser-download:jvmTest` and `:composeApp:desktopTest` green.
+- **Next smallest safe step:** after CI confirms `DownloadPipelineAndroidTest`, flip Android `downloads = true`. Remaining C-gate candidates: C4 source-specific cases (redirect-source navigations) and the `composeApp` commonMain UI/adapter package split evaluation.
+- **Files:** `browser-core/src/commonTest/.../session/BrowserSessionCoordinatorTest.kt`, `docs/AI_WORK_LOG.md`.
