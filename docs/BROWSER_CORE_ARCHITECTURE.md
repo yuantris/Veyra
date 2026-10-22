@@ -477,6 +477,12 @@ This section is an implementation gate, not a statement that the current prototy
 | C8 — capability truthfulness | A capability is true only when the adapter can enforce it and integration tests demonstrate it; engine potential or UI presence is not enough | Capability matrix review linked to platform-specific test evidence |
 | C9 — adapter boundary | Core contracts contain no native view/runtime types; adapter owns native callbacks/resources; a renderer crash is not silently treated as a normal tab close | Contract/API review and fake-adapter conformance tests |
 
+### Bridge authorization implementation status
+
+The common core now contains `BridgeAuthorizationPolicy` and `BrowserOrigin` as a pre-dispatch authorization gate. The gate validates protocol version, request ID, method allowlist, payload byte limit, main-frame status, exact document/frame origin equality, allowed origin, profile and optional extension identity.
+
+This is only the platform-neutral authorization primitive. It is **not yet an end-to-end JavaScript bridge**. Before a platform may advertise native messaging, its adapter must prove that document/frame origins are taken from trusted engine callbacks rather than page-provided JSON, must route every bridge call through this policy, must enforce website/extension permissions separately, and must test cancellation, timeout, duplicate request IDs and reply lifecycle. Until then, `nativeMessaging` remains false.
+
 ### Exit criteria
 
 The core skeleton is ready for native-engine integration only when:
