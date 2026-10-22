@@ -7,6 +7,7 @@ internal actual fun composeWebViewPlatformCapabilities(): BrowserCapabilities =
     BrowserCapabilities(
         // Keep the public capability conservative until real-WebView integration tests pass.
         navigationPolicy = false,
+        downloads = true,
         requestInterception = RequestInterceptionScope.MAIN_FRAME_NAVIGATION,
         privateProfiles = false,
         sessionRestore = false,
