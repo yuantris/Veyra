@@ -1,6 +1,8 @@
 package dev.veyra.browser.core
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -9,6 +11,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * The single platform-neutral owner of tab metadata ↔ engine-session coordination.
@@ -109,15 +112,18 @@ class BrowserSessionCoordinator(
         }
         store.closeTab(tabId)
         val remaining = store.state.value.tabs
-        remaining.forEach { replacement ->
-            if (controller.registeredEngines.value[TabId(replacement.id)] == null) {
-                try {
-                    ensureEngineLocked(replacement)
-                } catch (failure: Throwable) {
-                    closeFailures += failure
+        withContext(NonCancellable) {
+            remaining.forEach { replacement ->
+                if (controller.registeredEngines.value[TabId(replacement.id)] == null) {
+                    try {
+                        ensureEngineLocked(replacement)
+                    } catch (failure: Throwable) {
+                        closeFailures += failure
+                    }
                 }
             }
         }
+        closeFailures.filterIsInstance<CancellationException>().firstOrNull()?.let { throw it }
         closeFailures.firstOrNull()?.let { failure ->
             throw IllegalStateException(
                 "Tab $tabId was removed from metadata, but ${closeFailures.size} lifecycle operation(s) failed.",
