@@ -88,7 +88,7 @@ class BrowserNavigationRequestInterceptorAndroidTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             composeRule.runOnIdle {
                 navigatorRef.get()?.evaluateJavaScript(
-                    "document.getElementById('status')?.textContent ?: ''",
+                    "document.getElementById('status')?.textContent || ''",
                 ) {
                     if (it.contains("ready")) pageReady.countDown()
                 }
