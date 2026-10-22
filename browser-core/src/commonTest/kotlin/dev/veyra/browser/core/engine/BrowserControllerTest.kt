@@ -15,6 +15,7 @@ import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationId
+import dev.veyra.browser.core.NavigationPolicyHandler
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.ProfileId
@@ -40,6 +41,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -294,6 +296,33 @@ class BrowserControllerTest {
             received,
         )
         collector.cancel()
+        controller.close()
+        scope.cancel()
+    }
+
+    @Test
+    fun newTabDecisionIsReturnedToTheCallerWithoutLoadingTheCurrentTab() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val controller = BrowserController(
+            BrowserEngineManager(FakeFactory()),
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(
+                policyHandler = object : NavigationPolicyHandler {
+                    override fun decide(request: NavigationRequest): NavigationDecision =
+                        NavigationDecision.OpenInNewTab(request.url)
+                },
+            ),
+            BrowserEventHub(),
+            scope,
+        )
+        val engine = controller.openTab(TabId("tab-1")) as FakeEngine
+
+        val decision = controller.navigate(NavigationRequest(TabId("tab-1"), "https://example.com"))
+
+        // The decision is the caller's to route; the current tab must not load it.
+        assertIs<NavigationDecision.OpenInNewTab>(decision)
+        assertEquals("https://example.com", decision.url)
+        assertEquals(0, engine.navigateCount)
         controller.close()
         scope.cancel()
     }

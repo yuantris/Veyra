@@ -110,3 +110,13 @@
 - **Test evidence:** `:browser-core:jvmTest` green (57 tests; coordinator class now 8); `:browser-download:jvmTest` and `:composeApp:desktopTest` green.
 - **Next smallest safe step:** after CI confirms `DownloadPipelineAndroidTest`, flip Android `downloads = true`. Remaining C-gate candidates: C4 source-specific cases (redirect-source navigations) and the `composeApp` commonMain UI/adapter package split evaluation.
 - **Files:** `browser-core/src/commonTest/.../session/BrowserSessionCoordinatorTest.kt`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-23 — C4 evidence: new-tab decision and redirect-source policy
+
+- **Goal:** Close the two remaining items on C4's minimum verification list ("allow/cancel/external/new-tab, redirects, unknown schemes and late callbacks"): the new-tab decision path and redirect-source navigations.
+- **Completed:**
+  - `BrowserControllerTest.newTabDecisionIsReturnedToTheCallerWithoutLoadingTheCurrentTab`: a custom policy returning `OpenInNewTab` must hand the decision back to the caller for routing; the current tab's engine is never dispatched.
+  - `BrowserNavigationCoordinatorTest.redirectSourceNavigationFollowsTheSameBuiltInChecks`: a permissive custom policy cannot let a `REDIRECT`-source navigation bypass the built-in executable-URL checks (script URL cancelled, web URL allowed).
+- **Test evidence:** `:browser-core:jvmTest` green (59 tests; controller class 8, navigation class 7); `:browser-download:jvmTest`, `:composeApp:desktopTest` green; Android + Android-test + iOS compiles green.
+- **Next smallest safe step:** after CI confirms `DownloadPipelineAndroidTest`, flip Android `downloads = true`. Remaining candidate: evaluate whether `composeApp` commonMain should split UI from common adapter code (same bar as the core split: only with a real boundary).
+- **Files:** `browser-core/src/commonTest/.../engine/BrowserControllerTest.kt`, `browser-core/src/commonTest/.../navigation/BrowserNavigationCoordinatorTest.kt`, `docs/AI_WORK_LOG.md`.

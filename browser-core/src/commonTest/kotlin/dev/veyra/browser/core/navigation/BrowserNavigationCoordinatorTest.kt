@@ -3,6 +3,7 @@ package dev.veyra.browser.core.navigation
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationPolicyHandler
 import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -77,6 +78,38 @@ class BrowserNavigationCoordinatorTest {
         ).forEach { url ->
             assertEquals(NavigationDecision.Cancel, coordinator.decide(NavigationRequest(TabId("tab-1"), url)), url)
         }
+    }
+
+    @Test
+    fun redirectSourceNavigationFollowsTheSameBuiltInChecks() {
+        // A permissive custom policy must not let a redirect bypass the executable-URL checks.
+        val permissive = BrowserNavigationCoordinator(
+            policyHandler = object : NavigationPolicyHandler {
+                override fun decide(request: NavigationRequest): NavigationDecision =
+                    NavigationDecision.Allow
+            },
+        )
+
+        assertEquals(
+            NavigationDecision.Cancel,
+            permissive.decide(
+                NavigationRequest(
+                    tabId = TabId("tab-1"),
+                    url = "javascript:alert(1)",
+                    source = NavigationSource.REDIRECT,
+                ),
+            ),
+        )
+        assertEquals(
+            NavigationDecision.Allow,
+            permissive.decide(
+                NavigationRequest(
+                    tabId = TabId("tab-1"),
+                    url = "https://example.com",
+                    source = NavigationSource.REDIRECT,
+                ),
+            ),
+        )
     }
 
     @Test
