@@ -9,7 +9,7 @@ Veyra is a cross-platform browser built with Kotlin Multiplatform and Compose Mu
 
 | Platform | Selected engine direction | Integration principle |
 | --- | --- | --- |
-| Android | GeckoView | First implementation priority; validate the exact runtime capabilities and lifecycle |
+| Android | Chromium-based runtime | First implementation priority; validate the selected runtime's capabilities, lifecycle, extension model and packaging constraints |
 | iOS | WKWebView | Native adapter |
 | HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/toolchain |
 | Desktop | KCEF / Chromium | Native adapter |
@@ -84,7 +84,7 @@ Keep website permission requests, operating-system runtime permissions, popups, 
 
 ## 6. Platform adapter rules
 
-- Android / GeckoView is the first adapter and should validate the architecture before other platform work expands.
+- Android / Chromium is the first adapter and should validate the architecture before other platform work expands.
 - iOS uses WKWebView; HarmonyOS uses ArkWeb; desktop uses KCEF.
 - Each adapter translates native callbacks into normalized state/events and maps core decisions back to native actions.
 - Capabilities remain unavailable until the exact implementation is tested.
@@ -102,7 +102,7 @@ Before marking a platform feature complete, test it against the real native engi
 1. Treat this document and `BROWSER_CORE_ARCHITECTURE.md` as the architectural baseline.
 2. Audit and converge the legacy/new engine contracts before adding more engine-specific behavior.
 3. Verify BrowserController, engine manager, session ownership and event delivery with focused tests.
-4. Integrate Android/GeckoView first through a platform adapter that obeys the stable contract.
+4. Integrate the selected Android Chromium runtime first through a platform adapter that obeys the stable contract.
 5. Complete download transport as a platform adapter and wire it at the app composition root.
 6. Add iOS, HarmonyOS and desktop adapters against the same contract, documenting capability differences.
 7. Introduce more Gradle modules only when an observed dependency/build/release boundary justifies them.
