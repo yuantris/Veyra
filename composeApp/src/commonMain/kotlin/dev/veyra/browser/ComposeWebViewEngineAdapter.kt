@@ -216,8 +216,8 @@ internal class ComposeWebViewEngine(
         isLoading: Boolean,
         canGoBack: Boolean,
         canGoForward: Boolean,
-        errorCode: String? = null,
-        errorMessage: String? = null,
+        errorCode: String?,
+        errorMessage: String?,
     ) {
         if (closed) return
         val previous = mutablePageState.value
