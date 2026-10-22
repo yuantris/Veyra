@@ -110,7 +110,7 @@ class DefaultDownloadController(
                 ?: throw IllegalArgumentException("Unknown download: $downloadId")
             if (task.phase in terminalPhases) return
             replaceTask(task.copy(phase = DownloadPhase.CANCELLED, errorCode = null))
-            jobs[downloadId]
+            jobs.remove(downloadId)
         }
         job?.cancel()
     }
