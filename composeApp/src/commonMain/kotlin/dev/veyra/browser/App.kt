@@ -48,6 +48,7 @@ import dev.veyra.browser.core.BrowserEngineManager
 import dev.veyra.browser.core.BrowserEventHub
 import dev.veyra.browser.core.BrowserNavigationCoordinator
 import dev.veyra.browser.core.BrowserProfileProvider
+import dev.veyra.browser.core.BrowserSessionCoordinator
 import dev.veyra.browser.core.BrowserSessionStore
 import dev.veyra.browser.core.BrowserTab
 import dev.veyra.browser.core.InMemoryBrowserProfileProvider
@@ -56,10 +57,6 @@ import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF17202A)
@@ -69,9 +66,8 @@ private val Accent = Color(0xFF496BEB)
 
 @Composable
 fun App() {
-    val session = remember { BrowserSessionStore() }
+    val sessionStore = remember { BrowserSessionStore() }
     val uriHandler = LocalUriHandler.current
-    val sessionState by session.state.collectAsState()
     val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
     val controllerScope = rememberCoroutineScope()
     val profileProvider: BrowserProfileProvider = remember { InMemoryBrowserProfileProvider() }
@@ -84,64 +80,24 @@ fun App() {
             scope = controllerScope,
         )
     }
-    val engines by controller.registeredEngines.collectAsState()
-    val pageStates by controller.pageStates.collectAsState()
-    var address by remember { mutableStateOf(session.activeTab?.url.orEmpty()) }
+    val coordinator = remember {
+        BrowserSessionCoordinator(
+            store = sessionStore,
+            controller = controller,
+            profileProvider = profileProvider,
+            scope = controllerScope,
+        )
+    }
+    val sessionState by coordinator.state.collectAsState()
+    val engines by coordinator.engines.collectAsState()
+    var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
     var showBrowser by remember { mutableStateOf(false) }
     val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
 
-    // Reconcile desired tab identities with engine ownership. Observe both flows so a tab
-    // removed while its engine is still being created is closed as soon as registration completes.
-    // Collect serially (not collectLatest): lifecycle operations must not be cancelled midway when
-    // a rapid sequence of tab changes arrives.
-    LaunchedEffect(session, controller) {
-        val desiredTabs = session.state
-            .map { state -> state.tabs.associate { TabId(it.id) to it.url } }
-            .distinctUntilChanged { old, new -> old.keys == new.keys }
-        combine(desiredTabs, controller.registeredEngines) { tabs, registered ->
-            tabs to registered.keys
-        }.distinctUntilChanged().collect { (tabs, registeredIds) ->
-            (registeredIds - tabs.keys).forEach { tabId ->
-                controller.closeTab(tabId)
-            }
-            tabs.forEach { (tabId, url) ->
-                if (controller.registeredEngines.value[tabId] == null) {
-                    controller.openTab(tabId, ProfileId("default"), url)
-                }
-            }
-        }
-    }
-
-    // UI/session state is projected from the controller's platform-neutral page state,
-    // rather than being written directly by a concrete WebView adapter.
-    LaunchedEffect(pageStates) {
-        pageStates.values.forEach { page ->
-            val tabId = page.tabId.value
-            if (session.state.value.tabs.any { it.id == tabId }) {
-                session.updateTab(
-                    tabId = tabId,
-                    url = page.url,
-                    title = page.title.takeIf { it.isNotBlank() },
-                    isLoading = page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.STARTING ||
-                        page.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.LOADING,
-                    canGoBack = page.canGoBack,
-                    canGoForward = page.canGoForward,
-                )
-                if (session.state.value.activeTabId == tabId && page.url.isNotBlank()) {
-                    address = page.url
-                }
-            }
-        }
-    }
-
-    // Navigation history is driven by normalized core events, not platform callbacks.
-    LaunchedEffect(controller) {
-        controller.events.collect { event ->
-            if (event is dev.veyra.browser.core.BrowserEvent.NavigationCompleted) {
-                val page = controller.pageStates.value[event.tabId]
-                session.recordVisit(event.tabId.value, event.url, page?.title.orEmpty())
-            }
-        }
+    // The core coordinator owns startup, tab metadata, engine creation/closure and page projection.
+    // Compose only observes state and forwards user actions.
+    LaunchedEffect(coordinator) {
+        coordinator.start()
     }
 
     LaunchedEffect(activeTab?.id, activeTab?.url) {
@@ -162,20 +118,13 @@ fun App() {
     fun openAddress(raw: String) {
         val target = normalizeAddress(raw) ?: return
         showBrowser = true
-        val current = session.activeTab ?: session.openTab(url = "about:blank")
-        session.updateTab(current.id, url = target, title = target, isLoading = true)
         address = target
         controllerScope.launch {
-            val tabId = TabId(current.id)
-            if (controller.registeredEngines.value[tabId] == null) {
-                controller.openTab(tabId, ProfileId("default"), "about:blank")
-            }
-            when (controller.navigate(NavigationRequest(tabId, target, NavigationSource.USER))) {
+            val current = coordinator.activeTab ?: coordinator.openTab(url = "about:blank")
+            coordinator.updateTab(current.id, url = target, title = target, isLoading = true)
+            when (coordinator.navigate(NavigationRequest(TabId(current.id), target, NavigationSource.USER))) {
                 NavigationDecision.Allow -> Unit
-                NavigationDecision.Cancel -> session.updateTab(
-                    current.id,
-                    isLoading = false,
-                )
+                NavigationDecision.Cancel -> coordinator.updateTab(current.id, isLoading = false)
                 is NavigationDecision.OpenExternal,
                 is NavigationDecision.OpenInNewTab -> Unit
             }
@@ -242,21 +191,23 @@ fun App() {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         ToolText("‹", activeTab?.canGoBack == true) {
-                            activeTab?.let { controller.goBack(TabId(it.id)) }
+                            activeTab?.let { coordinator.goBack(TabId(it.id)) }
                         }
                         ToolText("›", activeTab?.canGoForward == true) {
-                            activeTab?.let { controller.goForward(TabId(it.id)) }
+                            activeTab?.let { coordinator.goForward(TabId(it.id)) }
                         }
                         ToolText(if (activeTab?.isLoading == true) "■" else "↻", activeTab != null) {
                             activeTab?.let { tab ->
-                                if (tab.isLoading) controller.stop(TabId(tab.id))
-                                else controller.reload(TabId(tab.id))
+                                if (tab.isLoading) coordinator.stop(TabId(tab.id))
+                                else coordinator.reload(TabId(tab.id))
                             }
                         }
                         Spacer(Modifier.weight(1f))
                         ToolText("+", true) {
-                            session.openTab()
-                            address = "about:blank"
+                            controllerScope.launch {
+                                coordinator.openTab()
+                                address = "about:blank"
+                            }
                         }
                     }
 
@@ -271,7 +222,7 @@ fun App() {
                                     if (selected) Color.White else Color(0xFFE9EDF3),
                                     RoundedCornerShape(10.dp),
                                 ).clickable {
-                                    session.selectTab(tab.id)
+                                    coordinator.selectTab(tab.id)
                                     address = tab.url
                                 }.padding(horizontal = 8.dp, vertical = 9.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -287,9 +238,7 @@ fun App() {
                                 Text(
                                     "×",
                                     modifier = Modifier.clickable {
-                                        // The session flow is the source of truth; the lifecycle
-                                        // reconciler releases the engine after the tab disappears.
-                                        session.closeTab(tab.id)
+                                        controllerScope.launch { coordinator.closeTab(tab.id) }
                                     }.padding(start = 4.dp),
                                     color = Muted,
                                     fontSize = 13.sp,
@@ -315,25 +264,19 @@ fun App() {
                                             tab = tab,
                                             engine = engine,
                                             isVisible = selected,
-                                            onNavigationRequest = controller::decideSurfaceNavigation,
+                                            onNavigationRequest = coordinator::decideSurfaceNavigation,
                                             onNavigationDecision = { decision ->
                                                 when (decision) {
                                                     is NavigationDecision.OpenExternal -> {
                                                         runCatching { uriHandler.openUri(decision.url) }
                                                     }
                                                     is NavigationDecision.OpenInNewTab -> {
-                                                        val newTab = session.openTab(url = "about:blank")
                                                         showBrowser = true
                                                         controllerScope.launch {
-                                                            val newTabId = TabId(newTab.id)
-                                                            controller.openTab(
-                                                                newTabId,
-                                                                ProfileId("default"),
-                                                                "about:blank",
-                                                            )
-                                                            controller.navigate(
+                                                            val newTab = coordinator.openTab(url = "about:blank")
+                                                            coordinator.navigate(
                                                                 NavigationRequest(
-                                                                    newTabId,
+                                                                    TabId(newTab.id),
                                                                     decision.url,
                                                                     NavigationSource.PAGE,
                                                                 ),
@@ -387,9 +330,9 @@ fun App() {
         }
     }
 
-    DisposableEffect(controller) {
+    DisposableEffect(coordinator) {
         onDispose {
-            controllerScope.launch { controller.close() }
+            controllerScope.launch { coordinator.close() }
         }
     }
 }
