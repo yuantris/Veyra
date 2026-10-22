@@ -78,7 +78,10 @@ class BrowserNavigationCoordinatorTest {
     @Test
     fun scriptSchemesCannotBeAllowedByCustomPolicy() {
         val coordinator = BrowserNavigationCoordinator(
-            policyHandler = NavigationPolicyHandler { NavigationDecision.Allow },
+            policyHandler = object : NavigationPolicyHandler {
+                override fun decide(request: NavigationRequest): NavigationDecision =
+                    NavigationDecision.Allow
+            },
         )
 
         assertEquals(
