@@ -16,4 +16,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "Veyra"
-include(":composeApp", ":browser-core")
+include(":composeApp", ":browser-core", ":download-core")
