@@ -184,10 +184,10 @@ sealed interface BrowserEvent {
 }
 
 /**
- * Next-generation engine contract.
+ * The single platform-neutral engine/session contract used by the controller and every adapter.
  *
- * Kept separate from the existing BrowserEngine during this migration step so the current
- * prototype remains buildable while adapters move over incrementally.
+ * Platform implementations must report their actual capabilities and keep native engine objects
+ * outside common code. Session closure is idempotent and independent from surface detachment.
  */
 interface BrowserEngineContract {
     val tabId: TabId
