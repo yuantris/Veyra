@@ -61,7 +61,7 @@ Record the concrete runtime/version and verify:
 
 ## 6. Implementation sequence
 
-1. Audit `BrowserEngine`, `BrowserEngineContract`, `BrowserController`, `BrowserEngineManager` and the existing Android adapter; converge duplicate contracts before adding engine features.
+1. Audit the single `BrowserEngineContract`, `BrowserController`, `BrowserEngineManager` and the existing Android adapter before adding engine features.
 2. Add focused tests for session ownership, active-tab switching, detach/reattach, idempotent close and stale navigation events.
 3. Implement the chosen Chromium runtime behind the single stable engine contract.
 4. Validate core navigation and lifecycle on a real Android emulator/device.
