@@ -44,9 +44,36 @@ The intended ownership model is:
 - **`BrowserEngineContract`**: the sole active platform-neutral engine/session contract. Do not reintroduce legacy `BrowserEngine`, `BrowserEngineRegistry`, or a second engine abstraction/registry.
 - **Platform adapters**: translate native engine callbacks and resources to common contracts. Native view/runtime types must not leak into `browser-core`.
 - **Compose UI**: presents state and forwards user actions. It must not create a competing lifecycle authority.
-- **`download-core`**: owns download implementation and task/transport orchestration behind the browser's download contracts. `browser-core` must not depend on `download-core` implementation.
+- **`browser-download`**: owns download implementation and task/transport orchestration behind the browser's download contracts. `browser-core` must not depend on `browser-download` implementation.
 
 Keep dependency direction one-way: common contracts/core must not depend on Compose UI, Android SDK, iOS frameworks, ArkUI/native engine types, or a platform implementation. Avoid adding Gradle modules unless a real dependency/lifecycle boundary requires one and the reason is documented. Prefer cohesive packages over many tiny abstractions.
+
+## 4a. Logical module map and package layout
+
+`docs/BROWSER_CORE_ARCHITECTURE.md` §2 defines the logical boundaries. This section records where each one physically lives today. It names ownership; it does not authorize new Gradle modules (see §4).
+
+| Logical module | Responsibility | Current home |
+| --- | --- | --- |
+| browser-core | shared contracts and vocabulary: IDs, models, events, errors, capabilities, policy request/result types, engine contract | `:browser-core`, package `dev.veyra.browser.core` (root) |
+| browser-session | tab/session lifecycle, metadata, session restore, private-profile association | `:browser-core`, packages `.engine` (registry + command facade) and `.session` (coordinator + store) |
+| browser-security | URL validation, origin policy, permission decisions, bridge authorization | `:browser-core`, packages `.navigation` and `.security` |
+| browser-download | download task model and task/transport orchestration | `:browser-download`; contracts in the `dev.veyra.browser.core` root package |
+| browser-extensions | extension identity/permission contracts | contracts only, `dev.veyra.browser.core` root; no runtime implementation exists |
+| browser-platform-<os> | native engine instance, callback mapping, JS injection, interception, permission execution | platform source sets of `:composeApp` (androidMain / iosMain / desktopMain) |
+| composeApp | shared Compose UI and interaction | `:composeApp` |
+
+Package dependency direction inside `:browser-core`:
+
+- `core` (root): contracts only; depends on no sub-package and on no platform or Compose type.
+- `engine`: depends on root and `navigation`.
+- `session`: depends on root and `engine`.
+- `navigation`, `security`: depend on root only.
+
+Adapters and UI implement or observe the root contract surface plus the `session` package API; they must not reach into `.engine`, `.navigation` or `.security` internals. Gradle does not enforce this direction — review and tests do. Promote a package to a Gradle module only when a documented dependency, build, test or release boundary requires it.
+
+Native-type rule, stated checkably: `WKNavigationDelegate`, `CefLoadHandler`, Android `WebView`/`GeckoSession`, ArkWeb/ArkUI types and every other platform engine type must not appear in `:browser-core` or in `commonMain` browser code. Core depends only on Veyra-defined interfaces and event models.
+
+History and bookmarks: `BrowserSessionStore` owns in-memory history/bookmark metadata today. There is no persistence owner, restore policy or cross-profile policy yet; treat persistence as unsupported until an explicit decision is recorded here.
 
 ## 5. Non-negotiable lifecycle rules
 
@@ -93,6 +120,7 @@ Before implementing native surfaces, document and test the attach/detach/re-atta
 ## 7. Kotlin and implementation quality
 
 - Prefer idiomatic Kotlin and common Kotlin APIs for common code.
+- In common code, value classes require an explicit `import kotlin.jvm.JvmInline`. The JVM/Android target has `kotlin.jvm.*` in its default imports, so a missing import passes JVM compilation and only fails on iOS/native targets. The `ios-compile` CI job guards this; never remove iOS targets from CI to avoid it.
 - Avoid `!!`; use explicit types and handle nullable/failed states intentionally.
 - Keep public contracts small, documented and stable. Make invalid states difficult to represent.
 - Do not catch `Throwable` and silently convert it to success. If cleanup catches failures to unblock waiters, preserve/report the failure and rethrow cancellation where appropriate.
@@ -105,7 +133,7 @@ Before implementing native surfaces, document and test the attach/detach/re-atta
 1. **Inspect before editing.** Read the existing contract, implementation, related tests, and docs. Do not assume file names or APIs from an earlier conversation are still accurate.
 2. **State the invariant being fixed.** Prefer one coherent change that enforces a clear rule over broad unrelated refactoring.
 3. **Implement tests with the change.** Include negative, failure, concurrency, and lifecycle cases where applicable.
-4. **Run the narrowest relevant tests, then the repository's CI tasks.** Current CI includes ` :browser-core:jvmTest`, `:download-core:jvmTest`, and `:composeApp:desktopTest`; inspect the workflow before relying on this list.
+4. **Run the narrowest relevant tests, then the repository's CI tasks.** Current CI includes `:browser-core:jvmTest`, `:browser-download:jvmTest`, and `:composeApp:desktopTest`; inspect the workflow before relying on this list.
 5. **Read CI results.** A commit is not proof of passing tests. Report running, failed, skipped and passing checks accurately. Fix failures; do not bypass or disable tests to get a green run.
 6. **Update docs and capability claims** when contracts, ownership, supported behavior, or decisions change.
 7. **Summarize the exact files/commits changed, evidence from tests, remaining gaps, and the next smallest safe step.** Never imply work was done if it was only proposed.
@@ -131,7 +159,7 @@ A gate is not complete merely because a document, interface, or unit test exists
 
 ## 10. Current known implementation boundary
 
-The repository has a common engine contract, `BrowserSessionCoordinator`, controller, engine manager, metadata store, navigation coordinator, profile abstractions, download core and a platform-neutral bridge authorization primitive. `App.kt` should use `BrowserSessionCoordinator.create(...)` and must not rebuild the store/controller/manager graph or reconcile their flows itself. These are the starting points to audit—not proof that all core acceptance gates are complete.
+The repository has a common engine contract, `BrowserSessionCoordinator`, controller, engine manager, metadata store, navigation coordinator, profile abstractions, `:browser-download` and a platform-neutral bridge authorization primitive. `App.kt` should use `BrowserSessionCoordinator.create(...)` and must not rebuild the store/controller/manager graph or reconcile their flows itself. These are the starting points to audit—not proof that all core acceptance gates are complete.
 
 In particular:
 - The bridge authorization primitive is not a complete end-to-end JS bridge.
@@ -149,3 +177,4 @@ When continuing work from prior AI sessions:
 - If a requirement is ambiguous and affects security, persistence, API compatibility, or engine ownership, inspect the existing contract and document the decision before coding.
 - Prefer completing a vertical slice (contract + implementation + tests + docs) over adding many unfinished interfaces.
 - Be candid about uncertainty and CI state. Never claim tests passed unless their actual result was observed.
+- **Record the session in `docs/AI_WORK_LOG.md`.** Multiple AI sessions and human contributors take turns in this repository; the log is how they stay aligned. Before finishing, append one entry stating what you planned, what you completed (with test evidence), and the next smallest safe step, then refresh the status snapshot at the top of that document. The log is append-only: never rewrite or delete earlier entries, and never record proposed work as completed.

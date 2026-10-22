@@ -41,6 +41,8 @@ These are logical responsibilities first. Keep the initial Gradle module count s
 | `composeApp` | Shared UI and platform UI hosts | Direct native engine calls from common UI |
 | Platform adapters | Native runtime/session, delegates, native view attachment, native callbacks and SDK-specific feature implementations | Other platform adapters |
 
+Physical homes for these boundaries (Gradle modules and packages) are recorded in `AGENTS.md` §4a; keep the two documents in sync.
+
 Dependency direction:
 
 ```text
@@ -460,7 +462,7 @@ Each adapter must run the shared core contract tests where possible plus native 
 - [CEF general usage and request handling](https://chromiumembedded.github.io/cef/general_usage.html)
 - [Huawei ArkWeb developer documentation](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V5/web-introduction-V5)
 
-## 11. Core skeleton acceptance gates (required before engine integration)
+## 13. Core skeleton acceptance gates (required before engine integration)
 
 This section is an implementation gate, not a statement that the current prototype already passes it. Android/native engine integration must not be treated as the next step until the platform-neutral gates below are implemented and tested.
 

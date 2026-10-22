@@ -24,9 +24,11 @@ Keep the initial module count deliberately small:
 | --- | --- | --- |
 | `:composeApp` | App entry points, shared Compose UI, platform UI/surface adapters, dependency assembly | Browser policy implementations hidden inside UI; engine lifetime tied to recomposition |
 | `:browser-core` | Stable browser contracts and shared coordination: IDs, models, engine/session ownership, navigation, normalized events/errors, capabilities and policy interfaces | Native SDKs, Compose UI, file I/O, platform-specific downloads |
-| `:download-core` | Download task lifecycle, queue/concurrency, progress, cancellation, transport abstraction and task state | Browser tab ownership, native engine objects, concrete platform file APIs |
+| `:browser-download` | Download task lifecycle, queue/concurrency, progress, cancellation, transport abstraction and task state | Browser tab ownership, native engine objects, concrete platform file APIs |
 
 Platform engine adapters initially live in the appropriate platform source sets and packages. Do not create a Gradle module for every logical subsystem. Navigation, tab metadata, JS bridge policy, permissions and extension use cases can begin as cohesive packages/contracts within the existing modules. Split them only when a demonstrated need exists—for example, independent dependency isolation, build/test isolation, publication, or a genuinely separate release lifecycle.
+
+Inside `:browser-core`, the root package holds contracts only; coordination lives in the `engine`, `session`, `navigation` and `security` sub-packages. The current physical home of every logical module and the package dependency direction are recorded in `AGENTS.md` §4a; keep the two documents in sync.
 
 A shared contract does not imply that every feature needs a shared implementation. Platform-specific behavior stays in platform adapters; unsupported capabilities are explicit.
 
@@ -36,7 +38,7 @@ A shared contract does not imply that every feature needs a shared implementatio
                          composeApp
                        /            \\
                       v              v
-               browser-core      download-core
+               browser-core      browser-download
                       ^              |
                       |              | depends on download contracts
               platform adapters ----+
@@ -47,7 +49,7 @@ A shared contract does not imply that every feature needs a shared implementatio
 The diagram shows ownership and assembly rather than requiring a strict linear dependency chain. The rules are:
 
 1. `:browser-core` never depends on `:composeApp`, platform SDKs or concrete engines.
-2. `:download-core` may depend on browser-owned download contracts; `:browser-core` must not depend on the download implementation.
+2. `:browser-download` may depend on browser-owned download contracts; `:browser-core` must not depend on the download implementation.
 3. `:composeApp` is the composition root: it wires a controller, engine factory, optional subsystem controllers and platform adapters.
 4. Common code depends on platform-neutral interfaces. Native objects do not escape their adapter/source set.
 5. Dependencies point toward stable contracts. Avoid circular project dependencies and service-locator access to concrete platform implementations.
@@ -72,7 +74,7 @@ The engine manager owns live engine instances. Selecting or detaching a tab must
 Navigation decisions must be fast and deterministic when invoked from synchronous native callbacks. Separate navigation decisions from resource interception; do not claim broad interception where a platform only supports top-level navigation callbacks.
 
 ### Downloads
-A platform download callback only announces a candidate request; it does not imply user consent or start network I/O. The app/policy layer explicitly accepts or rejects the request. `download-core` owns task state and scheduling, while an injected transport owns HTTP behavior, cookies/authentication, destination creation, persistence and cleanup. Platform capabilities and limitations must be explicit.
+A platform download callback only announces a candidate request; it does not imply user consent or start network I/O. The app/policy layer explicitly accepts or rejects the request. `:browser-download` owns task state and scheduling, while an injected transport owns HTTP behavior, cookies/authentication, destination creation, persistence and cleanup. Platform capabilities and limitations must be explicit.
 
 ### JS/native bridge and extensions
 Bridge messages are versioned and validated. The receiver derives origin/frame identity from trusted engine metadata rather than trusting fields supplied by page JavaScript. Privileged methods require origin/extension identity checks and explicit permission policy. Do not treat arbitrary script injection as equivalent to a WebExtensions runtime. Extension contracts can begin in browser-core packages; a separate Gradle module is not justified until dependency or release boundaries require it.
@@ -91,7 +93,7 @@ Keep website permission requests, operating-system runtime permissions, popups, 
 
 ## 7. Testing and quality gates
 
-Every architectural change must pass the relevant module tests and build checks. The CI test workflow must include both `:browser-core:jvmTest` and `:download-core:jvmTest`, plus the existing app adapter tests. Add focused tests for lifecycle, navigation race handling, event normalization, download state transitions, cancellation and unsupported capabilities.
+Every architectural change must pass the relevant module tests and build checks. The CI test workflow must include both `:browser-core:jvmTest` and `:browser-download:jvmTest`, plus the existing app adapter tests. Add focused tests for lifecycle, navigation race handling, event normalization, download state transitions, cancellation and unsupported capabilities.
 
 Before marking a platform feature complete, test it against the real native engine (emulator/device where applicable), not only a fake transport or mocked contract.
 
