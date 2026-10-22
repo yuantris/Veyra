@@ -30,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +48,10 @@ import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF17202A)
@@ -60,7 +63,8 @@ private val Accent = Color(0xFF496BEB)
 fun App() {
     val uriHandler = LocalUriHandler.current
     val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
-    val controllerScope = rememberCoroutineScope()
+    // This owner scope outlives the Compose subtree long enough to close native sessions on dispose.
+    val controllerScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     val coordinator = remember {
         BrowserSessionCoordinator.create(
             engineFactory = createPlatformBrowserEngineFactory(),
@@ -311,7 +315,13 @@ fun App() {
 
     DisposableEffect(coordinator) {
         onDispose {
-            controllerScope.launch { coordinator.close() }
+            controllerScope.launch {
+                try {
+                    coordinator.close()
+                } finally {
+                    controllerScope.cancel()
+                }
+            }
         }
     }
 }
