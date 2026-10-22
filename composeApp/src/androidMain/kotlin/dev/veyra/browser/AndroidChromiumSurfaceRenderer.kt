@@ -6,12 +6,13 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.veyra.browser.core.BrowserEngineContract
 import dev.veyra.browser.core.BrowserTab
@@ -19,10 +20,8 @@ import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 
 /**
- * Android's Chromium-backed WebView surface. The engine contract stays platform-neutral;
- * this renderer owns only the Android view and translates its callbacks into engine observations.
- *
- * Note: this uses the device's Chromium WebView provider, not a bundled standalone Chromium build.
+ * Android Chromium-backed surface using the platform WebView provider.
+ * A future bundled Chromium embedder can replace this implementation without changing core.
  */
 internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     @Composable
@@ -33,8 +32,21 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         onNavigationDecision: (NavigationDecision) -> Unit,
     ) {
         val binding = engine as? BrowserSurfaceBinding ?: return
+        val context = LocalContext.current
         val initialUrl = binding.pageState.value.url
-        val webView = remember(tab.id) { createWebView() }
+        val webView = remember(tab.id, context, binding) {
+            createWebView(context) { view, url, title, loading, errorCode, errorMessage ->
+                binding.observe(
+                    url = url,
+                    title = title,
+                    isLoading = loading,
+                    canGoBack = view.canGoBack(),
+                    canGoForward = view.canGoForward(),
+                    errorCode = errorCode,
+                    errorMessage = errorMessage,
+                )
+            }
+        }
         val surface = remember(webView) {
             object : BrowserSurfacePort {
                 override fun loadUrl(url: String) { webView.loadUrl(url) }
@@ -69,78 +81,49 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun createWebView(): WebView {
-    lateinit var view: WebView
-    view = WebViewHolder.create { webView ->
-        webView.settings.javaScriptEnabled = true
-        webView.settings.domStorageEnabled = true
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onReceivedTitle(view: WebView, title: String?) {
-                view.reportObservation()
-            }
+private fun createWebView(
+    context: android.content.Context,
+    observe: (WebView, String?, String?, Boolean, String?, String?) -> Unit,
+): WebView = WebView(context).apply {
+    settings.javaScriptEnabled = true
+    settings.domStorageEnabled = true
 
-            override fun onProgressChanged(view: WebView, newProgress: Int) {
-                view.reportObservation(isLoading = newProgress < 100)
-            }
+    webChromeClient = object : WebChromeClient() {
+        override fun onReceivedTitle(view: WebView, title: String?) {
+            observe(view, view.url, title, view.progress < 100, null, null)
         }
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
-                view.reportObservation(url = url, isLoading = true)
-            }
 
-            override fun onPageFinished(view: WebView, url: String) {
-                view.reportObservation(url = url, isLoading = false)
-            }
+        override fun onProgressChanged(view: WebView, newProgress: Int) {
+            observe(view, view.url, view.title, newProgress < 100, null, null)
+        }
+    }
 
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: WebResourceError,
-            ) {
-                if (request.isForMainFrame) {
-                    view.reportObservation(
-                        url = request.url.toString(),
-                        isLoading = false,
-                        errorCode = "chromium_webview_${error.errorCode}",
-                        errorMessage = error.description?.toString() ?: "Page load failed.",
-                    )
-                }
+    webViewClient = object : WebViewClient() {
+        override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
+            observe(view, url, view.title, true, null, null)
+        }
+
+        override fun onPageFinished(view: WebView, url: String) {
+            observe(view, url, view.title, false, null, null)
+        }
+
+        override fun onReceivedError(
+            view: WebView,
+            request: WebResourceRequest,
+            error: WebResourceError,
+        ) {
+            if (request.isForMainFrame) {
+                observe(
+                    view,
+                    request.url.toString(),
+                    view.title,
+                    false,
+                    "chromium_webview_" + error.errorCode,
+                    error.description?.toString() ?: "Page load failed.",
+                )
             }
         }
     }
-    return view
-}
-
-/** Kept as a helper so creation can be swapped for a future bundled Chromium embedder. */
-private object WebViewHolder {
-    fun create(configure: (WebView) -> Unit): WebView {
-        val context = AndroidBrowserContext.current
-            ?: error("Android Chromium surface must be created inside a Compose Android view context.")
-        return WebView(context).also(configure)
-    }
-}
-
-private object AndroidBrowserContext {
-    var current: android.content.Context? = null
-}
-
-private fun WebView.reportObservation(
-    url: String? = this.url,
-    isLoading: Boolean = progress < 100,
-    errorCode: String? = null,
-    errorMessage: String? = null,
-) {
-    // The renderer keeps a weak association to the active logical binding through its view tag.
-    val binding = getTag(R.id.veyra_browser_binding) as? BrowserSurfaceBinding ?: return
-    binding.observe(
-        url = url,
-        title = title,
-        isLoading = isLoading,
-        canGoBack = canGoBack(),
-        canGoForward = canGoForward(),
-        errorCode = errorCode,
-        errorMessage = errorMessage,
-    )
 }
 
 internal actual fun createBrowserSurfaceRenderer(): BrowserSurfaceRenderer =
