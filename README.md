@@ -5,7 +5,7 @@ A cross-platform browser built with Kotlin Multiplatform and Compose Multiplatfo
 ## Architecture direction
 
 - Shared Compose UI does not imply a shared rendering engine.
-- Android is the first platform and the selected engine direction is GeckoView.
+- Android is the first platform and the selected engine direction is Chromium-based; see [the Android Chromium plan](docs/CHROMIUM_ANDROID_PLAN.md).
 - iOS uses WKWebView, HarmonyOS uses ArkWeb, and desktop uses KCEF.
 - Native engine types and callbacks stay inside platform adapters.
 - `:browser-core` owns browser contracts and coordination; `:download-core` owns download task coordination and transport abstractions.
