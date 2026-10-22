@@ -46,6 +46,10 @@ enum class BrowserStoragePolicy {
 interface BrowserProfileProvider {
     fun get(profileId: ProfileId): BrowserProfile?
     fun defaultProfile(): BrowserProfile
+
+    /** Resolves the profile boundary required by a tab; private mode never falls back to regular. */
+    fun profileFor(isPrivate: Boolean): BrowserProfile? =
+        if (isPrivate) null else defaultProfile()
 }
 
 /** Small in-memory provider suitable for app bootstrap and deterministic tests. */
@@ -55,6 +59,14 @@ class InMemoryBrowserProfileProvider(
             id = ProfileId("default"),
             kind = BrowserProfileKind.REGULAR,
             storagePolicy = BrowserStoragePolicy.PERSISTENT,
+        ),
+        BrowserProfile(
+            id = ProfileId("private"),
+            kind = BrowserProfileKind.PRIVATE,
+            storagePolicy = BrowserStoragePolicy.EPHEMERAL,
+            allowsCookies = true,
+            allowsCache = true,
+            allowsHistory = false,
         ),
     ),
     private val defaultProfileId: ProfileId = ProfileId("default"),
@@ -72,4 +84,9 @@ class InMemoryBrowserProfileProvider(
     override fun get(profileId: ProfileId): BrowserProfile? = profilesById[profileId]
 
     override fun defaultProfile(): BrowserProfile = profilesById.getValue(defaultProfileId)
+
+    override fun profileFor(isPrivate: Boolean): BrowserProfile? {
+        if (!isPrivate) return defaultProfile()
+        return profilesById.values.firstOrNull { it.kind == BrowserProfileKind.PRIVATE }
+    }
 }
