@@ -13,8 +13,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Public facade that coordinates profiles, engine ownership, navigation policy and normalized
- * event publication. UI code should depend on this facade rather than constructing engines.
+ * Engine command facade that coordinates engine ownership, navigation policy and normalized event
+ * publication. Application/UI code should use BrowserSessionCoordinator rather than calling this
+ * facade directly; the coordinator owns metadata-to-engine workflows.
  *
  * The supplied scope must outlive the controller and should be cancelled by the application owner.
  * Platform adapters remain responsible for native view attachment and enforcing capabilities.
