@@ -1,7 +1,6 @@
 package dev.veyra.browser
 
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
@@ -11,7 +10,6 @@ import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
-import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -64,7 +62,7 @@ class BrowserNavigationRequestInterceptorAndroidTest {
             WebView(
                 state = state,
                 navigator = navigator,
-                modifier = Modifier.then(Modifier),
+                modifier = Modifier,
             )
         }
 
@@ -95,7 +93,7 @@ class BrowserNavigationRequestInterceptorAndroidTest {
         composeRule.runOnIdle {
             navigatorRef.get()!!.evaluateJavaScript(
                 "document.getElementById('blocked').click(); " +
-                    "setTimeout(() => location.href, 100)",
+                    "location.href",
             ) {
                 currentUrl.set(it.trim('"'))
                 clickFinished.countDown()
