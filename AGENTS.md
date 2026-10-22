@@ -37,7 +37,8 @@ If this file and a detailed architecture contract appear to conflict, do not gue
 
 The intended ownership model is:
 
-- **`BrowserController`**: the application-facing command facade. Owns orchestration of open/navigate/back/forward/reload/stop/close and controller-visible page state. It is not a second engine registry.
+- **`BrowserSessionCoordinator`**: the application-facing tab/session orchestration layer. It serializes metadata↔engine workflows, resolves profile identity, and projects normalized engine state/events into tab metadata. Compose observes this coordinator and forwards user commands; it must not reconcile the store against the engine registry itself.
+- **`BrowserController`**: the engine command facade. Owns orchestration of engine open/navigate/back/forward/reload/stop/close and controller-visible page state. It is not a second engine registry.
 - **`BrowserEngineManager`**: the single authoritative registry/owner of live engine instances and their creation/closure lifecycle. It must handle concurrent creation, close-during-create, close-during-close, shutdown-during-create, failures and cancellation deliberately.
 - **`BrowserSessionStore`**: tab/session metadata only. It must not own or implicitly create/destroy native engines. Metadata and a live rendering surface are not the browser session.
 - **`BrowserEngineContract`**: the sole active platform-neutral engine/session contract. Do not reintroduce legacy `BrowserEngine`, `BrowserEngineRegistry`, or a second engine abstraction/registry.
@@ -130,7 +131,7 @@ A gate is not complete merely because a document, interface, or unit test exists
 
 ## 10. Current known implementation boundary
 
-The repository has a common engine contract, controller, engine manager, metadata store, navigation coordinator, profile abstractions, download core and a platform-neutral bridge authorization primitive. These are the starting points to audit—not proof that all core acceptance gates are complete.
+The repository has a common engine contract, `BrowserSessionCoordinator`, controller, engine manager, metadata store, navigation coordinator, profile abstractions, download core and a platform-neutral bridge authorization primitive. `App.kt` should use `BrowserSessionCoordinator.create(...)` and must not rebuild the store/controller/manager graph or reconcile their flows itself. These are the starting points to audit—not proof that all core acceptance gates are complete.
 
 In particular:
 - The bridge authorization primitive is not a complete end-to-end JS bridge.
