@@ -23,7 +23,6 @@ kotlin {
             implementation(libs.compose.webview)
         }
         androidMain.dependencies { implementation(libs.androidx.activity.compose) }
-        androidInstrumentedTest.dependencies { implementation(libs.androidx.compose.ui.test.junit4) }
         val desktopMain by getting
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
