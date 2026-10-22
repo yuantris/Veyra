@@ -40,9 +40,10 @@ internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
     override fun Render(
         tab: BrowserTab,
         engine: BrowserEngineContract,
+        isVisible: Boolean,
         onNavigationRequest: (NavigationRequest) -> NavigationDecision,
         onNavigationDecision: (NavigationDecision) -> Unit,
-   ) {
+    ) {
         ComposeWebViewSurface(tab, engine, isVisible, onNavigationRequest, onNavigationDecision)
     }
 }
