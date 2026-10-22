@@ -26,6 +26,7 @@ internal interface BrowserSurfaceRenderer {
     fun Render(
         tab: BrowserTab,
         engine: BrowserEngineContract,
+        isVisible: Boolean,
         onNavigationRequest: (NavigationRequest) -> NavigationDecision,
         onNavigationDecision: (NavigationDecision) -> Unit,
     )
@@ -42,7 +43,7 @@ internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
         onNavigationRequest: (NavigationRequest) -> NavigationDecision,
         onNavigationDecision: (NavigationDecision) -> Unit,
    ) {
-        ComposeWebViewSurface(tab, engine, onNavigationRequest, onNavigationDecision)
+        ComposeWebViewSurface(tab, engine, isVisible, onNavigationRequest, onNavigationDecision)
     }
 }
 
@@ -50,6 +51,7 @@ internal object ComposeWebViewSurfaceRenderer : BrowserSurfaceRenderer {
 private fun ComposeWebViewSurface(
     tab: BrowserTab,
     engine: BrowserEngineContract,
+    isVisible: Boolean,
     onNavigationRequest: (NavigationRequest) -> NavigationDecision,
     onNavigationDecision: (NavigationDecision) -> Unit,
  ) {
