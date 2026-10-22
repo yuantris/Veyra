@@ -38,7 +38,9 @@ class BrowserSessionCoordinator(
     val events: Flow<BrowserEvent> get() = controller.events
 
     /** Installs the projections and opens engines for tabs restored in metadata. Safe to call twice. */
-    suspend fun start() = mutex.withLock {
+    suspend fun start() = mutex.withLock { startLocked() }
+
+    private suspend fun startLocked() {
         check(!closed) { "Browser session coordinator is closed." }
         if (!started) {
             started = true
@@ -77,7 +79,7 @@ class BrowserSessionCoordinator(
         isPrivate: Boolean = false,
     ): BrowserTab = mutex.withLock {
         check(!closed) { "Browser session coordinator is closed." }
-        check(started) { "Browser session coordinator has not been started." }
+        if (!started) startLocked()
         val tab = store.openTab(url = url, title = title, isPrivate = isPrivate)
         try {
             ensureEngineLocked(tab)
@@ -123,6 +125,7 @@ class BrowserSessionCoordinator(
 
     suspend fun navigate(request: NavigationRequest): NavigationDecision = mutex.withLock {
         if (closed) return@withLock NavigationDecision.Cancel
+        if (!started) startLocked()
         val tab = store.state.value.tabs.firstOrNull { it.id == request.tabId.value }
             ?: return@withLock NavigationDecision.Cancel
         ensureEngineLocked(tab)
