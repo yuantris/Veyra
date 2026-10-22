@@ -42,7 +42,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import dev.veyra.browser.core.session.BrowserSessionCoordinator
 import dev.veyra.browser.core.session.BrowserTab
 import dev.veyra.browser.core.BrowserEvent
 import dev.veyra.browser.core.DownloadPhase
@@ -51,13 +50,6 @@ import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
-import dev.veyra.browser.download.DefaultDownloadController
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF17202A)
 private val Muted = Color(0xFF77818D)
@@ -68,29 +60,12 @@ private val Accent = Color(0xFF496BEB)
 fun App() {
     val uriHandler = LocalUriHandler.current
     val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
-    // This owner scope outlives the Compose subtree long enough to close native sessions on dispose.
-    val controllerScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    // Platform download execution: present only where the platform can actually download.
-    val downloadTransport = remember { createPlatformDownloadTransport() }
-    val downloadController = remember(downloadTransport) {
-        downloadTransport?.let { transport -> DefaultDownloadController(controllerScope, transport) }
-    }
-    val coordinator = remember(downloadController) {
-        BrowserSessionCoordinator.create(
-            engineFactory = createPlatformBrowserEngineFactory(),
-            scope = controllerScope,
-            downloadController = downloadController,
-        )
-    }
-    // The app owns download acceptance; the core owns ownership validation and task state.
-    val downloadHandler = remember(coordinator) {
-        DownloadRequestHandler { request -> coordinator.startDownload(request) }
-    }
+    // The composition root assembles the session graph; this file stays pure UI.
+    val session = rememberBrowserSession()
+    val coordinator = session.coordinator
+    val downloadHandler = session.downloadHandler
+    val downloadTasks by session.downloadTasks
     var downloadStatus by remember { mutableStateOf<String?>(null) }
-    val downloadTasksFlow = coordinator.downloadTasks
-    val downloadTasks by remember(downloadTasksFlow) {
-        downloadTasksFlow ?: flowOf(emptyList())
-    }.collectAsState(initial = emptyList())
     val sessionState by coordinator.state.collectAsState()
     val engines by coordinator.engines.collectAsState()
     var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
@@ -135,7 +110,7 @@ fun App() {
         val target = normalizeAddress(raw) ?: return
         showBrowser = true
         address = target
-        controllerScope.launch {
+        session.launchCommand {
             val current = coordinator.activeTab ?: coordinator.openTab(url = "about:blank")
             coordinator.updateTab(current.id, url = target, title = target, isLoading = true)
             when (coordinator.navigate(NavigationRequest(TabId(current.id), target, NavigationSource.USER))) {
@@ -220,7 +195,7 @@ fun App() {
                         }
                         Spacer(Modifier.weight(1f))
                         ToolText("+", true) {
-                            controllerScope.launch {
+                            session.launchCommand {
                                 coordinator.openTab()
                                 address = "about:blank"
                             }
@@ -250,7 +225,7 @@ fun App() {
                                     Text(
                                         "×",
                                         modifier = Modifier.clickable {
-                                            controllerScope.launch { coordinator.cancelDownload(task.id) }
+                                            session.launchCommand { coordinator.cancelDownload(task.id) }
                                         }.padding(start = 4.dp),
                                         color = Muted,
                                         fontSize = 13.sp,
@@ -295,7 +270,7 @@ fun App() {
                                 Text(
                                     "×",
                                     modifier = Modifier.clickable {
-                                        controllerScope.launch { coordinator.closeTab(tab.id) }
+                                        session.launchCommand { coordinator.closeTab(tab.id) }
                                     }.padding(start = 4.dp),
                                     color = Muted,
                                     fontSize = 13.sp,
@@ -329,7 +304,7 @@ fun App() {
                                                     }
                                                     is NavigationDecision.OpenInNewTab -> {
                                                         showBrowser = true
-                                                        controllerScope.launch {
+                                                        session.launchCommand {
                                                             val newTab = coordinator.openTab(url = "about:blank")
                                                             coordinator.navigate(
                                                                 NavigationRequest(
@@ -387,17 +362,10 @@ fun App() {
         }
     }
 
-    DisposableEffect(coordinator) {
+    DisposableEffect(session) {
         onDispose {
-            controllerScope.launch {
-                try {
-                    coordinator.close()
-                } finally {
-                    // The download controller is owned by this composition root, not by the core.
-                    downloadController?.close()
-                    controllerScope.cancel()
-                }
-            }
+            // Closes the coordinator, then the download controller, then cancels the owner scope.
+            session.requestShutdown()
         }
     }
 }
