@@ -43,6 +43,9 @@ kotlin {
                 implementation(libs.androidx.test.ext.junit)
                 implementation(libs.androidx.compose.ui.test.junit4)
                 implementation(libs.mockwebserver)
+                // MockWebServer 4.12.0 references OkHttp runtime internals; declare the
+                // matching runtime explicitly so they are packaged in the instrumentation APK.
+                implementation(libs.okhttp)
             }
         }
     }
