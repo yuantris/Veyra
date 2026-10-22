@@ -72,6 +72,7 @@ fun App() {
     val session = remember { BrowserSessionStore() }
     val uriHandler = LocalUriHandler.current
     val sessionState by session.state.collectAsState()
+    val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
     val controllerScope = rememberCoroutineScope()
     val profileProvider: BrowserProfileProvider = remember { InMemoryBrowserProfileProvider() }
     val controller = remember {
@@ -307,7 +308,7 @@ fun App() {
                                             .alpha(if (selected) 1f else 0f)
                                             .zIndex(if (selected) 1f else 0f),
                                     ) {
-                                        ComposeWebViewSurfaceRenderer.Render(
+                                        surfaceRenderer.Render(
                                             tab = tab,
                                             engine = engine,
                                             onNavigationRequest = controller::decideSurfaceNavigation,
