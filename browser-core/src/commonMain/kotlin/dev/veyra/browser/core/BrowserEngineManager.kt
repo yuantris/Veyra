@@ -1,7 +1,6 @@
 package dev.veyra.browser.core
 
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -52,10 +51,7 @@ class BrowserEngineManager(
                 return@withLock OpenClaim.Wait(creation.completion)
             }
 
-            val creation = Creation(
-                profileId = request.profileId,
-                completion = CompletableDeferred(),
-            )
+            val creation = Creation(request.profileId, CompletableDeferred())
             creatingTabs[request.tabId] = creation
             OpenClaim.Create(creation)
         }
@@ -95,7 +91,8 @@ class BrowserEngineManager(
             return engine
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
-                if (createdEngine != null) runCatching { createdEngine.close() }
+                val engineToClose = createdEngine
+                if (engineToClose != null) runCatching { engineToClose.close() }
                 mutex.withLock {
                     if (creatingTabs[request.tabId] === creation) {
                         creatingTabs.remove(request.tabId)
@@ -116,6 +113,7 @@ class BrowserEngineManager(
     suspend fun closeTab(tabId: TabId): Boolean {
         val claim = mutex.withLock {
             closingTabs[tabId]?.let { return@withLock CloseClaim.Wait(it) }
+            creatingTabs[tabId]?.let { return@withLock CloseClaim.WaitForCreation(it.completion) }
             val engine = engines.remove(tabId) ?: return false
             val completion = CompletableDeferred<Result<Unit>>()
             closingTabs[tabId] = completion
@@ -128,9 +126,12 @@ class BrowserEngineManager(
                 claim.completion.await().getOrThrow()
                 false
             }
+            is CloseClaim.WaitForCreation -> {
+                claim.completion.await().getOrThrow()
+                closeTab(tabId)
+            }
             is CloseClaim.Own -> {
-                val result = closeAndComplete(claim.engine, claim.completion)
-                result.getOrThrow()
+                closeAndComplete(claim.engine, claim.completion).getOrThrow()
                 true
             }
         }
@@ -215,5 +216,8 @@ class BrowserEngineManager(
             val completion: CompletableDeferred<Result<Unit>>,
         ) : CloseClaim
         data class Wait(val completion: CompletableDeferred<Result<Unit>>) : CloseClaim
+        data class WaitForCreation(
+            val completion: CompletableDeferred<Result<BrowserEngineContract>>,
+        ) : CloseClaim
     }
 }
