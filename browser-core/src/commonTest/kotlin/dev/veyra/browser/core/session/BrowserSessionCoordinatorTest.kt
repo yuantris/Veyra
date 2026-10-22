@@ -16,6 +16,7 @@ import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.engine.BrowserController
 import dev.veyra.browser.core.engine.BrowserEngineManager
 import dev.veyra.browser.core.navigation.BrowserNavigationCoordinator
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -129,11 +131,79 @@ class BrowserSessionCoordinatorTest {
         coordinator.close()
         scope.cancel()
     }
+
+    @Test
+    fun engineCloseFailureIsObservableAndOtherTabsKeepTheirEngines() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val factory = CoordinatorTestFactory()
+        val store = BrowserSessionStore("about:blank")
+        val profiles = InMemoryBrowserProfileProvider()
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            profiles,
+            BrowserNavigationCoordinator(),
+            BrowserEventHub(),
+            scope,
+        )
+        val coordinator = BrowserSessionCoordinator(store, controller, profiles, scope)
+        coordinator.start()
+
+        val first = coordinator.openTab("https://first.example")
+        val second = coordinator.openTab("https://second.example")
+        factory.failCloseFor(second.id, IllegalStateException("native disposal failed"))
+
+        val failure = assertFailsWith<IllegalStateException> { coordinator.closeTab(second.id) }
+
+        // The disposal failure must stay observable, not be swallowed into a clean close.
+        assertTrue(failure.message!!.contains("lifecycle operation(s) failed"))
+        // Metadata follows the terminal transition even though disposal failed.
+        assertTrue(store.state.value.tabs.none { it.id == second.id })
+        // Other tabs are untouched by one tab's failed disposal.
+        assertTrue(controller.registeredEngines.value.containsKey(TabId(first.id)))
+
+        coordinator.close()
+        scope.cancel()
+    }
+
+    @Test
+    fun closeTabRethrowsCancellationInsteadOfWrappingItAsFailure() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val factory = CoordinatorTestFactory()
+        val store = BrowserSessionStore("about:blank")
+        val profiles = InMemoryBrowserProfileProvider()
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            profiles,
+            BrowserNavigationCoordinator(),
+            BrowserEventHub(),
+            scope,
+        )
+        val coordinator = BrowserSessionCoordinator(store, controller, profiles, scope)
+        coordinator.start()
+
+        val first = coordinator.openTab("https://first.example")
+        val second = coordinator.openTab("https://second.example")
+        factory.failCloseFor(second.id, CancellationException("close cancelled"))
+
+        // Cancellation is not an ordinary engine failure: it must reach the caller unchanged.
+        assertFailsWith<CancellationException> { coordinator.closeTab(second.id) }
+        assertTrue(store.state.value.tabs.none { it.id == second.id })
+        assertTrue(controller.registeredEngines.value.containsKey(TabId(first.id)))
+
+        coordinator.close()
+        scope.cancel()
+    }
 }
 
 private class CoordinatorTestFactory : BrowserEngineFactory {
     val requests = mutableListOf<BrowserEngineCreateRequest>()
     var failNextCreate = false
+    private val closeFailures = mutableMapOf<String, Throwable>()
+
+    /** Makes close() of the engine for [tabId] throw [error]. Applies to engines already created. */
+    fun failCloseFor(tabId: String, error: Throwable) {
+        closeFailures[tabId] = error
+    }
 
     override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract {
         requests += request
@@ -141,12 +211,13 @@ private class CoordinatorTestFactory : BrowserEngineFactory {
             failNextCreate = false
             throw IllegalStateException("Synthetic engine creation failure")
         }
-        return CoordinatorTestEngine(request)
+        return CoordinatorTestEngine(request) { closeFailures[request.tabId.value] }
     }
 }
 
 private class CoordinatorTestEngine(
     request: BrowserEngineCreateRequest,
+    private val closeError: () -> Throwable? = { null },
 ) : BrowserEngineContract {
     override val tabId = request.tabId
     override val sessionId = SessionId("session-${request.tabId.value}")
@@ -176,5 +247,6 @@ private class CoordinatorTestEngine(
 
     override suspend fun close() {
         closed = true
+        closeError()?.let { throw it }
     }
 }

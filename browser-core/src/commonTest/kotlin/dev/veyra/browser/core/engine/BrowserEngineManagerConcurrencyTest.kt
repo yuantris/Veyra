@@ -21,6 +21,7 @@ import kotlinx.coroutines.yield
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class BrowserEngineManagerConcurrencyTest {
@@ -113,6 +114,72 @@ class BrowserEngineManagerConcurrencyTest {
         assertEquals(0, manager.size)
     }
 
+    @Test
+    fun concurrentOpenOfSameTabSharesOneCreation() = runBlocking {
+        var createCount = 0
+        val creationStarted = CompletableDeferred<Unit>()
+        val releaseCreation = CompletableDeferred<Unit>()
+        val factory = object : BrowserEngineFactory {
+            override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract {
+                createCount++
+                creationStarted.complete(Unit)
+                releaseCreation.await()
+                return FakeEngine(request.tabId, request.profileId)
+            }
+        }
+        val manager = BrowserEngineManager(factory)
+
+        val first = async {
+            manager.openTab(BrowserEngineCreateRequest(TabId("tab-1"), ProfileId("default")))
+        }
+        creationStarted.await()
+
+        // Arrives while the first creation is still in flight: the second caller must join the
+        // in-flight creation instead of starting a second one, whichever order the claims run in.
+        val second = async {
+            manager.openTab(BrowserEngineCreateRequest(TabId("tab-1"), ProfileId("default")))
+        }
+        yield()
+
+        releaseCreation.complete(Unit)
+        val firstEngine = first.await()
+        val secondEngine = second.await()
+
+        assertSame(firstEngine, secondEngine)
+        assertEquals(1, createCount)
+        assertEquals(1, manager.size)
+        manager.closeAll()
+    }
+
+    @Test
+    fun concurrentCloseOfSameTabClosesTheEngineOnce() = runBlocking {
+        val closeStarted = CompletableDeferred<Unit>()
+        val releaseClose = CompletableDeferred<Unit>()
+        lateinit var engine: FakeEngine
+        val manager = BrowserEngineManager(object : BrowserEngineFactory {
+            override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract =
+                FakeEngine(request.tabId, request.profileId).also { engine = it }
+        })
+        manager.openTab(BrowserEngineCreateRequest(TabId("tab-1"), ProfileId("default")))
+        engine.onClose = {
+            closeStarted.complete(Unit)
+            releaseClose.await()
+        }
+
+        val firstClose = async { manager.closeTab(TabId("tab-1")) }
+        closeStarted.await()
+        val secondClose = async { manager.closeTab(TabId("tab-1")) }
+        yield()
+        // The second caller waits for the in-flight close instead of disposing a second time.
+        assertFalse(secondClose.isCompleted)
+
+        releaseClose.complete(Unit)
+        assertTrue(firstClose.await())
+        assertFalse(secondClose.await())
+        assertEquals(1, engine.closeCount)
+        assertEquals(0, manager.size)
+    }
+
     private class FakeEngine(
         override val tabId: TabId,
         override val profileId: ProfileId,
@@ -124,6 +191,9 @@ class BrowserEngineManagerConcurrencyTest {
         var closeCount = 0
             private set
 
+        /** Optional gate so a test can hold close() open and observe concurrent callers. */
+        var onClose: (suspend () -> Unit)? = null
+
         override fun navigate(request: NavigationRequest) = Unit
         override fun goBack() = Unit
         override fun goForward() = Unit
@@ -131,6 +201,7 @@ class BrowserEngineManagerConcurrencyTest {
         override fun stop() = Unit
         override suspend fun close() {
             closeCount++
+            onClose?.invoke()
         }
     }
 }
