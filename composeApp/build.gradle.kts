@@ -57,6 +57,10 @@ dependencies {
 android {
     namespace = "dev.veyra.browser"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
     defaultConfig {
         applicationId = "dev.veyra.browser"
         minSdk = libs.versions.android.minSdk.get().toInt()
