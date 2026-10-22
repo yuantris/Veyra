@@ -1,6 +1,6 @@
 # Veyra Browser Core Architecture
 
-**Status:** Proposed normative contract  
+**Status:** Approved normative contract; implementation is in progress  
 **Scope:** Shared browser domain model and platform adapter contracts  
 **First implementation:** Android + a Chromium-based runtime (concrete embedding selected against capability, lifecycle, licensing and packaging gates)  
 **Decision rule:** Platform adapters must either satisfy a contract or explicitly report that the capability is unsupported/limited. They must never silently fake success.
@@ -459,3 +459,32 @@ Each adapter must run the shared core contract tests where possible plus native 
 - [Apple WKUIDelegate](https://developer.apple.com/documentation/webkit/wkuidelegate)
 - [CEF general usage and request handling](https://chromiumembedded.github.io/cef/general_usage.html)
 - [Huawei ArkWeb developer documentation](https://developer.huawei.com/consumer/en/doc/harmonyos-guides-V5/web-introduction-V5)
+
+## 11. Core skeleton acceptance gates (required before engine integration)
+
+This section is an implementation gate, not a statement that the current prototype already passes it. Android/native engine integration must not be treated as the next step until the platform-neutral gates below are implemented and tested.
+
+| Gate | Required invariant | Minimum verification |
+| --- | --- | --- |
+| C0 — dependency direction | Common browser code has no platform SDK or Compose UI dependency; download implementation does not leak into browser-core | Gradle dependency review and common/JVM compilation |
+| C1 — engine ownership | One live engine per tab/profile binding; duplicate opens share one in-flight creation; slow creation/disposal does not hold the registry lock; close and shutdown are idempotent and await in-flight work | Concurrent open, close-during-create, close-during-close, shutdown-during-create, failed-close and cancellation tests |
+| C2 — session vs surface | Surface attach/detach never defines session lifetime; only explicit tab/session closure or documented eviction releases the engine; closing one tab cannot release a shared runtime used by others | Fake surface/session lifecycle tests; platform resource owner contract reviewed before adapters |
+| C3 — tab metadata consistency | Every active tab ID has metadata; engine identity/profile maps to exactly one tab; closing a tab rejects late callbacks; last-tab replacement creates a fresh tab/session and preserves the intended regular/private policy | Store/controller integration tests for active/inactive close, last-tab close, private tab close, stale callback and ID mismatch |
+| C4 — navigation correctness | Navigation decision is synchronous where required; main-frame navigation is distinct from subresources; old navigation callbacks cannot overwrite newer state; external/new-tab decisions never silently load in the current tab | Deterministic tests for allow/cancel/external/new-tab, redirects, unknown schemes and late callbacks |
+| C5 — bridge security | The trusted origin/frame is supplied by the engine adapter, never accepted from page JSON; exact origin + profile + extension identity + method authorization are checked before dispatch; protocol version, message size, request lifecycle and timeout are enforced | Negative tests for forged origin, suffix/subdomain confusion, opaque origin, untrusted frame, missing permission, replay/unknown request and unsupported version |
+| C6 — permission boundaries | Website permission, OS runtime permission and Veyra/extension capability permission remain separate; unsupported, denied, cancelled and timed-out are distinct outcomes | Policy tests proving no automatic grant from OS permission alone and no private-to-regular grant inheritance |
+| C7 — downloads and interception | A download candidate is not auto-started; explicit acceptance precedes transfer; task/profile/tab ownership is validated; interception scope is reported truthfully | Tests for duplicate requests, close-vs-start race, cancellation, byte-count validation, private profile policy and unsupported interception scope |
+| C8 — capability truthfulness | A capability is true only when the adapter can enforce it and integration tests demonstrate it; engine potential or UI presence is not enough | Capability matrix review linked to platform-specific test evidence |
+| C9 — adapter boundary | Core contracts contain no native view/runtime types; adapter owns native callbacks/resources; a renderer crash is not silently treated as a normal tab close | Contract/API review and fake-adapter conformance tests |
+
+### Exit criteria
+
+The core skeleton is ready for native-engine integration only when:
+
+1. C0–C9 have implementation notes and tests, with any deferred feature explicitly marked unsupported.
+2. The common/JVM test suite passes on CI; failures are fixed rather than bypassed.
+3. BrowserController is the single application-facing command facade, BrowserEngineManager is the single live-engine registry, and BrowserSessionStore is explicitly metadata-only. No second registry or Compose-owned engine lifetime is introduced.
+4. All architecture docs agree on the same selected engine direction and do not claim unimplemented runtime, WebExtensions, privacy isolation, or interception capabilities.
+5. A platform surface resource ownership protocol has been reviewed at the contract level before any native adapter is allowed to own or destroy a view.
+
+Until these criteria are met, the architecture should be described as defined but not yet implementation-complete. Platform work must not be used to paper over unresolved core ownership or security contracts.
