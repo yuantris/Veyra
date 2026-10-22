@@ -101,8 +101,8 @@ class ComposeWebViewEngineTest {
         engine.close()
         engine.close()
         engine.navigate(NavigationRequest(TabId("tab-1"), "https://closed.example"))
-        engine.attachSurface(RecordingSurface())
 
+        assertTrue(runCatching { engine.attachSurface(RecordingSurface()) }.isFailure)
         assertTrue(surface.loadedUrls.isEmpty())
         assertFalse(engine.pageState.value.url == "https://closed.example")
     }
