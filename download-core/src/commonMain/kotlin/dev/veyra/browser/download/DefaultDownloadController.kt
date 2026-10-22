@@ -214,7 +214,8 @@ class DefaultDownloadController(
         require(normalizedUrl.startsWith("https://") || normalizedUrl.startsWith("http://")) {
             "Only HTTP and HTTPS download URLs are supported."
         }
-        require(request.expectedBytes == null || request.expectedBytes >= 0) {
+        val expectedBytes = request.expectedBytes
+        require(expectedBytes == null || expectedBytes >= 0) {
             "Expected byte count cannot be negative."
         }
     }
