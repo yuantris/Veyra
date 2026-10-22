@@ -1,10 +1,12 @@
+> **Superseded:** This document records the previous GeckoView proposal and is retained only as decision history. The current Android direction is Chromium-based; see [CHROMIUM_ANDROID_PLAN.md](CHROMIUM_ANDROID_PLAN.md). Do not implement this plan unless the engine decision is explicitly reversed.
+
 # Android GeckoView implementation plan
 
 This plan is the first implementation stage for Veyra's Android-first architecture. It records decisions and gates; it does not claim that GeckoView has already been integrated.
 
-## Decision record
+## Historical decision record (no longer current)
 
-- **Android engine:** GeckoView.
+- **Previous Android engine proposal:** GeckoView.
 - **Shared UI:** Compose Multiplatform.
 - **Shared contract:** `:browser-core`.
 - **Native ownership:** Android source sets own `GeckoRuntime`, `GeckoSession`, `GeckoView` and all Gecko delegates.
