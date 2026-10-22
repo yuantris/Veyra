@@ -6,7 +6,7 @@
 - **Extension requirement:** a real WebExtensions implementation is mandatory; Blink + V8 alone does not satisfy this requirement.
 - **Shared contract:** `:browser-core` (`BrowserEngineContract`, `BrowserPageState`, `BrowserEvent`, `BrowserController`).
 - **Shared UI:** Compose Multiplatform, with renderer binding isolated from engine control.
-- **Current status:** direction selected; exact Android Chromium embedder/runtime is not yet selected or integrated.
+- **Current status:** Android uses a native `android.webkit.WebView` surface backed by the device's Chromium WebView provider. This is the first working Chromium surface adapter, not a bundled/pinned Chromium distribution. WebExtensions remain a later capability spike, not a prerequisite for getting the engine surface running.
 
 ## Critical distinction: Chromium is not one embeddable API
 
@@ -72,19 +72,18 @@ These are proposed boundaries, not files that already exist.
 
 ## First implementation sequence
 
-1. Complete shared renderer/engine decoupling in `commonMain`.
-2. Select and document one concrete Chromium runtime using the gates above.
-3. Prove runtime startup and a single live tab before changing the full app shell.
-4. Implement the Android `BrowserEngineContract` adapter and per-tab lifecycle.
-5. Verify page state, navigation policy, back/forward/reload/stop and resource release.
-6. Run the extension spike: bundled test extension, content script, permission prompt, storage and native messaging.
-7. Add Android integration tests for tab switching, tab closure, navigation callbacks and extension behavior.
-8. Only then migrate more shared UI and add advanced features.
+1. Complete shared renderer/engine decoupling and platform-specific factory selection.
+2. Use the native Android Chromium WebView surface to prove one live tab and lifecycle integration.
+3. Verify page state, back/forward/reload/stop and resource release on Android.
+4. Evaluate a bundled Chromium embedder separately if pinning the engine version becomes a requirement.
+5. Run the WebExtensions spike only after the base Chromium surface is stable: bundled test extension, content script, permission prompt, storage and native messaging.
+6. Add Android integration tests for tab switching, tab closure and navigation callbacks.
+7. Only then migrate more shared UI and add advanced features.
 
 ## Exit criteria
 
-- A named, pinned runtime and its license/update strategy are recorded.
-- WebExtensions support is demonstrated with an actual extension, not inferred from engine branding.
+- The chosen runtime's update model is explicit (system-updated WebView for the initial adapter; bundled runtime is a separate decision).
+- WebExtensions support, if pursued, is demonstrated with an actual extension, not inferred from engine branding.
 - Core contracts and tests pass without Android SDK types in `browser-core`.
 - Tab switching preserves the engine session; closing a tab releases only its own resources.
 - Unsupported capabilities are reported honestly and are covered by tests.
