@@ -3,6 +3,8 @@ package dev.veyra.browser
 import dev.veyra.browser.core.BrowserLoadPhase
 import dev.veyra.browser.core.BrowserEngineCreateRequest
 import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.DownloadRequest
+import dev.veyra.browser.core.RequestId
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
@@ -88,6 +90,34 @@ class ComposeWebViewEngineTest {
         assertEquals(BrowserLoadPhase.SUCCEEDED, engine.pageState.value.loadPhase)
         assertEquals("Example", engine.pageState.value.title)
         assertTrue(engine.pageState.value.canGoBack)
+    }
+
+    @Test
+    fun downloadRequestsAreEmittedWithoutStartingTransfers() = runBlocking {
+        val tabId = TabId("tab-download")
+        val profileId = ProfileId("default")
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, profileId),
+        )
+        val request = DownloadRequest(
+            requestId = RequestId("download-1"),
+            tabId = tabId,
+            profileId = profileId,
+            url = "https://example.com/file.zip",
+            suggestedFileName = "file.zip",
+            mimeType = "application/zip",
+            expectedBytes = 1024,
+        )
+        val emitted = async(start = CoroutineStart.UNDISPATCHED) {
+            engine.events.first { it is BrowserEvent.DownloadRequested }
+        }
+
+        engine.reportDownloadRequested(request)
+
+        val event = assertIs<BrowserEvent.DownloadRequested>(emitted.await())
+        assertEquals(tabId, event.tabId)
+        assertEquals(request, event.request)
+        assertEquals("about:blank", engine.pageState.value.url)
     }
 
     @Test
