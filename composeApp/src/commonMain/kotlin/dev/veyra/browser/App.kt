@@ -60,6 +60,9 @@ import dev.veyra.browser.core.TabId
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF17202A)
@@ -88,15 +91,24 @@ fun App() {
     var showBrowser by remember { mutableStateOf(false) }
     val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
 
-    LaunchedEffect(sessionState.tabs) {
-        val liveTabIds = sessionState.tabs.map { TabId(it.id) }.toSet()
-        engines.keys.filterNot { it in liveTabIds }.forEach { tabId ->
-            controller.closeTab(tabId)
-        }
-        sessionState.tabs.forEach { tab ->
-            val tabId = TabId(tab.id)
-            if (controller.registeredEngines.value[tabId] == null) {
-                controller.openTab(tabId, ProfileId("default"), tab.url)
+    // Reconcile desired tab identities with engine ownership. Observe both flows so a tab
+    // removed while its engine is still being created is closed as soon as registration completes.
+    // Collect serially (not collectLatest): lifecycle operations must not be cancelled midway when
+    // a rapid sequence of tab changes arrives.
+    LaunchedEffect(session, controller) {
+        val desiredTabs = session.state
+            .map { state -> state.tabs.associate { TabId(it.id) to it.url } }
+            .distinctUntilChanged { old, new -> old.keys == new.keys }
+        combine(desiredTabs, controller.registeredEngines) { tabs, registered ->
+            tabs to registered.keys
+        }.distinctUntilChanged().collect { (tabs, registeredIds) ->
+            (registeredIds - tabs.keys).forEach { tabId ->
+                controller.closeTab(tabId)
+            }
+            tabs.forEach { (tabId, url) ->
+                if (controller.registeredEngines.value[tabId] == null) {
+                    controller.openTab(tabId, ProfileId("default"), url)
+                }
             }
         }
     }
@@ -241,10 +253,9 @@ fun App() {
                                 Text(
                                     "×",
                                     modifier = Modifier.clickable {
-                                        controllerScope.launch {
-                                            controller.closeTab(TabId(tab.id))
-                                            session.closeTab(tab.id)
-                                        }
+                                        // The session flow is the source of truth; the lifecycle
+                                        // reconciler releases the engine after the tab disappears.
+                                        session.closeTab(tab.id)
                                     }.padding(start = 4.dp),
                                     color = Muted,
                                     fontSize = 13.sp,
