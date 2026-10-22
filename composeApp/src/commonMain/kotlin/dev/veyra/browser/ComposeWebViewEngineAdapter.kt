@@ -56,6 +56,8 @@ internal interface BrowserSurfaceBinding {
     )
 }
 
+internal expect fun createPlatformBrowserEngineFactory(): BrowserEngineFactory
+
 /**
  * Logical engine/session adapter for the current compose-webview-multiplatform surface.
  *
