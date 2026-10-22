@@ -44,14 +44,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.veyra.browser.core.session.BrowserSessionCoordinator
 import dev.veyra.browser.core.session.BrowserTab
+import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.DownloadPhase
+import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
+import dev.veyra.browser.download.DefaultDownloadController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 private val Ink = Color(0xFF17202A)
@@ -65,12 +70,27 @@ fun App() {
     val surfaceRenderer = remember { createBrowserSurfaceRenderer() }
     // This owner scope outlives the Compose subtree long enough to close native sessions on dispose.
     val controllerScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    val coordinator = remember {
+    // Platform download execution: present only where the platform can actually download.
+    val downloadTransport = remember { createPlatformDownloadTransport() }
+    val downloadController = remember(downloadTransport) {
+        downloadTransport?.let { transport -> DefaultDownloadController(controllerScope, transport) }
+    }
+    val coordinator = remember(downloadController) {
         BrowserSessionCoordinator.create(
             engineFactory = createPlatformBrowserEngineFactory(),
             scope = controllerScope,
+            downloadController = downloadController,
         )
     }
+    // The app owns download acceptance; the core owns ownership validation and task state.
+    val downloadHandler = remember(coordinator) {
+        DownloadRequestHandler { request -> coordinator.startDownload(request) }
+    }
+    var downloadStatus by remember { mutableStateOf<String?>(null) }
+    val downloadTasksFlow = coordinator.downloadTasks
+    val downloadTasks by remember(downloadTasksFlow) {
+        downloadTasksFlow ?: flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
     val sessionState by coordinator.state.collectAsState()
     val engines by coordinator.engines.collectAsState()
     var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
@@ -81,6 +101,19 @@ fun App() {
     // Compose only observes state and forwards user actions.
     LaunchedEffect(coordinator) {
         coordinator.start()
+    }
+
+    // A platform download callback is a candidate: nothing starts until the app policy accepts it.
+    LaunchedEffect(coordinator, downloadHandler) {
+        coordinator.events.collect { event ->
+            if (event is BrowserEvent.DownloadRequested) {
+                downloadStatus = when (val outcome = downloadHandler.handle(event.request)) {
+                    is DownloadRequestHandler.Outcome.Started -> null
+                    is DownloadRequestHandler.Outcome.Rejected -> "Download rejected: ${outcome.reason}"
+                    is DownloadRequestHandler.Outcome.Failed -> "Download failed: ${outcome.reason}"
+                }
+            }
+        }
     }
 
     LaunchedEffect(activeTab?.id, activeTab?.url) {
@@ -192,6 +225,47 @@ fun App() {
                                 address = "about:blank"
                             }
                         }
+                    }
+
+                    if (downloadTasks.isNotEmpty()) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            downloadTasks.take(2).forEach { task ->
+                                Row(
+                                    Modifier.weight(1f).background(Color.White, RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        downloadLabel(task),
+                                        modifier = Modifier.weight(1f),
+                                        fontSize = 11.sp,
+                                        color = Ink,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        "×",
+                                        modifier = Modifier.clickable {
+                                            controllerScope.launch { coordinator.cancelDownload(task.id) }
+                                        }.padding(start = 4.dp),
+                                        color = Muted,
+                                        fontSize = 13.sp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    downloadStatus?.let { status ->
+                        Text(
+                            status,
+                            fontSize = 11.sp,
+                            color = Muted,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
                     }
 
                     Row(
@@ -319,9 +393,27 @@ fun App() {
                 try {
                     coordinator.close()
                 } finally {
+                    // The download controller is owned by this composition root, not by the core.
+                    downloadController?.close()
                     controllerScope.cancel()
                 }
             }
+        }
+    }
+}
+
+private fun downloadLabel(task: DownloadTask): String {
+    val name = task.request.suggestedFileName
+        ?: task.request.url.substringAfterLast('/').ifEmpty { "download" }
+    return when (task.phase) {
+        DownloadPhase.COMPLETED -> "✓ $name"
+        DownloadPhase.FAILED -> "✗ $name"
+        DownloadPhase.CANCELLED -> "× $name"
+        else -> {
+            val percent = task.totalBytes?.takeIf { it > 0L }?.let { total ->
+                (task.receivedBytes * 100 / total).toInt().coerceIn(0, 100)
+            }
+            if (percent == null) "↓ $name" else "↓ $name $percent%"
         }
     }
 }

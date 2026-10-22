@@ -12,7 +12,7 @@
 | Broad resource interception | Unsupported | Unsupported | Unsupported | Separate capability from navigation policy. |
 | Private profiles | Unsupported | Unsupported | Unsupported | Current adapter does not isolate cookies/cache/storage per profile. |
 | Session restore | Unsupported | Unsupported | Unsupported | Current adapter does not serialize and restore engine session state. |
-| Downloads | Unsupported | Unsupported | Unsupported | No normalized download pipeline connected yet. |
+| Downloads | Wired; capability held false pending device verification | Unsupported | Unsupported | Android has the full pipeline in code (DownloadListener → app acceptance policy → core task model → Ktor transport → app-specific files dir) with unit tests at every component, but no emulator/device test has proven the path yet, so `downloads` stays false per the gate below. iOS has no page download API; desktop detection is unverified. |
 | Website permission broker | Unsupported | Unsupported | Unsupported | No normalized permission request flow connected yet. |
 | Popup/new-window interception | Unsupported | Unsupported | Unsupported | A core event type alone is not a platform implementation. |
 | Native messaging / JS bridge policy | Unsupported | Unsupported | Unsupported | No origin-bound permissioned bridge is connected to Browser Core. |
@@ -39,3 +39,16 @@ The Android adapter deliberately keeps `navigationPolicy = false` until an Andro
 - a late callback for a closed tab cannot trigger host navigation.
 
 Until those tests exist and pass, the Android callback remains wired for development, but the public capability stays false. iOS and Desktop must remain false until their own native delegate/handler path and tests are added.
+
+## Current downloads verification gate
+
+The Android download pipeline is wired end-to-end in code — `DownloadListener` → `BrowserEvent.DownloadRequested` → app acceptance policy (`DownloadPolicy`) → `DownloadRequestHandler` → core task model → `KtorDownloadTransport` → app-specific external files directory — with unit tests for the transport, the task controller races and the acceptance policy. The capability is still held at `downloads = false` until an Android integration test proves on a real WebView that:
+
+- a download candidate reaches the app as a `DownloadRequested` event;
+- the acceptance policy starts the transfer only for accepted HTTP(S) candidates;
+- the file lands in the app-specific Downloads directory and the task reports progress and completion;
+- cancelling the task stops the transfer and leaves no partial file;
+- closing the tab or the app while a transfer is in flight ends the task as cancelled without hanging;
+- a private tab's download keeps its profile attribution and never enters normal download history.
+
+When that test passes, flip `downloads` to true in `ComposeWebViewPlatformCapabilities.android.kt` and update the row above. iOS and Desktop keep `downloads = false` until their own detection and execution paths exist.

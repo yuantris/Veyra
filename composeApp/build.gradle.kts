@@ -15,6 +15,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":browser-core"))
+            implementation(project(":browser-download"))
+            implementation(libs.ktor.client.core)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.ui)
@@ -22,13 +24,19 @@ kotlin {
             implementation(compose.components.resources)
             implementation(libs.compose.webview)
         }
-        androidMain.dependencies { implementation(libs.androidx.activity.compose) }
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.ktor.client.okhttp)
+        }
         val desktopMain by getting
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kcef)
         }
-        commonTest.dependencies { implementation(kotlin("test")) }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(libs.ktor.client.mock)
+        }
         val androidInstrumentedTest by getting {
             dependencies {
                 implementation(libs.androidx.test.runner)
