@@ -1,11 +1,15 @@
 package dev.veyra.browser
 
 import android.annotation.SuppressLint
+import android.os.Build
+import android.webkit.SslErrorHandler
+import android.net.http.SslError
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebSettings
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -107,6 +111,16 @@ private fun createWebView(
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
 
+    // Secure defaults: web content must not be able to read local files or mix HTTP into HTTPS.
+    settings.allowFileAccess = false
+    settings.allowContentAccess = false
+    settings.allowFileAccessFromFileURLs = false
+    settings.allowUniversalAccessFromFileURLs = false
+    settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        settings.safeBrowsingEnabled = true
+    }
+
     webChromeClient = object : WebChromeClient() {
         override fun onReceivedTitle(view: WebView, title: String?) {
             observe(view, view.url, title, view.progress < 100, null, null)
@@ -118,6 +132,23 @@ private fun createWebView(
     }
 
     webViewClient = object : WebViewClient() {
+        override fun onReceivedSslError(
+            view: WebView,
+            handler: SslErrorHandler,
+            error: SslError,
+        ) {
+            // Never let a page bypass certificate validation through an interactive proceed().
+            handler.cancel()
+            observe(
+                view,
+                error.url,
+                view.title,
+                false,
+                "tls_certificate_error",
+                "The secure connection could not be verified.",
+            )
+        }
+
         override fun shouldOverrideUrlLoading(
             view: WebView,
             request: WebResourceRequest,
