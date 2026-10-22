@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -30,18 +31,21 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     override fun Render(
         tab: BrowserTab,
         engine: BrowserEngineContract,
+        isVisible: Boolean,
         onNavigationRequest: (NavigationRequest) -> NavigationDecision,
         onNavigationDecision: (NavigationDecision) -> Unit,
     ) {
         val binding = engine as? BrowserSurfaceBinding ?: return
         val context = LocalContext.current
         val initialUrl = binding.pageState.value.url
+        val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
+        val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
         val webView = remember(tab.id, context, binding) {
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
-                onNavigationRequest = onNavigationRequest,
-                onNavigationDecision = onNavigationDecision,
+                onNavigationRequest = { currentOnNavigationRequest(it) },
+                onNavigationDecision = { currentOnNavigationDecision(it) },
             ) { view, url, title, loading, errorCode, errorMessage ->
                 binding.observe(
                     url = url,
@@ -71,6 +75,10 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                 webView.stopLoading()
                 webView.destroy()
             }
+        }
+
+        LaunchedEffect(webView, isVisible) {
+            if (isVisible) webView.onResume() else webView.onPause()
         }
 
         LaunchedEffect(webView, initialUrl) {
