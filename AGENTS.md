@@ -14,12 +14,12 @@ Compose is the presentation/assembly layer. It must not become the owner of brow
 
 The selected target direction is:
 
-- Android: Chromium-based runtime. The exact embeddable/runtime implementation is subject to the explicit evaluation gates in `docs/CHROMIUM_ANDROID_PLAN.md`; do not claim a bundled Chromium runtime, WebExtensions, or equivalent capabilities merely because Android System WebView uses Chromium.
+- Android: the long-term target is a **self-compiled Chromium kernel**. Use Android System WebView (`android.webkit.WebView`) now as a temporary native runtime to validate the adapter contract, navigation, lifecycle, security defaults and browser features. Do not treat System WebView as the final engine, and do not claim the self-compiled kernel is integrated until its build, packaging and emulator gates pass. See `docs/CHROMIUM_ANDROID_PLAN.md`.
 - iOS: WKWebView.
 - HarmonyOS: ArkWeb.
 - Desktop: KCEF.
 
-Android is the first planned native-engine integration after core acceptance, not a reason to weaken or platform-contaminate common contracts. Do not switch Android back to GeckoView or treat System WebView as an already-approved final runtime without an explicit decision backed by the Chromium plan.
+Android is the first native-engine integration. The current System WebView is a validation adapter only; it must remain replaceable behind the existing `BrowserEngineContract` and platform surface boundary by the future self-compiled Chromium runtime. Do not introduce GeckoView or a second engine contract.
 
 ## 3. Read these documents first
 
@@ -163,7 +163,7 @@ The repository has a common engine contract, `BrowserSessionCoordinator`, contro
 
 In particular:
 - The bridge authorization primitive is not a complete end-to-end JS bridge.
-- An Android WebView prototype is not proof that the selected bundled/embeddable Chromium runtime decision has passed its packaging, license, ABI, size, startup and capability gates.
+- The Android System WebView validation adapter is not proof that the future self-compiled Chromium kernel has passed build reproducibility, license, ABI, package-size, startup, security-update and capability gates.
 - A Compose surface being visible is not proof that tab/session state survives surface disposal.
 - Architecture documents define desired behavior; CI and implementation tests must establish actual behavior.
 
