@@ -20,7 +20,7 @@
 
 ## Architecture targets (not yet implemented by this prototype)
 
-The normative architecture document describes a Chromium-based Android runtime, WKWebView, ArkWeb, and KCEF/CEF as targets. The exact Android Chromium embedder remains unselected, and WebExtensions support must be verified on the chosen runtime. These targets do not imply that the current Compose WebView prototype already provides their features.
+Android currently uses the device-provided System WebView only as a temporary validation runtime. The long-term target is a self-compiled Chromium kernel, which has not been built or integrated yet. iOS targets WKWebView, HarmonyOS targets ArkWeb, and desktop targets KCEF/CEF. These targets do not imply that the current Android WebView prototype already provides their features; WebExtensions support must be verified on the eventual self-compiled runtime.
 
 Each adapter must:
 1. Publish an immutable capability snapshot that matches its real native integration.
@@ -47,4 +47,4 @@ The Android adapter now reports `navigationPolicy = true`. `AndroidNavigationPol
 
 The Android download pipeline passed `DownloadPipelineAndroidTest` in the GitHub Actions Android Emulator job (run [39820740225](https://github.com/yuantris/Veyra/actions/runs/39820740225)). The test exercises the current compose-webview prototype's production download callback, acceptance policy, transfer completion and destination, cancellation/partial-file cleanup, controller shutdown, and private-profile attribution.
 
-Accordingly, Android's `downloads` capability is now `true` for this verified prototype adapter. iOS and Desktop remain unsupported. This result does **not** claim the separately selected GeckoView Android engine has been implemented or verified; its adapter must run its own integration tests before inheriting this capability.
+Accordingly, Android's `downloads` capability is now `true` for this verified prototype adapter. iOS and Desktop remain unsupported. This result applies only to the current System WebView validation adapter. The future self-compiled Chromium adapter must run its own integration tests before inheriting this capability.
