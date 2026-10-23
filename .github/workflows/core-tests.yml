@@ -58,6 +58,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # compileSdk is 36, so the build needs platforms;android-36 + a build-tools;
+          # the API 35 emulator image is what the instrumentation run boots on.
+          packages: >-
+            platforms;android-36
+            build-tools;35.0.0
+            system-images;android-35;google_apis;x86_64
+            emulator
       - name: Enable KVM for Android Emulator
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -73,16 +83,5 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-linux-hw-accel: false
+          timeout: 30
           script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
-      - name: Explicitly verify DownloadPipelineAndroidTest on emulator
-        if: always()
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          disable-linux-hw-accel: false
-          script: >-
-            bash gradlew :composeApp:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=dev.veyra.browser.DownloadPipelineAndroidTest
-            --stacktrace

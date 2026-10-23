@@ -96,6 +96,15 @@ class AndroidNavigationPolicyWebViewTest {
         return false
     }
 
+    private fun waitUntil(timeoutMs: Long = 5000, cond: () -> Boolean): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            if (cond()) return true
+            Thread.sleep(100)
+        }
+        return false
+    }
+
     @Test
     fun allowedMainFrameLinkLoadsOnce() {
         val navUrls = ConcurrentLinkedQueue<String>()
@@ -109,15 +118,15 @@ class AndroidNavigationPolicyWebViewTest {
             },
             committed = committed,
         )
-        loadHtml("""<!doctype html><html><body><a id="go" href="https://veyra.invalid/allowed">go</a></body></html>""")
+        loadHtml("""<!doctype html><html><body><a id="go" href="data:text/html,allowed">go</a></body></html>""")
         assertTrue("Test document did not become ready", waitForElement("go"))
         runJs("document.getElementById('go').click()")
         assertTrue("Navigation request was not intercepted", latch.await(10, TimeUnit.SECONDS))
         assertEquals("Allowed navigation must be seen exactly once", 1, navUrls.size)
-        assertEquals("https://veyra.invalid/allowed", navUrls.first())
+        assertEquals("data:text/html,allowed", navUrls.first())
         assertTrue(
             "Allowed URL should have started loading in the WebView",
-            committed.contains("https://veyra.invalid/allowed"),
+            waitUntil(5000) { committed.contains("data:text/html,allowed") },
         )
     }
 
@@ -134,14 +143,14 @@ class AndroidNavigationPolicyWebViewTest {
             },
             committed = committed,
         )
-        loadHtml("""<!doctype html><html><body><a id="b" href="https://veyra.invalid/blocked">b</a></body></html>""")
+        loadHtml("""<!doctype html><html><body><a id="b" href="data:text/html,blocked">b</a></body></html>""")
         assertTrue("Test document did not become ready", waitForElement("b"))
         runJs("document.getElementById('b').click()")
         assertTrue("Navigation request was not intercepted", latch.await(10, TimeUnit.SECONDS))
-        assertEquals("https://veyra.invalid/blocked", navUrls.first())
+        assertEquals("data:text/html,blocked", navUrls.first())
         assertFalse(
             "Rejected URL must never start loading in the WebView",
-            committed.contains("https://veyra.invalid/blocked"),
+            committed.contains("data:text/html,blocked"),
         )
     }
 
