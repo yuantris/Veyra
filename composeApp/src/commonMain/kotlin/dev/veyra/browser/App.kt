@@ -208,6 +208,7 @@ fun App() {
                             coordinator.openTab(url = "about:blank")
                         }
                     },
+                ),
             },
             bottomBar = {
                 BottomBar(
