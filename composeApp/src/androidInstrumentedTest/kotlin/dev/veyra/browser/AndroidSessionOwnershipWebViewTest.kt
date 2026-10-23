@@ -46,8 +46,12 @@ class AndroidSessionOwnershipWebViewTest {
     fun tearDown() {
         // Tear down every port (which marks itself destroyed so no late forwarded call can touch a
         // dead WebView), then release the activity.
-        createdPorts.forEach { it.destroyWebView() }
-        createdPorts.clear()
+        // WebView APIs, including destroy(), must run on the main looper.
+        // ActivityScenario.onActivity dispatches this cleanup onto the activity thread.
+        scenario.onActivity {
+            createdPorts.forEach { it.destroyWebView() }
+            createdPorts.clear()
+        }
         scenario.close()
     }
 
