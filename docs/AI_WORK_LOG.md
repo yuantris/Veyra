@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** Android native WebView validation gate passed: Browser Core Tests #276 (run 39989260552) and Build Veyra #293 (run 39989260554) succeeded. Responsive Miuix shell is now being implemented in `BrowserScaffold.kt` and `App.kt`, with constraint-based compact/expanded layouts and an expanded-window tab strip. A follow-up lifecycle correction keeps every live tab's native surface composed and places the new-tab home above them instead of disposing inactive surfaces. An early build at #295 failed because an obsolete `Modifier.weight` import resolved to an internal symbol; the import has been removed. The latest tree is awaiting CI confirmation: [Build Veyra #300](https://github.com/yuantris/Veyra/actions/runs/39990228256), [Browser Core Tests #283](https://github.com/yuantris/Veyra/actions/runs/39990228369), with newer commits also queued. Responsive runtime behavior is not yet validated on foldables/resized desktop windows. Self-compiled Chromium remains the long-term Android target and is not integrated. See `AGENTS.md` §12 and `docs/CHROMIUM_ANDROID_PLAN.md` §8.
+- **Phase:** Android native WebView validation gate passed: Browser Core Tests #276 (run 39989260552) and Build Veyra #293 (run 39989260554) succeeded. Responsive Miuix shell is implemented in `BrowserScaffold.kt` and wired into `App.kt`, with constraint-based compact/expanded layouts, system-bar insets and an expanded-window tab strip. A lifecycle correction keeps every live tab's native surface composed across tab/home visibility changes. CI exposed a Kotlin syntax error in the new tab-strip callback (`App.kt:211`); commit `78f7ba1` removes the problematic trailing comma from the final callback argument. Latest build/test runs for `78f7ba1` are queued: [Build Veyra #303](https://github.com/yuantris/Veyra/actions/runs/39990395984) and [Browser Core Tests #286](https://github.com/yuantris/Veyra/actions/runs/39990395974). Responsive runtime behavior is not yet validated on foldables/resized desktop windows. Self-compiled Chromium remains the long-term Android target and is not integrated. See `AGENTS.md` §12 and `docs/CHROMIUM_ANDROID_PLAN.md` §8.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -30,6 +30,19 @@
   5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Fix responsive shell compile error
+
+- **Goal:** Resolve the compile failure introduced while wiring the responsive Miuix tab strip, without backing out the shell or surface-retention fix.
+- **Planned:** Inspect the failed Build Veyra log, locate the compiler diagnostic, apply the smallest source correction, and rerun the workflows.
+- **Completed:**
+  - Build Veyra #298 failed in `App.kt:211` while compiling the responsive-shell integration. The Kotlin compiler reported `Syntax error: Expecting an argument` and a corresponding extra-argument diagnostic in the `BrowserTabStrip` call.
+  - Simplified the final `onNewTab` named argument and removed the trailing comma after its lambda, keeping the same behavior.
+  - Commit: `78f7ba191aa08340e18ba6b2fcb63287b6908d97` (`fix(ui): correct tab strip callback argument syntax`).
+- **Test evidence:** Build Veyra #298 is red for the preceding commit. The corrected commit's [Build Veyra #303](https://github.com/yuantris/Veyra/actions/runs/39990395984) and [Browser Core Tests #286](https://github.com/yuantris/Veyra/actions/runs/39990395974) were queued at log time; the syntax fix is not yet confirmed green.
+- **Next smallest safe step:** Confirm compilation on #303 and #286; if green, test responsive layout and tab-surface retention on the Android emulator before treating this phase as stable.
+- **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `docs/AI_WORK_LOG.md`.
+
 ### 2026-10-24 — Responsive Miuix browser shell implementation started
 
 - **Goal:** Start the next phase after the Android System WebView validation gate passed, using one reusable responsive shell without transferring session/engine ownership into Compose layout.
