@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** core-first, now **complete and cleared**. All C0–C9 gates are evidenced (C5 PARTIAL by design, deferred with `nativeMessaging` honestly false) and all five exit criteria in `BROWSER_CORE_ARCHITECTURE.md` §13 are MET. The formal reviews live in `docs/CORE_GATE_REVIEW.md` and `docs/SURFACE_OWNERSHIP_REVIEW.md`. **Native engine integration has NOT started** — the next phase is the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md`.
+- **Phase:** core-first **complete and cleared**; **native-engine integration started**. The Android runtime selection is decided: `docs/CHROMIUM_ANDROID_PLAN.md` §7 selects **Android System WebView** (Google's Chromium build, Play-Store-updated) — the current `AndroidChromiumSurfaceRenderer` already uses it, so no bundle change is needed now; bundled Chromium is deferred. Remaining work is verification gates, not a runtime swap.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Test suite (last verified green):** `:browser-core:jvmTest` 74, `:browser-download:jvmTest` 10, `:composeApp:desktopTest` 21–22. ~105 platform-neutral tests; Android + iOS compiles green on CI.
@@ -21,9 +21,10 @@
   - `navigationPolicy` stays `false` pending its Android integration verification gate (matrix §"Current navigation-policy verification gate").
   - The prototype runs on compose-webview-multiplatform; none of the architecture-target runtimes (Android Chromium, iOS WKWebView, HarmonyOS ArkWeb, Desktop KCEF) are integrated yet.
 - **Next smallest safe steps:**
-  1. Begin the Android runtime selection per `CHROMIUM_ANDROID_PLAN.md` (the first native-engine integration task). Audit the existing `createPlatformBrowserEngineFactory` / `AndroidChromiumSurfaceRenderer` before replacing them.
-  2. If a platform ever needs permission prompts, wire the OS layer through the injected provider and keep the matrix claim tied to the adapter, not the core policy.
-  3. Land the `navigationPolicy` Android verification gate, then flip `navigationPolicy = true`.
+  1. Clear the `navigationPolicy` Android verification gate (matrix §"Current navigation-policy verification gate"): write the integration test (allow-once / reject-does-not-load / custom-scheme-to-host / subresource-excluded / late-callback-no-nav) and flip `navigationPolicy = true` only after it passes on a real WebView.
+  2. Confirm session-ownership tests (active-tab switch, detach/reattach, idempotent close, stale events) under the Android renderer path.
+  3. Run the emulator/device smoke test (navigation, lifecycle, renderer-process recreation).
+  4. Decide `androidx.webkit` adoption as an API-surface upgrade, not a runtime change.
 
 ## Session log
 
@@ -169,3 +170,11 @@
 - **Gaps recorded, none blocking:** G1 engine+surface binding are one object today (fine for the single-platform prototype; future Chromium/ArkWeb likely splits them — the `BrowserSurfaceBinding` contract already anticipates this); G2 `manager.detachSurface` no-op would need real teardown if a surface-scoped native resource appears; G3 detached-but-alive tab is intended session-persistence behavior (WebView disposed by Compose, engine stays open); G4 host must call `requestShutdown` or the owner scope leaks (no built-in safety net).
 - **Gate status:** all five exit criteria now MET. C0-C9: C5 remains PARTIAL by design with the deferred bridge honestly marked unsupported (`nativeMessaging` false). Conclusion in `CORE_GATE_REVIEW.md` updated to "core cleared for native-engine integration"; next phase = Android runtime selection per `CHROMIUM_ANDROID_PLAN.md`.
 - **Files:** `docs/SURFACE_OWNERSHIP_REVIEW.md` (new), `docs/CORE_GATE_REVIEW.md`.
+
+### 2026-10-23 — Android runtime selection (CHROMIUM_ANDROID_PLAN.md §7)
+
+- **Goal:** Start the first native-engine integration task: select the concrete Android Chromium runtime per `CHROMIUM_ANDROID_PLAN.md`.
+- **Audit (plan §2/§6.1):** `AndroidBrowserEngineFactory.kt` is a 6-line `actual` delegating to `SurfaceBoundBrowserEngineFactory` (commonMain). `AndroidChromiumSurfaceRenderer.kt` renders via `android.webkit.WebView` (system WebView) through `AndroidView` with secure defaults already set (JS on, file access off, mixed-content never, safe-browsing on, SSL cancelled, renderer-gone → recreate). So the Android path already uses the device's Chromium WebView; it does NOT bundle a custom kernel.
+- **Decision (recorded in §7):** Selected runtime = **Android System WebView** (which is Google's Chromium build, Play-Store-updated; versions 146/155 seen in 2026). It satisfies the plan's "Chromium-based runtime" requirement at zero APK cost with Google-delivered security patches, and is already isolated behind `androidMain` + the single `BrowserEngineContract`. **Deferred:** bundled Chromium (self-build or ChromeView adds 80–150MB+ APK, huge build infra, shifts 0-day patching onto us; GeckoView is Firefox/not-Chromium and excluded; Crosswalk dead). **Recommended incremental (same runtime):** `androidx.webkit` for `WebViewCompat`/modern API without bundling. Requirement-mapping table + remaining verification gates (navigationPolicy gate, session-ownership tests, emulator smoke test, androidx.webkit decision) recorded in §7. Decision is reversible by design.
+- **Files:** `docs/CHROMIUM_ANDROID_PLAN.md`.
+- **Next smallest safe step:** clear the `navigationPolicy` Android verification gate — write the integration test (allow-once / reject-does-not-load / custom-scheme-to-host / subresource-excluded / late-callback-no-nav) and flip `navigationPolicy = true` only after it passes on a real WebView.
