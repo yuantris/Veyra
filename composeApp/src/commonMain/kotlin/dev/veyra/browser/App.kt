@@ -144,53 +144,54 @@ fun App() {
                 Box(contentModifier.fillMaxSize()) {
                     // Keep tab/session coordination outside the adaptive shell. A window resize
                     // only changes this host's constraints; it must not recreate the session graph.
-                    if (showBrowser) {
-                        sessionState.tabs.forEach { tab ->
-                            val selected = tab.id == sessionState.activeTabId
-                            val engine = engines[TabId(tab.id)]
-                            if (engine != null) {
-                                key(tab.id) {
-                                    Box(
-                                        Modifier
-                                            .fillMaxSize()
-                                            .zIndex(if (selected) 1f else 0f),
-                                    ) {
-                                        if (selected) {
-                                            surfaceRenderer.Render(
-                                                tab = tab,
-                                                engine = engine,
-                                                isVisible = true,
-                                                onNavigationRequest = coordinator::decideSurfaceNavigation,
-                                                onNavigationDecision = { decision ->
-                                                    when (decision) {
-                                                        is NavigationDecision.OpenExternal -> {
-                                                            runCatching { uriHandler.openUri(decision.url) }
-                                                        }
-                                                        is NavigationDecision.OpenInNewTab -> {
-                                                            showBrowser = true
-                                                            session.launchCommand {
-                                                                val newTab = coordinator.openTab(url = "about:blank")
-                                                                coordinator.navigate(
-                                                                    NavigationRequest(
-                                                                        TabId(newTab.id),
-                                                                        decision.url,
-                                                                        NavigationSource.PAGE,
-                                                                    ),
-                                                                )
-                                                            }
-                                                        }
-                                                        NavigationDecision.Allow,
-                                                        NavigationDecision.Cancel -> Unit
+                    // Keep every native surface composed while its tab is live: disposing a WebView
+                    // destroys native back/forward history even though the core engine survives.
+                    sessionState.tabs.forEach { tab ->
+                        val selected = tab.id == sessionState.activeTabId
+                        val engine = engines[TabId(tab.id)]
+                        if (engine != null) {
+                            key(tab.id) {
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (selected && showBrowser) 1f else 0f),
+                                ) {
+                                    surfaceRenderer.Render(
+                                        tab = tab,
+                                        engine = engine,
+                                        isVisible = selected && showBrowser,
+                                        onNavigationRequest = coordinator::decideSurfaceNavigation,
+                                        onNavigationDecision = { decision ->
+                                            when (decision) {
+                                                is NavigationDecision.OpenExternal -> {
+                                                    runCatching { uriHandler.openUri(decision.url) }
+                                                }
+                                                is NavigationDecision.OpenInNewTab -> {
+                                                    showBrowser = true
+                                                    session.launchCommand {
+                                                        val newTab = coordinator.openTab(url = "about:blank")
+                                                        coordinator.navigate(
+                                                            NavigationRequest(
+                                                                TabId(newTab.id),
+                                                                decision.url,
+                                                                NavigationSource.PAGE,
+                                                            ),
+                                                        )
                                                     }
-                                                },
-                                            )
-                                        }
-                                    }
+                                                }
+                                                NavigationDecision.Allow,
+                                                NavigationDecision.Cancel -> Unit
+                                            }
+                                        },
+                                    )
                                 }
                             }
                         }
-                    } else {
-                        HomeScreen(onOpen = ::openAddress)
+                    }
+                    if (!showBrowser) {
+                        Box(Modifier.fillMaxSize().zIndex(2f)) {
+                            HomeScreen(onOpen = ::openAddress)
+                        }
                     }
                 }
             },
