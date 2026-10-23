@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** Android native WebView validation is underway; self-compiled Chromium remains the long-term target and is not integrated. The next UI phase is now explicitly scoped in `AGENTS.md` §12: one Miuix browser shell entry point with responsive layouts across compact/expanded windows, landscape, foldables, split-screen and desktop; it must preserve browser-session and engine ownership across resize/posture changes. The native smoke test's CI result remains unconfirmed in the currently inspected state. Latest UI requirements commit: `2262af8`. See `docs/CHROMIUM_ANDROID_PLAN.md` §8 and `AGENTS.md` §12.
+- **Phase:** Android native WebView validation is underway; self-compiled Chromium remains the long-term target and is not integrated. The next UI phase is now explicitly scoped in `AGENTS.md` §12: one Miuix browser shell entry point with responsive layouts across compact/expanded windows, landscape, foldables, split-screen and desktop; it must preserve browser-session and engine ownership across resize/posture changes. The first API 35 emulator run exposed a smoke-test assertion mismatch: `loadDataWithBaseURL` does not guarantee `WebView.url` will equal the supplied base origin. The production load/title callback and security-default assertions passed; the test now checks that the reported URL is nonblank, leaving origin enforcement to the dedicated navigation-policy test. The fix is committed and awaits a rerun. Latest UI requirements commit: `2262af8`. See `docs/CHROMIUM_ANDROID_PLAN.md` §8 and `AGENTS.md` §12.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -30,6 +30,20 @@
   5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Fix Android WebView runtime smoke assertion
+
+- **Goal:** Resolve the first real-emulator failure in `AndroidWebViewRuntimeSmokeTest` without weakening production security or conflating inline-document loading with top-level navigation-policy validation.
+- **Planned:** Inspect the API 35 instrumentation report, identify whether the production WebView path or the test assumption failed, apply the smallest test-only correction, and record the observed evidence.
+- **Completed:**
+  - Inspected Browser Core Tests run [#273](https://github.com/yuantris/Veyra/actions/runs/39988644129). The API 35 emulator ran 15 instrumentation tests; 14 passed and only `AndroidWebViewRuntimeSmokeTest.productionWebViewLoadsDocumentReportsTitleAndKeepsSecureDefaults` failed.
+  - The title/load callback and secure-default assertions passed. The failing assertion incorrectly assumed `WebView.url` must start with the `loadDataWithBaseURL` base origin; Android WebView does not guarantee that representation for inline HTML.
+  - Updated the smoke test to assert the callback URL is nonblank instead. Top-level origin/navigation decisions remain covered by `AndroidNavigationPolicyWebViewTest`; no production behavior or capability flag was changed.
+  - Commit: `f41c595b495711857fe239902d8275cea7fee175` (`test(android): fix WebView smoke URL assumption`).
+- **Test evidence:** The previous run's four session-ownership tests, five navigation-policy tests, and all five download-pipeline tests passed. The single smoke test failed only at the invalid URL-prefix expectation. The corrected test has not yet rerun, so it is **not yet green**.
+- **Next smallest safe step:** Confirm the corrected smoke test on the API 35 emulator. If green, proceed to the remaining Android adapter vertical-slice gaps (controller command delivery, active-tab switching, close/shutdown, renderer recovery); only then start the responsive Miuix browser-shell UI slice.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidWebViewRuntimeSmokeTest.kt`, `docs/AI_WORK_LOG.md`.
+
 
 ### 2026-10-24 — Record Miuix compatibility and responsive browser-shell next phase
 
