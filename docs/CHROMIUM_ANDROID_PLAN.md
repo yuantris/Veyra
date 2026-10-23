@@ -132,3 +132,9 @@ process metrics) rather than as a runtime change. It does not alter the selected
 
 This decision is reversible: the architecture already keeps the runtime behind `androidMain` and the
 single `BrowserEngineContract`, so moving to a bundled Chromium later is a localized adapter change.
+
+**Reaffirmed 2026-10-23:** the user confirmed Android keeps the System WebView for now and that the
+skeleton is intentionally swappable — should a future product need arise, swapping to either GeckoView
+(Firefox engine) or a self-built Chromium kernel (the `system_webview_apk` / `monochrome` build
+targets) is a localized adapter change behind `androidMain` + the single contract, not a core rewrite.
+The decision is deferred until a concrete requirement the System WebView cannot meet appears.

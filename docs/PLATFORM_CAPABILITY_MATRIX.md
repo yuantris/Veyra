@@ -31,14 +31,17 @@ Each adapter must:
 
 ## Current navigation-policy verification gate
 
-The Android adapter deliberately keeps `navigationPolicy = false` until an Android integration test verifies all of the following against a real WebView:
-- an allowed top-level HTTP(S) link loads once;
-- a rejected top-level request does not load;
-- a custom scheme is rejected in WebView and routed to the host;
-- subresource requests do not enter top-level navigation policy;
-- a late callback for a closed tab cannot trigger host navigation.
+The Android adapter keeps `navigationPolicy = false` until the Android integration test passes on a real WebView. The test now **exists** and drives the real production path:
 
-Until those tests exist and pass, the Android callback remains wired for development, but the public capability stays false. iOS and Desktop must remain false until their own native delegate/handler path and tests are added.
+- `composeApp/src/androidInstrumentedTest/.../AndroidNavigationPolicyWebViewTest.kt` constructs the WebView through the **same `createWebView` factory `AndroidChromiumSurfaceRenderer` uses** and verifies the real `WebViewClient.shouldOverrideUrlLoading` interception (it is NOT the compose-webview library `WebViewNavigator` path, which the test plan deems insufficient). It asserts against a real WebView that:
+  - an allowed top-level HTTP(S) link is intercepted exactly once and begins loading;
+  - a rejected top-level request does not load and the current document stays;
+  - a custom scheme is intercepted and routed to the host policy, never loaded by the WebView;
+  - subresource requests (img/script/iframe) do not enter top-level navigation policy;
+  - a late callback after the tab's WebView is destroyed cannot reach the host policy.
+- It is gated in CI: the `android-emulator-integration` job runs `:composeApp:connectedDebugAndroidTest` on an API 35 emulator, which includes this test.
+
+**Status:** test written, compiles (`compileDebugAndroidTestKotlinAndroid` green), and CI-gated. `navigationPolicy` stays `false` until `connectedDebugAndroidTest` is green on the emulator; the flip is a one-line change in `ComposeWebViewPlatformCapabilities.android.kt` (`navigationPolicy = false` → `true`), to be made after the run passes and the API level + WebView provider version are recorded. iOS and Desktop remain `false` until their own native delegate/handler path and tests are added.
 
 ## Current downloads verification result
 

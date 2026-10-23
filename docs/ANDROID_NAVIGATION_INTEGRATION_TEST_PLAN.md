@@ -2,7 +2,7 @@
 
 ## Status
 
-The shared `BrowserNavigationRequestInterceptor` has JVM/desktop unit coverage. An Android instrumentation test now exercises the pinned Compose WebView + navigator interceptor path and verifies a rejected main-frame link leaves the current document loaded. The emulator CI run is still the acceptance gate; the broader cases below are not yet all covered.
+The shared `BrowserNavigationRequestInterceptor` has JVM/desktop unit coverage. The Android instrumentation suite now exercises the **real production path** — the `createWebView` factory that `AndroidChromiumSurfaceRenderer` uses, with its `WebViewClient.shouldOverrideUrlLoading` interception — and verifies the five gate cases from the capability matrix against a real WebView.
 
 Until device/emulator integration tests pass, Android reports:
 - `navigationPolicy = false`
@@ -12,11 +12,22 @@ Do not upgrade the capability based on common tests alone.
 
 ## Integration harness
 
-Implemented initial harness: `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/BrowserNavigationRequestInterceptorAndroidTest.kt`. It uses a deterministic inline HTML document and a rejected same-origin-style link destination, with bounded latches rather than sleeps. `.github/workflows/core-tests.yml` runs `:composeApp:connectedDebugAndroidTest` on an API 35 emulator.
+`composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidNavigationPolicyWebViewTest.kt` drives the same `createWebView` factory the shipping renderer uses (not the compose-webview library `WebViewNavigator` path, which the earlier harness used and which this plan deems insufficient). It loads a deterministic inline HTML document and uses bounded latches rather than sleeps; all assertions are network-free because `shouldOverrideUrlLoading` fires synchronously when a top-level navigation is initiated. `.github/workflows/core-tests.yml` runs `:composeApp:connectedDebugAndroidTest` on an API 35 emulator.
 
-The initial test covers rejection and current-document continuity. Add the remaining acceptance cases below incrementally; do not treat the entire matrix as covered yet.
+## Coverage of acceptance cases
 
-The harness must exercise the exact production wiring from `BrowserTabHost` through the pinned `compose-webview-multiplatform:2.0.3` `RequestInterceptor` and its Android `AccompanistWebViewClient`. A test that installs an unrelated custom `WebViewClient` only verifies Android platform behavior and is not sufficient.
+Covered at the WebView boundary by `AndroidNavigationPolicyWebViewTest`:
+1. **Allowed main-frame URL** — intercepted once, document begins loading. ✅
+2. **Rejected main-frame URL** — `Cancel`, target never loads, current document stays. ✅
+3. **External scheme** — custom scheme intercepted and routed to the host policy; WebView does not navigate. ✅ (host action = the recorded policy decision; this adapter's external-handoff routing is a controller concern, not the WebView client)
+4. **New-tab decision** — not yet covered at the WebView boundary (new-tab creation/dispatch is a controller-level concern above `shouldOverrideUrlLoading`). ⏳
+5. **Subresources** — img/script/iframe do not enter top-level policy. ✅
+6. **Redirects** — not yet covered. ⏳
+7. **Closed tab / stale callback** — after `webView.destroy()`, a late navigation cannot reach the host policy. ✅ (renderer-boundary form)
+8. **Repeated clicks** — not yet covered. ⏳
+9. **Lifecycle** — not yet covered (no separate integration test yet). ⏳
+
+`navigationPolicy` flips to `true` only after the full suite passes on the emulator and the API level + WebView provider version are recorded.
 
 ## Acceptance cases
 
