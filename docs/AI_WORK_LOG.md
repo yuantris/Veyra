@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** Android native WebView validation is underway; self-compiled Chromium remains the long-term target and is not integrated. The corrected `AndroidWebViewRuntimeSmokeTest` and the complete Browser Core Tests workflow passed in run [#276](https://github.com/yuantris/Veyra/actions/runs/39989260552); Build Veyra #293 also passed for the same tree. The next UI phase remains specified in `AGENTS.md` §12: one Miuix browser shell entry point with responsive layouts across compact/expanded windows, landscape, foldables, split-screen and desktop, preserving sessions/engines across resize and posture changes. A source review found that `App.kt`'s comment promised to keep all tabs composed, but the `if (selected)` condition actually removed inactive WebView surfaces; the new-tab home also removed every surface. Commit `e0edd76` corrects this by retaining all live tab surfaces and changing only visibility/foreground ordering. CI for that UI lifecycle fix is pending: [Browser Core Tests #278](https://github.com/yuantris/Veyra/actions/runs/39990051640), [Build Veyra #295](https://github.com/yuantris/Veyra/actions/runs/39990051730). See `docs/CHROMIUM_ANDROID_PLAN.md` §8 and `AGENTS.md` §12.
+- **Phase:** Android native WebView validation is underway; self-compiled Chromium remains the long-term target and is not integrated. The corrected `AndroidWebViewRuntimeSmokeTest` passed as part of Browser Core Tests #276, and Build Veyra #293 passed. The responsive Miuix shell is now implemented in `BrowserScaffold.kt` and wired from `App.kt` (commits `411168b` and `efcbc5e`); it uses available window constraints and system-bar insets. Review found that the initial wiring still conditionally removed inactive WebView renderers, contradicting the session/surface ownership contract. Commit `ac10d4f` corrects the current `App.kt` wiring by retaining each live tab surface across tab/home visibility changes. CI for this latest change is pending: [Browser Core Tests](https://github.com/yuantris/Veyra/actions) and [Build Veyra](https://github.com/yuantris/Veyra/actions). See `docs/CHROMIUM_ANDROID_PLAN.md` §8 and `AGENTS.md` §12.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -30,6 +30,19 @@
   5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Reapply tab-surface retention in responsive shell
+
+- **Goal:** Preserve the surface/session lifecycle invariant after the responsive shell was added to the composition root.
+- **Planned:** Inspect the current main-branch responsive shell integration, ensure its adaptive layout does not remove inactive tab renderers, and record the exact state and pending CI.
+- **Completed:**
+  - Reviewed the new `BrowserScaffold.kt` and its integration in `App.kt`. The shell uses `BoxWithConstraints`, compact/expanded layout constraints, max content widths, and `WindowInsets.systemBars`; it keeps browser state outside the adaptive layout.
+  - Found the shell wiring reintroduced the same renderer-removal bug: only the selected tab was rendered, and showing Home removed every renderer. Applied the lifecycle correction to the current responsive-shell version of `App.kt`, rendering all live tab surfaces while changing only `isVisible` and z-order.
+  - Commit: `ac10d4fd261c2a1ae777d1017d39772159bcce8d` (`fix(ui): retain tab surfaces inside responsive shell`).
+- **Test evidence:** The smoke test and baseline build passed in earlier run #276/#293. CI for this latest responsive-shell integration and surface-retention fix has not yet completed; no claim is made that this revision is green.
+- **Next smallest safe step:** Inspect CI for `ac10d4f`; fix any compile or emulator regressions before extending the responsive UI with foldable/resize-specific verification.
+- **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/BrowserScaffold.kt`, `docs/AI_WORK_LOG.md`.
+
 
 ### 2026-10-24 — Preserve Android tab surfaces and confirm smoke gate
 
