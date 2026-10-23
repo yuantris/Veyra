@@ -12,16 +12,16 @@
 
 ## Status snapshot
 
-- **Phase:** core-first. The C0–C9 acceptance gates in `docs/BROWSER_CORE_ARCHITECTURE.md` are not all evidenced yet; native engine integration has not started.
+- **Phase:** core-first. The C0–C9 gates are now all evidenced (C5 PARTIAL by design, deferred with `nativeMessaging` honestly false); the formal review lives in `docs/CORE_GATE_REVIEW.md`. Native engine integration has not started — exit criterion 5 (platform surface resource ownership review) is the last artifact before the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md` becomes the next phase.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
-- **Recently completed (2026-10-22):** renamed `:download-core` to `:browser-download`; reorganized `:browser-core` into root contracts plus `engine` / `session` / `navigation` / `security` packages; fixed the iOS `@JvmInline` resolution gap and added a CI `ios-compile` job; hardened C1/C3 with six deterministic race and failure tests; added the download composition seam, five C7 race/cancellation tests, the explicit acceptance layer, and the Ktor-based Android download transport with `App.kt` wiring (capability held at `downloads = false` pending device verification).
+- **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests). All modules now carry a 5-minute per-suite test timeout so a hung test fails the build instead of blocking CI.
 - **Known open issues:**
-  - `:browser-download` is built and tested but not yet depended on by `:composeApp`.
-  - `composeApp` commonMain still mixes UI (`App.kt`) with common adapter code (`ComposeWebViewEngineAdapter`, `BrowserNavigationRequestInterceptor`, `ComposeWebViewSurfaceRenderer`, `ComposeWebViewPlatformCapabilities`) in one flat package.
+  - No platform adapter connects an OS permission prompt to `WebsitePermissionPolicy` yet (matrix keeps the broker Unsupported on all platforms).
+  - Exit criterion 5 artifact missing: no written review of who owns/destroys native view and runtime resources.
 - **Next smallest safe steps:**
-  1. Add the Android instrumented download test from the `PLATFORM_CAPABILITY_MATRIX.md` verification gate (the emulator CI job already exists), then flip Android `downloads = true`.
-  2. Continue C-gate evidence: coordinator late-event/stale-callback cases and C4/C5 negative paths not yet covered by tests.
-  3. Decide whether `composeApp` commonMain should split UI from common adapter code (same bar as the core split: only with a real boundary).
+  1. Write the exit-criterion-5 platform surface resource ownership review (engine owns session, renderer owns view, attach/detach and crash semantics) at the contract level.
+  2. Re-run the gate review; when criteria 1–5 are met, formally start the Android runtime selection per `CHROMIUM_ANDROID_PLAN.md`.
+  3. If a platform ever needs prompts, wire the OS layer through the injected provider and keep the matrix claim tied to the adapter, not the core policy.
 
 ## Session log
 
