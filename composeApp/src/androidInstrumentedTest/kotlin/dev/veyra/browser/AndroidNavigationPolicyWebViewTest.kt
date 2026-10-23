@@ -105,28 +105,34 @@ class AndroidNavigationPolicyWebViewTest {
         return false
     }
 
+    private fun currentUrl(): String? {
+        var url: String? = null
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            url = webView.url
+        }
+        return url
+    }
+
     @Test
     fun allowedMainFrameLinkLoadsOnce() {
         val navUrls = ConcurrentLinkedQueue<String>()
         val latch = CountDownLatch(1)
-        val committed = ConcurrentLinkedQueue<String>()
         buildWebView(
             onNav = { req ->
                 navUrls.add(req.url)
                 latch.countDown()
                 NavigationDecision.Allow
             },
-            committed = committed,
         )
-        loadHtml("""<!doctype html><html><body><a id="go" href="data:text/html,allowed">go</a></body></html>""")
+        loadHtml("""<!doctype html><html><body><a id="go" href="https://veyra.invalid/allowed">go</a></body></html>""")
         assertTrue("Test document did not become ready", waitForElement("go"))
         runJs("document.getElementById('go').click()")
         assertTrue("Navigation request was not intercepted", latch.await(10, TimeUnit.SECONDS))
         assertEquals("Allowed navigation must be seen exactly once", 1, navUrls.size)
-        assertEquals("data:text/html,allowed", navUrls.first())
+        assertEquals("https://veyra.invalid/allowed", navUrls.first())
         assertTrue(
-            "Allowed URL should have started loading in the WebView",
-            waitUntil(5000) { committed.contains("data:text/html,allowed") },
+            "Allowed URL should become the WebView's current URL",
+            waitUntil(5000) { currentUrl() == "https://veyra.invalid/allowed" },
         )
     }
 
@@ -143,14 +149,14 @@ class AndroidNavigationPolicyWebViewTest {
             },
             committed = committed,
         )
-        loadHtml("""<!doctype html><html><body><a id="b" href="data:text/html,blocked">b</a></body></html>""")
+        loadHtml("""<!doctype html><html><body><a id="b" href="https://veyra.invalid/blocked">b</a></body></html>""")
         assertTrue("Test document did not become ready", waitForElement("b"))
         runJs("document.getElementById('b').click()")
         assertTrue("Navigation request was not intercepted", latch.await(10, TimeUnit.SECONDS))
-        assertEquals("data:text/html,blocked", navUrls.first())
+        assertEquals("https://veyra.invalid/blocked", navUrls.first())
         assertFalse(
             "Rejected URL must never start loading in the WebView",
-            committed.contains("data:text/html,blocked"),
+            committed.contains("https://veyra.invalid/blocked"),
         )
     }
 
