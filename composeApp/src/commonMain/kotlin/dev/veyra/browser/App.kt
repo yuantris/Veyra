@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -54,7 +52,6 @@ import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.session.BrowserTab
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -127,130 +124,116 @@ fun App() {
             }
         }
 
-        Scaffold(contentWindowInsets = WindowInsets.systemBars) { innerPadding ->
-            Box(Modifier.fillMaxSize().padding(innerPadding)) {
-                // Keep every live tab surface composed even while the new-tab home is shown.
-                // Removing a WebView from composition destroys its native back/forward history;
-                // visibility changes pause/resume the surface but do not define session lifetime.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(top = 64.dp, bottom = 84.dp),
-                ) {
-                    sessionState.tabs.forEach { tab ->
-                        val selected = tab.id == sessionState.activeTabId
-                        val engine = engines[TabId(tab.id)]
-                        if (engine != null) {
-                            key(tab.id) {
-                                Box(
-                                    Modifier
-                                        .fillMaxSize()
-                                        .zIndex(if (selected && showBrowser) 1f else 0f),
-                                ) {
-                                    surfaceRenderer.Render(
-                                        tab = tab,
-                                        engine = engine,
-                                        isVisible = selected && showBrowser,
-                                        onNavigationRequest = coordinator::decideSurfaceNavigation,
-                                        onNavigationDecision = { decision ->
-                                            when (decision) {
-                                                is NavigationDecision.OpenExternal -> {
-                                                    runCatching { uriHandler.openUri(decision.url) }
-                                                }
-                                                is NavigationDecision.OpenInNewTab -> {
-                                                    showBrowser = true
-                                                    session.launchCommand {
-                                                        val newTab = coordinator.openTab(url = "about:blank")
-                                                        coordinator.navigate(
-                                                            NavigationRequest(
-                                                                TabId(newTab.id),
-                                                                decision.url,
-                                                                NavigationSource.PAGE,
-                                                            ),
-                                                        )
+        BrowserScaffold(
+            addressBar = {
+                AddressBar(
+                    address = address,
+                    onAddressChange = { address = it },
+                    onGo = { openAddress(address) },
+                    isBrowsing = showBrowser,
+                    isLoading = activeTab?.isLoading == true,
+                    onStopOrReload = {
+                        activeTab?.let { tab ->
+                            if (tab.isLoading) coordinator.stop(TabId(tab.id))
+                            else coordinator.reload(TabId(tab.id))
+                        }
+                    },
+                )
+            },
+            content = { contentModifier ->
+                Box(contentModifier.fillMaxSize()) {
+                    // Keep tab/session coordination outside the adaptive shell. A window resize
+                    // only changes this host's constraints; it must not recreate the session graph.
+                    if (showBrowser) {
+                        sessionState.tabs.forEach { tab ->
+                            val selected = tab.id == sessionState.activeTabId
+                            val engine = engines[TabId(tab.id)]
+                            if (engine != null) {
+                                key(tab.id) {
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .zIndex(if (selected) 1f else 0f),
+                                    ) {
+                                        if (selected) {
+                                            surfaceRenderer.Render(
+                                                tab = tab,
+                                                engine = engine,
+                                                isVisible = true,
+                                                onNavigationRequest = coordinator::decideSurfaceNavigation,
+                                                onNavigationDecision = { decision ->
+                                                    when (decision) {
+                                                        is NavigationDecision.OpenExternal -> {
+                                                            runCatching { uriHandler.openUri(decision.url) }
+                                                        }
+                                                        is NavigationDecision.OpenInNewTab -> {
+                                                            showBrowser = true
+                                                            session.launchCommand {
+                                                                val newTab = coordinator.openTab(url = "about:blank")
+                                                                coordinator.navigate(
+                                                                    NavigationRequest(
+                                                                        TabId(newTab.id),
+                                                                        decision.url,
+                                                                        NavigationSource.PAGE,
+                                                                    ),
+                                                                )
+                                                            }
+                                                        }
+                                                        NavigationDecision.Allow,
+                                                        NavigationDecision.Cancel -> Unit
                                                     }
-                                                }
-                                                NavigationDecision.Allow,
-                                                NavigationDecision.Cancel -> Unit
-                                            }
-                                        },
-                                    )
+                                                },
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
+                    } else {
+                        HomeScreen(onOpen = ::openAddress)
                     }
-                    if (!showBrowser) {
-                        Box(
-                            Modifier
-                                .fillMaxSize()
-                                .zIndex(2f),
-                        ) {
-                            HomeScreen(onOpen = ::openAddress)
+                }
+            },
+            tabStrip = {
+                BrowserTabStrip(
+                    tabs = sessionState.tabs,
+                    activeTabId = sessionState.activeTabId,
+                    onSelect = { tabId ->
+                        coordinator.selectTab(tabId)
+                        showBrowser = true
+                    },
+                    onNewTab = {
+                        showBrowser = true
+                        session.launchCommand {
+                            coordinator.openTab(url = "about:blank")
                         }
-                    }
-                }
-
-                // Top floating address pill — always visible.
-                Box(
-                    Modifier
-                        .align(Alignment.TopCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    AddressBar(
-                        address = address,
-                        onAddressChange = { address = it },
-                        onGo = { openAddress(address) },
-                        isBrowsing = showBrowser,
-                        isLoading = activeTab?.isLoading == true,
-                        onStopOrReload = {
-                            activeTab?.let { tab ->
-                                if (tab.isLoading) coordinator.stop(TabId(tab.id))
-                                else coordinator.reload(TabId(tab.id))
-                            }
-                        },
-                    )
-                }
-
-                // Bottom floating toolbar — always visible.
-                Box(
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp)
-                        .padding(bottom = 12.dp),
-                ) {
-                    BottomBar(
-                        canGoBack = activeTab?.canGoBack == true,
-                        canGoForward = activeTab?.canGoForward == true,
-                        tabCount = sessionState.tabs.size,
-                        isBrowsing = showBrowser,
-                        onBack = { activeTab?.let { coordinator.goBack(TabId(it.id)) } },
-                        onForward = { activeTab?.let { coordinator.goForward(TabId(it.id)) } },
-                        onTabs = { showBrowser = !showBrowser },
-                    )
-                }
-
-                // Slim download status, only while something is in flight / rejected.
+                    },
+            },
+            bottomBar = {
+                BottomBar(
+                    canGoBack = activeTab?.canGoBack == true,
+                    canGoForward = activeTab?.canGoForward == true,
+                    tabCount = sessionState.tabs.size,
+                    isBrowsing = showBrowser,
+                    onBack = { activeTab?.let { coordinator.goBack(TabId(it.id)) } },
+                    onForward = { activeTab?.let { coordinator.goForward(TabId(it.id)) } },
+                    onTabs = { showBrowser = !showBrowser },
+                )
+            },
+            status = {
                 downloadStatus?.let { status ->
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 84.dp),
-                    ) {
-                        Text(
-                            status,
-                            fontSize = 12.sp,
-                            color = c.error,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(c.surfaceContainer)
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                    }
+                    Text(
+                        status,
+                        fontSize = 12.sp,
+                        color = c.error,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(c.surfaceContainer)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                    )
                 }
-            }
-        }
+            },
+        )
 
         DisposableEffect(session) {
             onDispose {
@@ -258,6 +241,48 @@ fun App() {
                 session.requestShutdown()
             }
         }
+    }
+}
+
+@Composable
+private fun BrowserTabStrip(
+    tabs: List<BrowserTab>,
+    activeTabId: String?,
+    onSelect: (String) -> Unit,
+    onNewTab: () -> Unit,
+) {
+    val c = MiuixTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        tabs.forEach { tab ->
+            val selected = tab.id == activeTabId
+            val label = tab.title.takeIf { it.isNotBlank() } ?: tab.url.ifBlank { "新标签页" }
+            Text(
+                text = label,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = if (selected) c.primary else c.onBackground.copy(alpha = 0.75f),
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .widthIn(min = 96.dp, max = 220.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (selected) c.surfaceContainer else c.surface)
+                    .clickable { onSelect(tab.id) }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            )
+        }
+        Text(
+            text = "＋",
+            color = c.onBackground,
+            fontSize = 18.sp,
+            modifier = Modifier
+                .clip(CircleShape)
+                .clickable(onClick = onNewTab)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
     }
 }
 
