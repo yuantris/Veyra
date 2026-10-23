@@ -194,6 +194,15 @@ The browser's Compose UI uses the **miuix** library (`top.yukonga.miuix.kmp`, cu
 - `:composeApp` is the only presentation module. UI renders state from `BrowserSessionCoordinator` and forwards user commands; it must **not** own session lifecycle, navigation policy, or the engine registry (see §4, §10). `App.kt` is the composition root.
 - Keep the address bar, bottom toolbar, and home screen as separable composables so new-tab vs in-page states swap cleanly.
 
+### Responsive browser shell (required next UI phase)
+- After the Android native WebView validation vertical slice is stable, implement one standard browser UI entry point in `:composeApp` (for example `BrowserScaffold` / `BrowserScreen`), assembled from reusable address bar, tab switcher, web-content host, browser controls, and new-tab home content. Do not create a separate UI lifecycle or duplicate the engine/session graph.
+- Use Compose window size classes / available window constraints and adaptive navigation patterns, not device-model checks or fixed screen-width assumptions. Support compact phones, landscape phones, tablets, foldables (including fold/unfold and posture changes), split-screen/resizable windows, and desktop-sized windows.
+- Compact layouts may use a floating bottom toolbar; expanded layouts should be able to move primary controls to a side rail or wider top toolbar. Keep address/search, tab switching, navigation actions and page content reachable at every size.
+- Treat safe drawing/system-bar insets and display cutouts correctly. Measure the web-content viewport from the actual remaining content area; browser chrome must not overlap page content or native WebView touch regions.
+- Window-size/posture changes must only recompose/re-layout the surface. They must not close, recreate, or reset the `BrowserSession`, native engine, current URL, scroll position, or in-flight navigation.
+- Add screenshot/layout tests or deterministic Compose UI tests for compact, expanded, landscape and resized-window configurations; test tab-switch and surface reattachment while resizing. Document any platform-specific adaptive limitation.
+- Keep this UI task behind the engine/session contract. The UI forwards commands to `BrowserController` / `BrowserSessionCoordinator` and observes normalized state; it must not call WebView directly for browser behavior.
+
 ### Build-baseline constraints (do not regress)
 miuix 0.9.4 pins a specific toolchain; the project baseline is therefore **Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0**. Preserve these observations:
 - **No `iosX64()` target.** miuix publishes `iosArm64`/`iosSimulatorArm64` only. Under Kotlin 2.4's strict metadata resolver, a `commonMain` dependency missing a variant for any declared leaf target fails the whole graph ("Couldn't resolve … for all target platforms"). The three modules therefore declare only `iosArm64()` + `iosSimulatorArm64()`. Do not re-add `iosX64()` unless miuix (or a replacement) ships that variant.
