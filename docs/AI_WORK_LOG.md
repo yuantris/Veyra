@@ -142,3 +142,20 @@
 - **Test evidence:** `:browser-core:jvmTest`, `:browser-download:jvmTest`, `:composeApp:desktopTest` green; Android + Android-test + iOS compiles green.
 - **Next smallest safe step:** C6 — implement the common `WebsitePermissionPolicy` decision point and its policy tests; then write the exit-criterion-5 surface ownership review.
 - **Files:** `docs/CORE_GATE_REVIEW.md` (new), `browser-download/src/commonMain/.../DefaultDownloadController.kt`, `browser-download/src/commonTest/.../DefaultDownloadControllerTest.kt`, `composeApp/src/commonTest/.../ComposeWebViewEngineTest.kt`, `browser-core/build.gradle.kts`, `browser-download/build.gradle.kts`, `composeApp/build.gradle.kts`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-23 — C6 closed: WebsitePermissionPolicy decision point
+
+- **Goal:** Close the C6 gate (permission boundaries) that blocked exit criterion 1: implement the common website-permission decision point required by `BROWSER_CORE_ARCHITECTURE.md` §5 and prove its policy rules with tests.
+- **Contract changes (`PermissionContracts.kt`, zero prior production usages):** added `Timeout` to `WebsitePermissionDecision` (architecture requires denials/cancellations/time-outs/unsupported to stay distinct) and `profileId` to `WebsitePermissionRequest` (decisions are per-profile; the request is the natural carrier from the engine's profile context).
+- **New `core/security/WebsitePermissionPolicy.kt`:** the core owns the sequence and the rules, the platform owns prompting.
+  1. site settings first — a stored `Deny` is final and the OS layer is never consulted, so an already-granted OS permission can never auto-grant a site;
+  2. the injected OS provider is consulted only when the site is undecided or granted;
+  3. a grant requires *both* layers (a site grant with an OS denial denies — OS revocation is caught);
+  4. only explicit user decisions (Grant/Deny) are recorded; cancel/time-out/unsupported leave the site undecided so the next request prompts again;
+  5. decisions are stored per (profile, canonical origin, permission) via `WebsitePermissionStore` + `InMemoryWebsitePermissionStore`, with `revoke` and `clearProfile` for ephemeral (private-profile) teardown;
+  6. a malformed origin fails closed (Deny) without consulting the OS layer.
+- **Tests (15, all green):** stored denial survives an OS grant and skips the OS layer (invocation-counted); OS revocation of a site grant; first-time grant/deny recording; each transient outcome distinct and unrecorded; private↔regular isolation proven in both directions (behaviorally for the denial direction, via store for the grant direction); `clearProfile` teardown; revoke re-prompts; per-origin/permission scoping; malformed-origin fail-closed; canonical-origin sharing; store rejects transient outcomes; pure `resolve` matrix.
+- **Capability truthfulness:** the matrix keeps "Website permission broker" Unsupported on all platforms and now records that the platform-neutral core decision point exists but no adapter connects an OS prompt yet.
+- **Test evidence:** `:browser-core:jvmTest` 74 (was 59), `:browser-download:jvmTest` 10, `:composeApp:desktopTest` 22; Android + iOS compiles green.
+- **Gate status:** C6 PASS. Remaining for exit criterion 1: C5 stays PARTIAL (deferred, `nativeMessaging` honestly false). Remaining overall: exit criterion 5 — the platform surface resource ownership review.
+- **Files:** `browser-core/src/commonMain/.../core/PermissionContracts.kt`, `browser-core/src/commonMain/.../core/security/WebsitePermissionPolicy.kt` (new), `browser-core/src/commonTest/.../core/security/WebsitePermissionPolicyTest.kt` (new), `docs/CORE_GATE_REVIEW.md`, `docs/PLATFORM_CAPABILITY_MATRIX.md`.

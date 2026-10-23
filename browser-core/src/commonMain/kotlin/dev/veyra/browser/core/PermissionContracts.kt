@@ -10,6 +10,7 @@ package dev.veyra.browser.core
 data class WebsitePermissionRequest(
     val requestId: RequestId,
     val tabId: TabId,
+    val profileId: ProfileId,
     /** Origin must be derived from trusted engine metadata by the platform adapter. */
     val origin: String,
     val permission: WebsitePermission,
@@ -26,10 +27,15 @@ enum class WebsitePermission {
     UNKNOWN,
 }
 
+/**
+ * Final outcomes of a website permission request. Denials, cancellations, time-outs and
+ * "not supported" are distinct outcomes and must never be collapsed into one another.
+ */
 sealed interface WebsitePermissionDecision {
     data object Grant : WebsitePermissionDecision
     data object Deny : WebsitePermissionDecision
     data object Cancel : WebsitePermissionDecision
+    data object Timeout : WebsitePermissionDecision
     data object Unsupported : WebsitePermissionDecision
 }
 

@@ -13,7 +13,7 @@
 | Private profiles | Unsupported | Unsupported | Unsupported | Current adapter does not isolate cookies/cache/storage per profile. |
 | Session restore | Unsupported | Unsupported | Unsupported | Current adapter does not serialize and restore engine session state. |
 | Downloads | Verified in Android Emulator for the current compose-webview prototype | Unsupported | Unsupported | Android's DownloadListener → app acceptance policy → core task model → Ktor transport → app-specific files dir passed `DownloadPipelineAndroidTest` in CI. This does not claim GeckoView integration is complete. iOS has no page download API; desktop detection is unverified. |
-| Website permission broker | Unsupported | Unsupported | Unsupported | No normalized permission request flow connected yet. |
+| Website permission broker | Unsupported | Unsupported | Unsupported | The platform-neutral decision point exists in Browser Core (`WebsitePermissionPolicy` with per-profile site settings, distinct grant/deny/cancel/time-out/unsupported outcomes, and policy tests), but no platform adapter connects an OS permission prompt to it yet. |
 | Popup/new-window interception | Unsupported | Unsupported | Unsupported | A core event type alone is not a platform implementation. |
 | Native messaging / JS bridge policy | Unsupported | Unsupported | Unsupported | No origin-bound permissioned bridge is connected to Browser Core. |
 | WebExtensions | Unsupported | Unsupported | Unsupported | Do not infer extension support from Blink/V8 or Chromium branding alone. |
