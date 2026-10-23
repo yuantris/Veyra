@@ -10,9 +10,9 @@ internal actual fun composeWebViewPlatformCapabilities(): BrowserCapabilities =
         // shouldOverrideUrlLoading path routes every main-frame navigation through the core policy
         // before the load happens, so this capability is now truthful.
         navigationPolicy = true,
-        // DownloadPipelineAndroidTest passed on the Android Emulator against the current
-        // compose-webview prototype. This advertises only this adapter's verified download path;
-        // it does not imply GeckoView integration is complete.
+        // DownloadPipelineAndroidTest passed on the API 35 emulator against the current native
+        // System WebView validation adapter. This capability applies only to this implementation;
+        // the future self-compiled Chromium adapter must pass its own integration test.
         downloads = true,
         requestInterception = RequestInterceptionScope.MAIN_FRAME_NAVIGATION,
         privateProfiles = false,
