@@ -83,22 +83,31 @@ jobs:
           disable-linux-hw-accel: false
           script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
       - name: Dump failing instrumentation tests
-        # AGP only prints "There were failing tests" at the task level; the per-test stack traces
-        # live in the TEST-*.xml result files. Emit those verbatim on failure so the exact failing
-        # case (and its exception) is visible in the log without needing admin log access.
         if: failure()
+        shell: bash
         run: |
+          set -uo pipefail
           hit=0
-          for f in $(find composeApp/build -name 'TEST-*.xml' 2>/dev/null); do
-            if grep -Eq '<(failure|error)[ />]' "$f"; then
+          while IFS= read -r -d '' f; do
+            if grep -Eq '<(failure|error)([[:space:]>])' "$f"; then
               hit=1
               echo "==================== $f ===================="
               cat "$f"
             fi
-          done
+          done < <(find composeApp/build -type f -name 'TEST-*.xml' -print0 2>/dev/null)
           if [ "$hit" -eq 0 ]; then
-            echo "No <failure>/<error> in TEST-*.xml; listing result files that do exist:"
-            find composeApp/build/outputs/androidTest-results -type f 2>/dev/null | head -60
-            echo "--- also grep the gradle log for FAILED test lines ---"
-            grep -rEn "FAILED|tests completed" /home/runner/work 2>/dev/null | head -40 || true
+            echo "No XML failure details found. Listing instrumentation results:"
+            find composeApp/build/outputs/androidTest-results -type f -print 2>/dev/null | head -100 || true
+            echo "--- test-result exit code ---"
+            cat composeApp/build/outputs/androidTest-results/connected/debug/test-result-exit-code.txt 2>/dev/null || true
           fi
+      - name: Upload Android instrumentation results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-instrumentation-results
+          path: |
+            composeApp/build/outputs/androidTest-results/
+            composeApp/build/reports/androidTests/
+          if-no-files-found: ignore
+          retention-days: 7
