@@ -38,8 +38,9 @@ import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
 
 /**
- * Android Chromium-backed surface using the platform WebView provider.
- * A future bundled Chromium embedder can replace this implementation without changing core.
+ * Temporary Android native-WebView validation surface. The device provider is Chromium-based,
+ * but this is not Veyra's future self-compiled kernel. Replace this platform renderer when the
+ * self-compiled Chromium embedder is ready; keep Browser Core and its single engine contract stable.
  */
 internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     @Composable
