@@ -35,7 +35,7 @@ import org.junit.runner.RunWith
 class AndroidSessionOwnershipWebViewTest {
 
     private lateinit var scenario: ActivityScenario<DownloadTestActivity>
-    private val createdViews = mutableListOf<WebView>()
+    private val createdPorts = mutableListOf<RealWebViewSurfacePort>()
 
     @Before
     fun setUp() {
@@ -44,36 +44,52 @@ class AndroidSessionOwnershipWebViewTest {
 
     @After
     fun tearDown() {
-        createdViews.forEach { it.destroy() }
-        createdViews.clear()
+        // Tear down every port (which marks itself destroyed so no late forwarded call can touch a
+        // dead WebView), then release the activity.
+        createdPorts.forEach { it.destroyWebView() }
+        createdPorts.clear()
         scenario.close()
     }
 
-    /** A real [WebView]-backed surface whose only extra behavior is recording requested loads. */
+    /**
+     * A real [WebView]-backed surface. It records every request the engine makes of it (that is what
+     * the ownership assertions check), and faithfully forwards the request to the live WebView the way
+     * [AndroidChromiumSurfaceRenderer] does at runtime — but only while the WebView is alive. Once the
+     * surface is destroyed (simulating a tab close), the guard prevents the main-thread-posted
+     * forwarding from calling into a destroyed WebView, which would otherwise throw on the next looper
+     * dispatch and fail the whole instrumentation run.
+     */
     private class RealWebViewSurfacePort(webView: WebView) : BrowserSurfacePort {
         val webView: WebView = webView
         val loadedUrls = mutableListOf<String>()
         private val mainHandler = Handler(Looper.getMainLooper())
+        @Volatile private var destroyed = false
+
+        /** Tears down the underlying WebView and blocks any late-forwarded call from touching it. */
+        fun destroyWebView() {
+            destroyed = true
+            webView.destroy()
+        }
 
         override fun loadUrl(url: String) {
             loadedUrls += url
-            mainHandler.post { webView.loadUrl(url) }
+            if (!destroyed) mainHandler.post { if (!destroyed) webView.loadUrl(url) }
         }
 
         override fun goBack() {
-            mainHandler.post { if (webView.canGoBack()) webView.goBack() }
+            if (!destroyed) mainHandler.post { if (!destroyed && webView.canGoBack()) webView.goBack() }
         }
 
         override fun goForward() {
-            mainHandler.post { if (webView.canGoForward()) webView.goForward() }
+            if (!destroyed) mainHandler.post { if (!destroyed && webView.canGoForward()) webView.goForward() }
         }
 
         override fun reload() {
-            mainHandler.post { webView.reload() }
+            if (!destroyed) mainHandler.post { if (!destroyed) webView.reload() }
         }
 
         override fun stop() {
-            mainHandler.post { webView.stopLoading() }
+            if (!destroyed) mainHandler.post { if (!destroyed) webView.stopLoading() }
         }
     }
 
@@ -91,8 +107,10 @@ class AndroidSessionOwnershipWebViewTest {
                 onRendererGone = {},
                 observe = { _, _, _, _, _, _ -> },
             )
-            createdViews += webView
             port = RealWebViewSurfacePort(webView)
+            // Mirror the shipping renderer: the WebView is attached to the window hierarchy.
+            activity.setContentView(webView)
+            createdPorts += port
         }
         return port
     }
@@ -109,7 +127,7 @@ class AndroidSessionOwnershipWebViewTest {
         // Simulate the Compose surface leaving composition: detach (engine keeps running) and destroy
         // the native WebView.
         engine.detachSurface(first)
-        scenario.onActivity { first.webView.destroy() }
+        scenario.onActivity { first.destroyWebView() }
 
         // Re-navigate while detached: must buffer, not reach the dead surface.
         engine.navigate(NavigationRequest(TabId("tab-1"), "https://b.example"))
@@ -164,7 +182,7 @@ class AndroidSessionOwnershipWebViewTest {
 
         // Recovery: detach the dead surface, issue a new navigation, reattach a fresh WebView.
         engine.detachSurface(surface)
-        scenario.onActivity { surface.webView.destroy() }
+        scenario.onActivity { surface.destroyWebView() }
         engine.navigate(NavigationRequest(TabId("tab-1"), "https://a.example/after", NavigationSource.USER))
         val recovery = makeSurface(TabId("tab-1"))
         engine.attachSurface(recovery)
@@ -182,7 +200,7 @@ class AndroidSessionOwnershipWebViewTest {
 
         // Tab closed: surface detaches and the native WebView is destroyed.
         engine.detachSurface(surface)
-        scenario.onActivity { surface.webView.destroy() }
+        scenario.onActivity { surface.destroyWebView() }
 
         // Late navigations must not throw and must never reach the destroyed surface.
         engine.navigate(NavigationRequest(TabId("tab-1"), "https://late.example"))

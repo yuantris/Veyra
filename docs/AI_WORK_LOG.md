@@ -253,3 +253,12 @@
 - **Fix:** In `.github/workflows/ci.yml` and `core-tests.yml`, the `packages:` list now uses `platforms;android-37.0` (kept `build-tools;35.0.0`, `system-images;android-35;google_apis;x86_64`, `emulator`).
 - **Next smallest safe step:** push and confirm both workflows go green; the `android-emulator-integration` run also validates `AndroidSessionOwnershipWebViewTest` on a real WebView.
 - **Files:** `.github/workflows/ci.yml`, `.github/workflows/core-tests.yml`.
+
+### 2026-10-23 (post-push) — Fix AndroidSessionOwnershipWebViewTest runtime crash
+
+- **Goal:** `android-emulator-integration` failed `connectedDebugAndroidTest` ("There were failing tests", exit 1) after the session-ownership test was added.
+- **Root cause:** `RealWebViewSurfacePort.loadUrl` forwarded to the live WebView via `mainHandler.post { webView.loadUrl(url) }` (async, on the main looper). The tests call `engine.navigate` (which synchronously requests a load) and then immediately `webView.destroy()` to simulate a tab close. Because `AndroidJUnit4` runs on the main thread, `onActivity { webView.destroy() }` runs inline, so the still-queued `loadUrl` runs *after* the WebView is destroyed → `RuntimeException` on the next looper dispatch → the whole instrumentation run reports failing tests. Assertions themselves were correct (verified against `ComposeWebViewEngine` source: `pendingUrl` keeps only the latest pending navigation, so the two-late-navigation case expecting exactly `late2` is right).
+- **Fix:** Added a `@Volatile destroyed` guard to `RealWebViewSurfacePort` plus a `destroyWebView()` that sets the flag before calling `webView.destroy()`; every forwarded call checks the flag both before posting and at dispatch time. Replaced the three inline `webView.destroy()` calls with `destroyWebView()`. Also added `activity.setContentView(webView)` in `makeSurface` (mirroring `AndroidNavigationPolicyWebViewTest`, which attaches the WebView to the window). Removed the invalid `timeout: 30` input from `android-emulator-runner@v2` in `core-tests.yml` (the action does not accept it; it was only a warning, not the failure cause).
+- **Verified:** `:composeApp:compileDebugAndroidTestKotlinAndroid` BUILD SUCCESSFUL. Runtime still delegated to CI.
+- **Next smallest safe step:** push and confirm `connectedDebugAndroidTest` is green on the emulator.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `.github/workflows/core-tests.yml`.
