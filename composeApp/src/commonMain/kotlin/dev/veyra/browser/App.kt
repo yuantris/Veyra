@@ -129,61 +129,64 @@ fun App() {
 
         Scaffold(contentWindowInsets = WindowInsets.systemBars) { innerPadding ->
             Box(Modifier.fillMaxSize().padding(innerPadding)) {
-                // Base layer: either the browsing surface or the Luna new-tab home.
+                // Keep every live tab surface composed even while the new-tab home is shown.
+                // Removing a WebView from composition destroys its native back/forward history;
+                // visibility changes pause/resume the surface but do not define session lifetime.
                 Box(
                     Modifier
                         .fillMaxSize()
                         .padding(top = 64.dp, bottom = 84.dp),
                 ) {
-                    if (showBrowser) {
-                        sessionState.tabs.forEach { tab ->
-                            val selected = tab.id == sessionState.activeTabId
-                            val engine = engines[TabId(tab.id)]
-                            if (engine != null) {
-                                key(tab.id) {
-                                    Box(
-                                        Modifier
-                                            .fillMaxSize()
-                                            .zIndex(if (selected) 1f else 0f),
-                                    ) {
-                                        // Keep every tab's native WebView composed; only the selected
-                                        // surface is visible/on top so switching tabs keeps native history.
-                                        if (selected) {
-                                            surfaceRenderer.Render(
-                                                tab = tab,
-                                                engine = engine,
-                                                isVisible = true,
-                                                onNavigationRequest = coordinator::decideSurfaceNavigation,
-                                                onNavigationDecision = { decision ->
-                                                    when (decision) {
-                                                        is NavigationDecision.OpenExternal -> {
-                                                            runCatching { uriHandler.openUri(decision.url) }
-                                                        }
-                                                        is NavigationDecision.OpenInNewTab -> {
-                                                            showBrowser = true
-                                                            session.launchCommand {
-                                                                val newTab = coordinator.openTab(url = "about:blank")
-                                                                coordinator.navigate(
-                                                                    NavigationRequest(
-                                                                        TabId(newTab.id),
-                                                                        decision.url,
-                                                                        NavigationSource.PAGE,
-                                                                    ),
-                                                                )
-                                                            }
-                                                        }
-                                                        NavigationDecision.Allow,
-                                                        NavigationDecision.Cancel -> Unit
+                    sessionState.tabs.forEach { tab ->
+                        val selected = tab.id == sessionState.activeTabId
+                        val engine = engines[TabId(tab.id)]
+                        if (engine != null) {
+                            key(tab.id) {
+                                Box(
+                                    Modifier
+                                        .fillMaxSize()
+                                        .zIndex(if (selected && showBrowser) 1f else 0f),
+                                ) {
+                                    surfaceRenderer.Render(
+                                        tab = tab,
+                                        engine = engine,
+                                        isVisible = selected && showBrowser,
+                                        onNavigationRequest = coordinator::decideSurfaceNavigation,
+                                        onNavigationDecision = { decision ->
+                                            when (decision) {
+                                                is NavigationDecision.OpenExternal -> {
+                                                    runCatching { uriHandler.openUri(decision.url) }
+                                                }
+                                                is NavigationDecision.OpenInNewTab -> {
+                                                    showBrowser = true
+                                                    session.launchCommand {
+                                                        val newTab = coordinator.openTab(url = "about:blank")
+                                                        coordinator.navigate(
+                                                            NavigationRequest(
+                                                                TabId(newTab.id),
+                                                                decision.url,
+                                                                NavigationSource.PAGE,
+                                                            ),
+                                                        )
                                                     }
-                                                },
-                                            )
-                                        }
-                                    }
+                                                }
+                                                NavigationDecision.Allow,
+                                                NavigationDecision.Cancel -> Unit
+                                            }
+                                        },
+                                    )
                                 }
                             }
                         }
-                    } else {
-                        HomeScreen(onOpen = ::openAddress)
+                    }
+                    if (!showBrowser) {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .zIndex(2f),
+                        ) {
+                            HomeScreen(onOpen = ::openAddress)
+                        }
                     }
                 }
 
