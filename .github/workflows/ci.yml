@@ -28,5 +28,13 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          # compileSdk is 37 (miuix 0.9.4 requires API 37).
+          packages: >-
+            platforms;android-37
+            build-tools;35.0.0
+
       - name: Compile Android and Desktop
         run: bash gradlew :composeApp:compileDebugKotlinAndroid :composeApp:compileKotlinDesktop --stacktrace

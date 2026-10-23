@@ -58,10 +58,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # compileSdk is 36, so the build needs platforms;android-36 + a build-tools;
-          # the API 35 emulator image is what the instrumentation run boots on.
+          # compileSdk is 37 (raised because miuix 0.9.4 requires API 37), so the build needs
+          # platforms;android-37 + a build-tools; the API 35 emulator image is what the
+          # instrumentation run boots on.
           packages: >-
-            platforms;android-36
+            platforms;android-37
             build-tools;35.0.0
             system-images;android-35;google_apis;x86_64
             emulator

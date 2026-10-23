@@ -178,3 +178,24 @@ When continuing work from prior AI sessions:
 - Prefer completing a vertical slice (contract + implementation + tests + docs) over adding many unfinished interfaces.
 - Be candid about uncertainty and CI state. Never claim tests passed unless their actual result was observed.
 - **Record the session in `docs/AI_WORK_LOG.md`.** Multiple AI sessions and human contributors take turns in this repository; the log is how they stay aligned. Before finishing, append one entry stating what you planned, what you completed (with test evidence), and the next smallest safe step, then refresh the status snapshot at the top of that document. The log is append-only: never rewrite or delete earlier entries, and never record proposed work as completed.
+
+## 12. UI/UX standards (fixed presentation decision)
+
+The browser's Compose UI uses the **miuix** library (`top.yukonga.miuix.kmp`, currently `0.9.4`: `miuix-ui` + `miuix-icons`). This is a fixed presentation decision comparable to the engine direction in §2; do not revert to Material3 or introduce a second UI toolkit without an explicit decision recorded here. The target look-and-feel is derived from the Luna browser reference (Weibo topic **#Luna浏览器#**).
+
+### Visual language
+- **Floating, inset-separated chrome.** The address bar is a top pill (lock + url + stop/reload) floating below the status-bar inset; the primary navigation is a bottom toolbar (back, forward, tab count / new-tab, bookmarks, menu, home) floating above the bottom inset. Content is padded by `WindowInsets.systemBars`.
+- **New-tab home screen** with: a large search pill ("搜索或输入网址"), a favorites row (site monograms), a suggestions row (horizontal cards), a privacy-report card (shield glyph + "已阻止 N 个跟踪器"), and a customize pill button.
+- **Privacy-first emphasis.** Privacy/reporting is a first-class, visible surface, not buried settings.
+- **Clean, light palette with large radii** (≈20–24 dp) and subtle elevation on floating elements. Follow miuix's HyperOS/MiUI aesthetic via `MiuixTheme.colorScheme` tokens, not hard-coded colors.
+
+### Implementation rules
+- Wrap the app in `MiuixTheme(colors = lightColorScheme()/darkColorScheme())` and use `Scaffold(contentWindowInsets = WindowInsets.systemBars)`. Read colors from `MiuixTheme.colorScheme.*` (surface, surfaceContainer, primary, onBackground, error, …).
+- `:composeApp` is the only presentation module. UI renders state from `BrowserSessionCoordinator` and forwards user commands; it must **not** own session lifecycle, navigation policy, or the engine registry (see §4, §10). `App.kt` is the composition root.
+- Keep the address bar, bottom toolbar, and home screen as separable composables so new-tab vs in-page states swap cleanly.
+
+### Build-baseline constraints (do not regress)
+miuix 0.9.4 pins a specific toolchain; the project baseline is therefore **Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0**. Preserve these observations:
+- **No `iosX64()` target.** miuix publishes `iosArm64`/`iosSimulatorArm64` only. Under Kotlin 2.4's strict metadata resolver, a `commonMain` dependency missing a variant for any declared leaf target fails the whole graph ("Couldn't resolve … for all target platforms"). The three modules therefore declare only `iosArm64()` + `iosSimulatorArm64()`. Do not re-add `iosX64()` unless miuix (or a replacement) ships that variant.
+- **AGP 9 + Kotlin Multiplatform bypass.** `gradle.properties` carries `android.builtInKotlin=false` + `android.newDsl=false` to keep the legacy `com.android.library` plugin working with AGP 9. These are stopgaps; prefer migrating `android {}` to `com.android.kotlin.multiplatform.library` to remove the deprecation warnings.
+- `compose-webview` (2.0.3) is a hard dependency for Desktop/iOS surface rendering and is aligned to Compose 1.12.2 by the Compose plugin; do not remove it as "dead code."
