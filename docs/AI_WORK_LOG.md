@@ -245,3 +245,11 @@
 - **Next smallest safe step:** emulator/device smoke test (navigation, lifecycle, renderer-process recreation), then decide `androidx.webkit` adoption.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt` (new), `gradle/libs.versions.toml`, `.github/workflows/ci.yml`, `.github/workflows/core-tests.yml`, `docs/AI_WORK_LOG.md`.
 
+
+### 2026-10-23 (post-push) — CI fix: Setup Android SDK failed on `platforms;android-37`
+
+- **Goal:** Both workflows failed at the `Setup Android SDK` step after the compileSdk 37 bump.
+- **Root cause:** The published SDK package is named **`platforms;android-37.0`**, not `platforms;android-37`. `sdkmanager` cannot find `platforms;android-37` and the step fails. Local proof: `~/Library/Android/sdk/platforms` contains `android-37.0` (no `android-37`), and `:composeApp:compileDebugKotlinAndroid` at compileSdk 37 resolves against `android-37.0` just fine — so the `android-compileSdk = "37"` value is correct; only the *install* package name was wrong. (License acceptance is not the issue: `android-actions/setup-android` accepts licenses by default.)
+- **Fix:** In `.github/workflows/ci.yml` and `core-tests.yml`, the `packages:` list now uses `platforms;android-37.0` (kept `build-tools;35.0.0`, `system-images;android-35;google_apis;x86_64`, `emulator`).
+- **Next smallest safe step:** push and confirm both workflows go green; the `android-emulator-integration` run also validates `AndroidSessionOwnershipWebViewTest` on a real WebView.
+- **Files:** `.github/workflows/ci.yml`, `.github/workflows/core-tests.yml`.

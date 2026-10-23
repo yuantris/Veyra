@@ -31,9 +31,11 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # compileSdk is 37 (miuix 0.9.4 requires API 37).
+          # compileSdk is 37 (miuix 0.9.4 requires API 37). The published SDK package is
+          # named platforms;android-37.0 (not platforms;android-37), which is what sdkmanager
+          # must install.
           packages: >-
-            platforms;android-37
+            platforms;android-37.0
             build-tools;35.0.0
 
       - name: Compile Android and Desktop
