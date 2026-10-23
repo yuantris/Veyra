@@ -9,7 +9,7 @@ Veyra is a cross-platform browser built with Kotlin Multiplatform and Compose Mu
 
 | Platform | Selected engine direction | Integration principle |
 | --- | --- | --- |
-| Android | Chromium-based runtime | First implementation priority; validate the selected runtime's capabilities, lifecycle, extension model and packaging constraints |
+| Android | Self-compiled Chromium kernel (long-term target); System WebView for temporary validation | First implementation priority; validate the adapter contract on WebView now, then replace the runtime behind the same boundary after kernel build/package gates pass |
 | iOS | WKWebView | Native adapter |
 | HarmonyOS | ArkWeb | Native adapter through the HarmonyOS host/toolchain |
 | Desktop | KCEF / Chromium | Native adapter |
@@ -84,7 +84,7 @@ Keep website permission requests, operating-system runtime permissions, popups, 
 
 ## 6. Platform adapter rules
 
-- Android / Chromium is the first adapter and should validate the architecture before other platform work expands.
+- Android is the first adapter. Use native System WebView to validate the architecture now; the intended final runtime is self-compiled Chromium and must replace the temporary WebView implementation behind the same contract.
 - iOS uses WKWebView; HarmonyOS uses ArkWeb; desktop uses KCEF.
 - Each adapter translates native callbacks into normalized state/events and maps core decisions back to native actions.
 - Capabilities remain unavailable until the exact implementation is tested.
