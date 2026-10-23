@@ -42,7 +42,7 @@ internal fun BrowserScaffold(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
         ) {
             // Breakpoints use available window constraints rather than device models/orientation.
-            val expanded = maxWidth >= 840.dp
+            val expanded = isExpandedBrowserWindow(maxWidth)
             val chromeHorizontalPadding = if (expanded) 24.dp else 12.dp
 
             Box(Modifier.fillMaxSize()) {
@@ -112,3 +112,8 @@ internal fun BrowserScaffold(
         }
     }
 }
+
+
+/** True when the available window width should use the expanded browser chrome. */
+internal fun isExpandedBrowserWindow(maxWidth: androidx.compose.ui.unit.Dp): Boolean =
+    maxWidth >= 840.dp
