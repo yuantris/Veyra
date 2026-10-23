@@ -206,8 +206,8 @@ fun App() {
                     onNewTab = {
                         showBrowser = true
                         session.launchCommand { coordinator.openTab(url = "about:blank") }
-                    }
-                ),
+                    },
+                )
             },
             bottomBar = {
                 BottomBar(
