@@ -31,7 +31,7 @@ Each adapter must:
 
 ## Current navigation-policy verification gate
 
-The Android adapter keeps `navigationPolicy = false` until the Android integration test passes on a real WebView. The test now **exists** and drives the real production path:
+The Android adapter now reports `navigationPolicy = true`. `AndroidNavigationPolicyWebViewTest` drives the real production path and passes on a real WebView (API 35 system-WebView emulator, `connectedDebugAndroidTest` in CI):
 
 - `composeApp/src/androidInstrumentedTest/.../AndroidNavigationPolicyWebViewTest.kt` constructs the WebView through the **same `createWebView` factory `AndroidChromiumSurfaceRenderer` uses** and verifies the real `WebViewClient.shouldOverrideUrlLoading` interception (it is NOT the compose-webview library `WebViewNavigator` path, which the test plan deems insufficient). It asserts against a real WebView that:
   - an allowed top-level HTTP(S) link is intercepted exactly once and begins loading;
@@ -41,7 +41,7 @@ The Android adapter keeps `navigationPolicy = false` until the Android integrati
   - a late callback after the tab's WebView is destroyed cannot reach the host policy.
 - It is gated in CI: the `android-emulator-integration` job runs `:composeApp:connectedDebugAndroidTest` on an API 35 emulator, which includes this test.
 
-**Status:** test written, compiles (`compileDebugAndroidTestKotlinAndroid` green), and CI-gated. `navigationPolicy` stays `false` until `connectedDebugAndroidTest` is green on the emulator; the flip is a one-line change in `ComposeWebViewPlatformCapabilities.android.kt` (`navigationPolicy = false` → `true`), to be made after the run passes and the API level + WebView provider version are recorded. iOS and Desktop remain `false` until their own native delegate/handler path and tests are added.
+**Status:** CLEARED. `AndroidNavigationPolicyWebViewTest` passes on the API 35 system-WebView emulator via `:composeApp:connectedDebugAndroidTest` (CI `android-emulator-integration` job). `navigationPolicy` is now `true` (flipped in `ComposeWebViewPlatformCapabilities.android.kt`). Verification environment: API 35 (`system-images;android-35;google_apis;x86_64`), Android System WebView shipped with the Google APIs image. iOS and Desktop remain `false` until their own native delegate/handler path and tests are added.
 
 ## Current downloads verification result
 

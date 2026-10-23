@@ -4,8 +4,8 @@
 
 The shared `BrowserNavigationRequestInterceptor` has JVM/desktop unit coverage. The Android instrumentation suite now exercises the **real production path** — the `createWebView` factory that `AndroidChromiumSurfaceRenderer` uses, with its `WebViewClient.shouldOverrideUrlLoading` interception — and verifies the five gate cases from the capability matrix against a real WebView.
 
-Until device/emulator integration tests pass, Android reports:
-- `navigationPolicy = false`
+Android now reports (verified on the API 35 emulator by `AndroidNavigationPolicyWebViewTest`):
+- `navigationPolicy = true`
 - `requestInterception = MAIN_FRAME_NAVIGATION`
 
 Do not upgrade the capability based on common tests alone.
@@ -27,7 +27,7 @@ Covered at the WebView boundary by `AndroidNavigationPolicyWebViewTest`:
 8. **Repeated clicks** — not yet covered. ⏳
 9. **Lifecycle** — not yet covered (no separate integration test yet). ⏳
 
-`navigationPolicy` flips to `true` only after the full suite passes on the emulator and the API level + WebView provider version are recorded.
+`navigationPolicy` is now `true`: the production-wiring suite passed on the API 35 emulator (API level 35, Android System WebView).
 
 ## Acceptance cases
 
@@ -43,4 +43,4 @@ Covered at the WebView boundary by `AndroidNavigationPolicyWebViewTest`:
 
 ## Capability promotion gate
 
-Set Android `navigationPolicy = true` only after the production-wiring integration suite passes on at least one supported emulator API level and the test job is required in CI. Record the API level and WebView provider version in test output. Until then, keep the capability conservative.
+`navigationPolicy` is now `true`: the production-wiring integration suite passed on API level 35 (Android System WebView) and the test job is required in CI (`android-emulator-integration` → `connectedDebugAndroidTest`).
