@@ -2,6 +2,9 @@ package dev.veyra.browser
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import java.util.concurrent.atomic.AtomicBoolean
 import android.webkit.SslErrorHandler
 import android.net.http.SslError
 import android.webkit.WebChromeClient
@@ -81,19 +84,36 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                 )
             }
         }
+        // All WebView method calls must occur on the thread that created the WebView (main).
+        // The engine (core, platform-neutral) may invoke these surface commands from any coroutine
+        // dispatcher, so marshal every call onto the main thread. surfaceDestroyed drops late
+        // calls that race with disposal.
+        val mainHandler = remember { Handler(Looper.getMainLooper()) }
+        val surfaceDestroyed = remember(webView) { AtomicBoolean(false) }
         val surface = remember(webView) {
             object : BrowserSurfacePort {
-                override fun loadUrl(url: String) { webView.loadUrl(url) }
-                override fun goBack() { if (webView.canGoBack()) webView.goBack() }
-                override fun goForward() { if (webView.canGoForward()) webView.goForward() }
-                override fun reload() { webView.reload() }
-                override fun stop() { webView.stopLoading() }
+                override fun loadUrl(url: String) {
+                    mainHandler.post { if (!surfaceDestroyed.get()) webView.loadUrl(url) }
+                }
+                override fun goBack() {
+                    mainHandler.post { if (!surfaceDestroyed.get() && webView.canGoBack()) webView.goBack() }
+                }
+                override fun goForward() {
+                    mainHandler.post { if (!surfaceDestroyed.get() && webView.canGoForward()) webView.goForward() }
+                }
+                override fun reload() {
+                    mainHandler.post { if (!surfaceDestroyed.get()) webView.reload() }
+                }
+                override fun stop() {
+                    mainHandler.post { if (!surfaceDestroyed.get()) webView.stopLoading() }
+                }
             }
         }
 
         DisposableEffect(engine, surface) {
             binding.attachSurface(surface)
             onDispose {
+                surfaceDestroyed.set(true)
                 binding.detachSurface(surface)
                 webView.stopLoading()
                 webView.destroy()

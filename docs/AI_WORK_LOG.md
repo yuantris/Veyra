@@ -205,3 +205,14 @@
 - **Caveat (honesty):** I could not fetch the raw CI log (GitHub API returned no run record for 766f807 at query time — likely indexing lag), so the flip relies on the user's go-ahead rather than a directly observed green run ID. If 766f807 actually failed, revert the one-line change and re-open the gate.
 - **Next smallest safe step:** session-ownership tests under the Android renderer path (active-tab switch, detach/reattach, idempotent close, stale events), then the emulator/device smoke test, then decide `androidx.webkit` adoption.
 - **Files:** `composeApp/src/androidMain/.../ComposeWebViewPlatformCapabilities.android.kt`, `docs/PLATFORM_CAPABILITY_MATRIX.md`, `docs/ANDROID_NAVIGATION_INTEGRATION_TEST_PLAN.md`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-23 — Fixed Android WebView called off the main thread (real-device crash)
+
+- **Goal:** Fix the real-device FATAL EXCEPTION: `A WebView method was called on thread 'DefaultDispatcher-worker-4'` thrown at `AndroidChromiumSurfaceRenderer.kt` `webView.loadUrl` via `ComposeWebViewEngine.navigate` <- `App.openAddress` (suspend, `Dispatchers.Default`).
+- **Root cause:** `BrowserSurfacePort` (the Android surface command port created in `AndroidChromiumSurfaceRenderer.Render`) called `webView.loadUrl/goBack/goForward/reload/stopLoading` directly. The engine (`ComposeWebViewEngine`, commonMain) may invoke these from any coroutine dispatcher; `App.openAddress` resolves on `Dispatchers.Default`, so `webView.loadUrl` ran on a worker thread. Android requires every WebView method on the creating (main) thread.
+- **Fix:** Marshal every `BrowserSurfacePort` command onto the main thread with `Handler(Looper.getMainLooper()).post { ... }` inside the Android surface (the layer that owns the WebView; core stays platform-neutral). Added a `surfaceDestroyed` (`AtomicBoolean`) guard set in `onDispose` to drop late commands racing with disposal. The initial `LaunchedEffect` loadUrl, `observe` callbacks, and `onDispose` stop/destroy were already on the main thread and are unchanged. The change does NOT touch `AndroidNavigationPolicyWebViewTest` (which drives `createWebView` directly, not this port), so CI is unaffected.
+- **Verification:** `:composeApp:compileDebugKotlinAndroid` BUILD SUCCESSFUL (only pre-existing deprecated-API warnings at lines 181-182, unrelated). Real-device re-run required (emulator cannot launch in this sandbox).
+- **Caveat:** Could not run the emulator here; the user must re-run on device to confirm the crash is gone.
+- **Next step:** user re-tests on device; if any other WebView call still lands off-main, repeat the same marshaling pattern at that call site.
+- **Files:** `composeApp/src/androidMain/kotlin/dev/veyra/browser/AndroidChromiumSurfaceRenderer.kt`, `docs/AI_WORK_LOG.md`.
