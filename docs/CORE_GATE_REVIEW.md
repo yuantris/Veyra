@@ -25,18 +25,22 @@
 
 | # | Criterion | Status |
 | --- | --- | --- |
-| 1 | C0–C9 implementation notes and tests, deferred features marked unsupported | **Not met** — C6 now PASS; C5 is PARTIAL (deferred with `nativeMessaging` false) |
+| 1 | C0–C9 implementation notes and tests, deferred features marked unsupported | **Met** — C0/C1/C2/C3/C4/C6/C7/C8/C9 PASS; C5 PARTIAL by design with the deferred end-to-end bridge honestly marked unsupported (`nativeMessaging` false in the capability matrix) |
 | 2 | Common/JVM test suite passes on CI | **Met** — `test` job green on `main`; a 5-minute per-suite test timeout now guards against hung workers |
 | 3 | Single command facade / single registry / metadata-only store | **Met** — `BrowserController`, `BrowserEngineManager`, `BrowserSessionStore`; `create()` owns graph assembly and `App.kt` cannot rebuild it |
 | 4 | Architecture docs agree on the selected engine direction and claim nothing unimplemented | **Met** — Chromium direction per `AGENTS.md` §2 and `CHROMIUM_ANDROID_PLAN.md`; capability matrix claims nothing beyond verified adapters |
-| 5 | Platform surface resource ownership protocol reviewed at the contract level | **Not met** — no written review of who owns/destroys native view and runtime resources |
+| 5 | Platform surface resource ownership protocol reviewed at the contract level | **Met** — see `docs/SURFACE_OWNERSHIP_REVIEW.md`: two distinct resource axes, full teardown chain anchored to code, owner scope wired to App dispose, and invariants I1/I3/I6 test-backed |
 
 ## Conclusion
 
-The core is **not yet cleared for native-engine integration**. C5 is PARTIAL (deferred, honestly marked) and exit criterion 5 has no artifact. All remaining work is platform-neutral core work, so per `AGENTS.md` §9 the next phase stays in core.
+The core is **cleared for native-engine integration**. All five exit criteria in
+`BROWSER_CORE_ARCHITECTURE.md` §13 are satisfied; the single remaining partial (C5) is a deliberate
+deferral whose unimplemented part is honestly marked unsupported, which is exactly what the criterion
+requires. Per `AGENTS.md` §9, the next phase is the Android runtime selection in
+`CHROMIUM_ANDROID_PLAN.md`.
 
 ## Ordered next steps
 
-1. ~~**C6**~~ — **done**: `WebsitePermissionPolicy` decision point + 15 policy tests (see gate row).
-2. **Exit criterion 5** — write the platform surface resource ownership protocol review (engine owns session, renderer owns view, attach/detach and crash semantics) at the contract level.
-3. Re-run this review; when criteria 1–5 are met, the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md` becomes the next phase.
+1. ~~**C6**~~ — **done**: `WebsitePermissionPolicy` decision point + 15 policy tests.
+2. ~~**Exit criterion 5**~~ — **done**: `docs/SURFACE_OWNERSHIP_REVIEW.md` reviews surface ownership at the contract level.
+3. **Next phase**: Android runtime selection per `CHROMIUM_ANDROID_PLAN.md` (the first native-engine integration task). C5's end-to-end bridge can be revisited when a concrete runtime needs it.
