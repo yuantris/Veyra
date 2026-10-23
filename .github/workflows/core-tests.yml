@@ -82,3 +82,23 @@ jobs:
           target: google_apis
           disable-linux-hw-accel: false
           script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
+      - name: Dump failing instrumentation tests
+        # AGP only prints "There were failing tests" at the task level; the per-test stack traces
+        # live in the TEST-*.xml result files. Emit those verbatim on failure so the exact failing
+        # case (and its exception) is visible in the log without needing admin log access.
+        if: failure()
+        run: |
+          hit=0
+          for f in $(find composeApp/build -name 'TEST-*.xml' 2>/dev/null); do
+            if grep -Eq '<(failure|error)[ />]' "$f"; then
+              hit=1
+              echo "==================== $f ===================="
+              cat "$f"
+            fi
+          done
+          if [ "$hit" -eq 0 ]; then
+            echo "No <failure>/<error> in TEST-*.xml; listing result files that do exist:"
+            find composeApp/build/outputs/androidTest-results -type f 2>/dev/null | head -60
+            echo "--- also grep the gradle log for FAILED test lines ---"
+            grep -rEn "FAILED|tests completed" /home/runner/work 2>/dev/null | head -40 || true
+          fi
