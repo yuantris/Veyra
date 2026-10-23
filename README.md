@@ -5,7 +5,7 @@ A cross-platform browser built with Kotlin Multiplatform and Compose Multiplatfo
 ## Architecture direction
 
 - Shared Compose UI does not imply a shared rendering engine.
-- Android is the first platform and the selected engine direction is Chromium-based; see [the Android Chromium plan](docs/CHROMIUM_ANDROID_PLAN.md).
+- Android is the first platform. System WebView is the temporary native validation runtime; the long-term target is a self-compiled Chromium kernel behind the same engine contract. See [the Android Chromium plan](docs/CHROMIUM_ANDROID_PLAN.md).
 - iOS uses WKWebView, HarmonyOS uses ArkWeb, and desktop uses KCEF.
 - Native engine types and callbacks stay inside platform adapters.
 - `:browser-core` owns browser contracts and coordination; `:browser-download` owns download task coordination and transport abstractions.
@@ -39,5 +39,5 @@ See `docs/HARMONYOS.md`. The HarmonyOS app host and CPF-specific build pipeline 
 
 - [Architecture baseline](docs/ARCHITECTURE.md): module boundaries, dependency rules, platform directions and change-review criteria.
 - [Browser Core Architecture](docs/BROWSER_CORE_ARCHITECTURE.md): normative browser contracts, lifecycle, JS Bridge security, capability interfaces and acceptance tests.
-- [Android Chromium plan](docs/CHROMIUM_ANDROID_PLAN.md): Android runtime decision gates; the selected engine direction is a Chromium-based runtime, and GeckoView is not the direction.
+- [Android Chromium plan](docs/CHROMIUM_ANDROID_PLAN.md): native WebView validation gates and the migration plan to a self-compiled Chromium kernel.
 
