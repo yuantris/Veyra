@@ -1,7 +1,8 @@
 [versions]
-agp = "8.11.2"
-kotlin = "2.2.21"
-compose = "1.9.2"
+agp = "9.4.1"
+kotlin = "2.4.21"
+compose = "1.12.2"
+miuix = "0.9.4"
 composeWebView = "2.0.3"
 kcef = "2024.04.20.4"
 androidx-activity = "1.11.0"
@@ -30,6 +31,8 @@ ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "mockwebserver" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 compose-webview = { module = "io.github.kevinnzou:compose-webview-multiplatform", version.ref = "composeWebView" }
+miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui", version.ref = "miuix" }
+miuix-icons = { module = "top.yukonga.miuix.kmp:miuix-icons", version.ref = "miuix" }
 kcef = { module = "dev.datlag:kcef", version.ref = "kcef" }
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

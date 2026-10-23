@@ -21,7 +21,7 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.14'
+          gradle-version: '9.6.0'
       - name: Run core and app adapter tests
         run: bash gradlew :browser-core:jvmTest :browser-download:jvmTest :composeApp:desktopTest --stacktrace
 
@@ -35,19 +35,16 @@ jobs:
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.14'
+          gradle-version: '9.6.0'
       - name: Compile iOS targets (Kotlin/Native requires a macOS runner)
         run: |
           bash gradlew \
             :browser-core:compileKotlinIosArm64 \
             :browser-core:compileKotlinIosSimulatorArm64 \
-            :browser-core:compileKotlinIosX64 \
             :browser-download:compileKotlinIosArm64 \
             :browser-download:compileKotlinIosSimulatorArm64 \
-            :browser-download:compileKotlinIosX64 \
             :composeApp:compileKotlinIosArm64 \
             :composeApp:compileKotlinIosSimulatorArm64 \
-            :composeApp:compileKotlinIosX64 \
             --stacktrace
 
   android-emulator-integration:
@@ -75,7 +72,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.14'
+          gradle-version: '9.6.0'
       - name: Run Android instrumentation suite (navigation and downloads)
         uses: reactivecircus/android-emulator-runner@v2
         with:

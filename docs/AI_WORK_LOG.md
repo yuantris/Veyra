@@ -15,6 +15,7 @@
 - **Phase:** core-first **complete and cleared**; **native-engine integration started**. The Android runtime selection is decided: `docs/CHROMIUM_ANDROID_PLAN.md` §7 selects **Android System WebView** (Google's Chromium build, Play-Store-updated) — the current `AndroidChromiumSurfaceRenderer` already uses it, so no bundle change is needed now; bundled Chromium is deferred. Remaining work is verification gates, not a runtime swap.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
+- **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
 - **Test suite (last verified green):** `:browser-core:jvmTest` 74, `:browser-download:jvmTest` 10, `:composeApp:desktopTest` 21–22. ~105 platform-neutral tests; Android + iOS compiles green on CI.
 - **Known open issues:**
   - No platform adapter connects an OS permission prompt to `WebsitePermissionPolicy` yet (matrix keeps the broker Unsupported on all platforms).
@@ -216,3 +217,19 @@
 - **Caveat:** Could not run the emulator here; the user must re-run on device to confirm the crash is gone.
 - **Next step:** user re-tests on device; if any other WebView call still lands off-main, repeat the same marshaling pattern at that call site.
 - **Files:** `composeApp/src/androidMain/kotlin/dev/veyra/browser/AndroidChromiumSurfaceRenderer.kt`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-23 (later) — miuix 0.9.4 Luna 风格 UI 重写 + 依赖基线上移
+
+- **Goal:** 用户暂停 session-ownership 任务，要求按微博 #Luna浏览器# 话题截图（新闻/视频站浏览页 + 新标签页）的视觉风格，用 miuix 重写 Veyra UI。
+- **Planned:** (1) 取样式参考（微博登录墙挡，改用用户粘贴的 3 张截图）；(2) 选 miuix 0.9.4（`top.yukonga.miuix.kmp`）；(3) 用户批准"全量升到 miuix 官方同款版本"——Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1；(4) 用 `MiuixTheme` 重写 `App.kt` 为新标签页 + 浮动地址/工具栏。
+- **Completed:**
+  - 依赖基线：agp 8.11.2→9.4.1、kotlin 2.2.21→2.4.21、compose 1.9.2→1.12.2（`gradle/libs.versions.toml`）；新增 miuix 0.9.4（miuix-ui + miuix-icons），composeApp commonMain 引入。
+  - gradle-wrapper 8.14→9.6.0（AGP 9.4.1 要求 Gradle ≥9.6，已确认腾讯镜像有）；`gradle.properties` 加 `android.builtInKotlin=false` + `android.newDsl=false`（AGP 9 与 KMP 旧式 `com.android.library` 插件的兼容 bypass，避免改用 `com.android.kotlin.multiplatform.library` 的大改）。
+  - **关键坑：miuix 0.9.4 不发布 iosX64 变体**（仅 iosArm64 / iosSimulatorArm64）。Kotlin 2.4 新依赖解析模型下，commonMain 任一叶子目标缺变体即整体解析失败（"Couldn't resolve ... for all target platforms"）。已从三个模块移除 `iosX64()` 目标（现代 KMP 不再需要 Intel Mac 模拟器目标）；CI `ios-compile` job 同步删除 `compileKotlinIosX64` 任务；两份 workflow 的 `gradle-version` 由 8.14→9.6.0。
+  - composeApp 仍硬依赖 compose-webview 2.0.3（Desktop/iOS 的 `ComposeWebViewSurfaceRenderer` 是真实使用，非死代码），被 compose 插件对齐到 1.12.2。
+  - `App.kt` 重写（`MiuixTheme` + `Scaffold` + 浮动地址 pill + 浮动底栏 + 新标签页：搜索 pill / 收藏行 / 建议行 / 隐私报告卡 / 自定义按钮），引擎接线保持不变（coordinator.start、decideSurfaceNavigation、DisposableEffect 关闭 owner scope）。
+  - 修正两处导入错误：`androidx.compose.foundation.Text`（不存在）→`androidx.compose.material3.Text`；`import dev.veyra.browser.core.DownloadRequestHandler`（类在 `dev.veyra.browser` 同包）→删除该 import。
+  - **验证证据**：`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` BUILD SUCCESSFUL（25s）。miuix 变体解析通过、App.kt 类型正确。仅余 AGP 9 弃用警告（`android {}` 旧 DSL、`allowFileAccessFromFileURLs` 等），非阻塞。
+- **Next smallest safe step:** (1) iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链，仅验证到 Android+Desktop）；(2) 真机/模拟器冒烟看 miuix 视觉落地；(3) 可选：把 `android {}` 旧 DSL 迁到 AGP 9 的 `com.android.kotlin.multiplatform.library` 新结构以消除弃用警告（当前用 bypass flag 维持绿色）。
+- **Files:** `gradle/libs.versions.toml`, `gradle/wrapper/gradle-wrapper.properties`, `gradle.properties`, `composeApp/build.gradle.kts`, `browser-core/build.gradle.kts`, `browser-download/build.gradle.kts`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `.github/workflows/ci.yml`, `.github/workflows/core-tests.yml`, `docs/AI_WORK_LOG.md`.
+

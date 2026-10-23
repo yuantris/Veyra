@@ -10,7 +10,7 @@ plugins {
 }
 kotlin {
     androidTarget { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }
-    listOf(iosArm64(), iosSimulatorArm64(), iosX64()).forEach { target ->
+    listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework { baseName = "Veyra"; isStatic = true }
     }
     jvm("desktop")
@@ -24,6 +24,8 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.material3)
             implementation(compose.components.resources)
+            implementation(libs.miuix.ui)
+            implementation(libs.miuix.icons)
             implementation(libs.compose.webview)
         }
         androidMain.dependencies {
