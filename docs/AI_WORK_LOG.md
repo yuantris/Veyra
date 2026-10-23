@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** core-first **complete and cleared**; Android native-adapter validation is underway. **Current decision (2026-10-24):** Android System WebView is a temporary native runtime for validating behavior; the long-term target is a self-compiled Chromium kernel. The current adapter remains behind the single `BrowserEngineContract`; kernel replacement is not implemented yet. The new native smoke test is in CI and has not yet been observed passing. Latest tracked adapter/doc commit: `3b748eb`. See `docs/CHROMIUM_ANDROID_PLAN.md` §8.
+- **Phase:** Android native WebView validation is underway; self-compiled Chromium remains the long-term target and is not integrated. The next UI phase is now explicitly scoped in `AGENTS.md` §12: one Miuix browser shell entry point with responsive layouts across compact/expanded windows, landscape, foldables, split-screen and desktop; it must preserve browser-session and engine ownership across resize/posture changes. The native smoke test's CI result remains unconfirmed in the currently inspected state. Latest UI requirements commit: `2262af8`. See `docs/CHROMIUM_ANDROID_PLAN.md` §8 and `AGENTS.md` §12.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -30,6 +30,20 @@
   5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Record Miuix compatibility and responsive browser-shell next phase
+
+- **Goal:** Answer whether the current Miuix/toolchain combination is usable, verify the existing UI decision in `AGENTS.md`, and define a responsive standard browser UI entry point as a future implementation phase without interrupting the current Android WebView validation gate.
+- **Planned:** Inspect repository version catalog, existing Miuix rules, current app dependencies and official Miuix release/platform documentation; record the responsive UI contract and next-stage sequence.
+- **Completed:**
+  - Confirmed `AGENTS.md` §12 already fixes Miuix (`top.yukonga.miuix.kmp`, version `0.9.4`) as the project's UI toolkit and records the Luna-inspired visual direction. `gradle/libs.versions.toml` currently uses AGP `9.4.1`, Kotlin `2.4.21`, Compose Multiplatform `1.12.2`, Miuix `0.9.4`, compileSdk `37`, minSdk `24`.
+  - Official Miuix release notes list AGP `9.4.1`, Kotlin `2.4.20`, Compose Multiplatform `1.12.0` and Gradle `9.7.1` for the 0.9.4 release line. Therefore AGP matches; the repository's Kotlin/CMP patch versions are newer than the versions explicitly listed in those notes. Existing `docs/AI_WORK_LOG.md` records successful Android and Desktop compilation against the repository's current dependency graph, which is practical compatibility evidence for those targets, but not a blanket guarantee for every platform. iOS compile/runtime and actual visual/adaptive behavior still require CI/device validation.
+  - Updated `AGENTS.md` §12 with a required next UI phase: one standard Miuix browser shell entry point, reusable address bar/tab switcher/web-content host/browser controls/new-tab home, adaptive layouts for phones/tablets/foldables/split-screen/resizable desktop, correct insets/content viewport, and tests proving resizing does not recreate or reset sessions/engines.
+  - Updated the status snapshot to put responsive UI after the current native WebView validation vertical slice and keep the engine integration order explicit.
+- **Test evidence:** Documentation-only change in this session; no new build/test was run. Previously recorded `:composeApp:compileDebugKotlinAndroid` and `:composeApp:compileKotlinDesktop` successes apply to the existing Miuix integration; the latest native smoke test remains pending/unconfirmed in the currently inspected CI state.
+- **Next smallest safe step:** Finish/inspect the Android native WebView smoke-test CI result and fix any failures. Then implement the responsive browser shell as a focused UI vertical slice against `BrowserController` / `BrowserSessionCoordinator`, with adaptive-layout and session-preservation tests. Do not start a separate UI lifecycle or bypass the engine contract.
+- **Files:** `AGENTS.md`, `docs/AI_WORK_LOG.md`.
+
 
 ### 2026-10-24 — Clarify Android validation adapter wording
 
