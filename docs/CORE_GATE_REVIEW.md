@@ -28,7 +28,7 @@
 | 1 | C0–C9 implementation notes and tests, deferred features marked unsupported | **Met** — C0/C1/C2/C3/C4/C6/C7/C8/C9 PASS; C5 PARTIAL by design with the deferred end-to-end bridge honestly marked unsupported (`nativeMessaging` false in the capability matrix) |
 | 2 | Common/JVM test suite passes on CI | **Met** — `test` job green on `main`; a 5-minute per-suite test timeout now guards against hung workers |
 | 3 | Single command facade / single registry / metadata-only store | **Met** — `BrowserController`, `BrowserEngineManager`, `BrowserSessionStore`; `create()` owns graph assembly and `App.kt` cannot rebuild it |
-| 4 | Architecture docs agree on the selected engine direction and claim nothing unimplemented | **Met** — Chromium direction per `AGENTS.md` §2 and `CHROMIUM_ANDROID_PLAN.md`; capability matrix claims nothing beyond verified adapters |
+| 4 | Architecture docs agree on the selected engine direction and claim nothing unimplemented | **Met** — Android System WebView is explicitly temporary validation only; self-compiled Chromium is the long-term target; capability matrix claims nothing beyond verified adapters |
 | 5 | Platform surface resource ownership protocol reviewed at the contract level | **Met** — see `docs/SURFACE_OWNERSHIP_REVIEW.md`: two distinct resource axes, full teardown chain anchored to code, owner scope wired to App dispose, and invariants I1/I3/I6 test-backed |
 
 ## Conclusion
@@ -36,11 +36,10 @@
 The core is **cleared for native-engine integration**. All five exit criteria in
 `BROWSER_CORE_ARCHITECTURE.md` §13 are satisfied; the single remaining partial (C5) is a deliberate
 deferral whose unimplemented part is honestly marked unsupported, which is exactly what the criterion
-requires. Per `AGENTS.md` §9, the next phase is the Android runtime selection in
-`CHROMIUM_ANDROID_PLAN.md`.
+requires. Per `AGENTS.md` §9, the next phase is Android native-adapter validation on System WebView, followed by a separately gated self-compiled Chromium kernel replacement; see `CHROMIUM_ANDROID_PLAN.md` §8.
 
 ## Ordered next steps
 
 1. ~~**C6**~~ — **done**: `WebsitePermissionPolicy` decision point + 15 policy tests.
 2. ~~**Exit criterion 5**~~ — **done**: `docs/SURFACE_OWNERSHIP_REVIEW.md` reviews surface ownership at the contract level.
-3. **Next phase**: Android runtime selection per `CHROMIUM_ANDROID_PLAN.md` (the first native-engine integration task). C5's end-to-end bridge can be revisited when a concrete runtime needs it.
+3. **Next phase**: finish the native WebView validation vertical slice (including `AndroidWebViewRuntimeSmokeTest`, pending CI), then define and prove the self-compiled Chromium build/package pipeline behind the same adapter contract. C5's end-to-end bridge can be revisited when the replacement runtime needs it.
