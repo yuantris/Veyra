@@ -1,8 +1,8 @@
 # Android Chromium implementation plan
 
-**Status:** Active implementation direction  
+**Status:** Active implementation plan — System WebView validation now, self-compiled Chromium target later  
 **Authority:** This plan is subordinate to [the architecture baseline](ARCHITECTURE.md) and [Browser Core Architecture](BROWSER_CORE_ARCHITECTURE.md).  
-**Decision:** Android uses a Chromium-based runtime. GeckoView is not the current direction; obsolete GeckoView planning has been removed.
+**Current decision (2026-10-24):** Use Android System WebView as the temporary native implementation for functional validation. The intended long-term runtime is a self-compiled Chromium kernel; replace the runtime behind the existing adapter boundary when the kernel is buildable and passes the documented gates. GeckoView is not the chosen direction.
 
 ## 1. Goals and decision boundaries
 
@@ -68,7 +68,7 @@ Record the concrete runtime/version and verify:
 5. Add capability-specific features only after their acceptance tests and runtime limits are documented.
 6. Keep iOS/WKWebView, HarmonyOS/ArkWeb and desktop/KCEF adapters aligned to the same core contracts without claiming identical capabilities.
 
-## 7. Runtime selection decision (2026-10-23)
+## 7. Historical runtime decision (2026-10-23; superseded on 2026-10-24)
 
 **Audit of the existing adapter (plan §2 / §6.1).** `AndroidBrowserEngineFactory.kt` is a
 six-line `actual fun` delegating to `SurfaceBoundBrowserEngineFactory` (defined in the commonMain
@@ -79,7 +79,7 @@ six-line `actual fun` delegating to `SurfaceBoundBrowserEngineFactory` (defined 
 surface. **The Android path therefore already uses the device's Chromium WebView; it does not bundle
 a custom kernel.**
 
-### Selected runtime: Android System WebView (Chromium)
+### Previous decision: Android System WebView as the final runtime (superseded)
 
 - It *is* Chromium. Google ships Android System WebView as a Chromium build, distributed through
   Google Play on the same cadence as Chrome (versions 146/155 observed in 2026). This satisfies the
@@ -90,7 +90,7 @@ a custom kernel.**
   platform-neutral `BrowserEngineContract`. A bundled embedder can later replace this implementation
   without touching core (the plan's own forward note in §2).
 
-### Deferred (not now): bundled Chromium
+### Previous rationale for deferring bundled Chromium (historical; no longer the product decision)
 
 Self-building Chromium (Content API) or a ChromeView-style library would add **80–150 MB+ to the
 APK**, require ~64 GB RAM / hundreds of GB of disk for the build, and shift 0-day patching onto us
@@ -133,8 +133,28 @@ process metrics) rather than as a runtime change. It does not alter the selected
 This decision is reversible: the architecture already keeps the runtime behind `androidMain` and the
 single `BrowserEngineContract`, so moving to a bundled Chromium later is a localized adapter change.
 
-**Reaffirmed 2026-10-23:** the user confirmed Android keeps the System WebView for now and that the
-skeleton is intentionally swappable — should a future product need arise, swapping to either GeckoView
-(Firefox engine) or a self-built Chromium kernel (the `system_webview_apk` / `monochrome` build
-targets) is a localized adapter change behind `androidMain` + the single contract, not a core rewrite.
-The decision is deferred until a concrete requirement the System WebView cannot meet appears.
+**Superseded 2026-10-24 by explicit user decision:** System WebView is now the temporary functional-validation runtime, not the final engine choice. The long-term target is a self-compiled Chromium kernel. Keep the same common contract and platform boundary so the kernel replaces the WebView implementation without rewriting Browser Core. Do not claim kernel support until the packaging and runtime acceptance gates below have evidence.
+
+## 8. Current decision — native WebView validation, self-compiled Chromium target (2026-10-24)
+
+### Purpose and non-goals
+
+- Continue using `android.webkit.WebView` as the real native runtime for fast, emulator-verifiable vertical slices.
+- Validate the production adapter path end-to-end: document load/state callbacks, navigation policy, downloads, surface detach/reattach, renderer loss/recovery, security defaults and close semantics.
+- Keep `BrowserEngineContract` as the only engine contract and `BrowserEngineManager` as the only live-engine registry. Keep Android SDK types in `androidMain`.
+- The System WebView is a temporary validation implementation, not a commitment to ship the device-provided kernel.
+- The future self-compiled Chromium integration must replace the implementation behind the same adapter boundary; do not create a parallel core or second registry.
+
+### Required sequence
+
+1. **Native WebView baseline (current):** build and run the smoke/instrumentation suite on the API 35 emulator; keep capability flags limited to evidence from this implementation.
+2. **Complete the Android adapter vertical slice:** wire native callbacks to normalized state/events, validate command delivery and lifecycle under active-tab changes, surface disposal/re-attachment, renderer crash and shutdown. Document unsupported capabilities honestly.
+3. **Define the self-compiled Chromium build plan:** select and document the Chromium source revision/build target, reproducible toolchain, supported ABIs/API levels, licensing/NOTICE obligations, artifact distribution, APK/AAB size, cold start and security patch cadence before committing to implementation details.
+4. **Build the kernel separately from app integration:** prove a minimal Android embedder can build and render on the API 35 emulator, then capture artifact size and startup measurements.
+5. **Replace the WebView surface/runtime behind the existing adapter boundary:** preserve core contracts and run the same applicable adapter conformance tests plus Chromium-specific tests. Never inherit WebView capability flags without fresh evidence.
+
+### Current evidence and gaps
+
+- Existing tests cover real WebView top-level navigation-policy enforcement, download flow, session/surface ownership and renderer-crash recovery at the current prototype boundary.
+- `AndroidWebViewRuntimeSmokeTest` has been added as the first baseline gate for native document loading, callback delivery and secure settings. Its result is pending CI after this commit.
+- No self-compiled Chromium source build, embedder, packaged kernel, ABI matrix, license audit, APK-size measurement or kernel-specific test has been completed yet. These remain future work and must not be described as implemented.
