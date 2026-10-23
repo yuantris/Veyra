@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** core-first **complete and cleared**; **native-engine integration started**. The Android runtime selection is decided: `docs/CHROMIUM_ANDROID_PLAN.md` §7 selects **Android System WebView** (Google's Chromium build, Play-Store-updated) — the current `AndroidChromiumSurfaceRenderer` already uses it, so no bundle change is needed now; bundled Chromium is deferred. Remaining work is verification gates, not a runtime swap.
+- **Phase:** core-first **complete and cleared**; Android native-adapter validation is underway. **Current decision (2026-10-24):** Android System WebView is a temporary native runtime for validating behavior; the long-term target is a self-compiled Chromium kernel. The current adapter remains behind the single `BrowserEngineContract`; kernel replacement is not implemented yet. See `docs/CHROMIUM_ANDROID_PLAN.md` §8.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -21,14 +21,28 @@
 - **Known open issues:**
   - No platform adapter connects an OS permission prompt to `WebsitePermissionPolicy` yet (matrix keeps the broker Unsupported on all platforms).
   - `navigationPolicy` is now `true` (flipped after `AndroidNavigationPolicyWebViewTest` passed on the API 35 system-WebView emulator via `:composeApp:connectedDebugAndroidTest`, CI `android-emulator-integration` job). The test drives the REAL production `createWebView`/`shouldOverrideUrlLoading` path and covers all five gate cases; the capability is now truthful. iOS and Desktop remain `false` (no native delegate/handler path yet).
-  - The prototype runs on compose-webview-multiplatform; none of the architecture-target runtimes (Android Chromium, iOS WKWebView, HarmonyOS ArkWeb, Desktop KCEF) are integrated yet.
+  - Android currently validates the native WebView path through `AndroidChromiumSurfaceRenderer`; this is not a self-compiled Chromium integration. iOS WKWebView, HarmonyOS ArkWeb and Desktop KCEF adapters are still future work.
 - **Next smallest safe steps:**
   1. ~~Run the `navigationPolicy` gate test on the API 35 emulator and flip `navigationPolicy = true`.~~ DONE — `AndroidNavigationPolicyWebViewTest` passed on the API 35 system-WebView emulator (CI `android-emulator-integration` → `connectedDebugAndroidTest`); flag flipped in `ComposeWebViewPlatformCapabilities.android.kt`. Continue the remaining native-engine verification gates below.
   2. ~~Confirm session-ownership tests (detach/reattach, idempotent close, renderer-crash recovery, stale/dead-surface safety) under the Android renderer path.~~ DONE — added `AndroidSessionOwnershipWebViewTest` (drives a real `WebView` surface via `createWebView`, the same factory `AndroidChromiumSurfaceRenderer` uses) re-running invariants I1/I3/I6 on the shipping Android path; compiles green and is executed by CI `android-emulator-integration` → `connectedDebugAndroidTest`. Writing it surfaced that miuix 0.9.4 requires `compileSdk = 37`, so `android-compileSdk` was bumped 36→37 and both workflows now install `platforms;android-37`.
-  3. Run the emulator/device smoke test (navigation, lifecycle, renderer-process recreation).
-  4. Decide `androidx.webkit` adoption as an API-surface upgrade, not a runtime change.
+  3. Run `AndroidWebViewRuntimeSmokeTest` on the API 35 emulator and fix any failures; it was added in this session and its CI result is pending.
+  4. Complete the native WebView adapter vertical slice for command delivery, active-tab switching, close/shutdown and renderer recovery. Keep capability flags tied to passing evidence.
+  5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Start Android native WebView validation; self-compiled Chromium target
+
+- **Goal:** Follow `AGENTS.md` and begin Android native-engine landing using the real Android System WebView for functional validation, while recording the user's updated long-term decision to replace it with a self-compiled Chromium kernel.
+- **Planned:** (1) align the authoritative engineering docs on the temporary-WebView / future-self-built-Chromium decision; (2) add a real-emulator smoke gate against the same production `createWebView` factory used by `AndroidChromiumSurfaceRenderer`; (3) refresh this status snapshot and append this entry without rewriting earlier log entries.
+- **Completed:**
+  - Updated `AGENTS.md`, `docs/CHROMIUM_ANDROID_PLAN.md`, `docs/ARCHITECTURE.md`, `docs/BROWSER_CORE_ARCHITECTURE.md`, `README.md`, and `docs/PLATFORM_CAPABILITY_MATRIX.md` to record System WebView as a validation runtime only and self-compiled Chromium as the long-term target. The previous 2026-10-23 final-System-WebView decision is retained as historical context and explicitly marked superseded.
+  - Added `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidWebViewRuntimeSmokeTest.kt`. It exercises the production WebView factory, waits for the native title/load callback on a deterministic local document, and asserts secure defaults (file/content access disabled, file URL access disabled, mixed content blocked). This does not change capability flags.
+  - Updated `docs/CORE_GATE_REVIEW.md` so the next phase reflects the new decision.
+- **Test evidence:** No test result for this new smoke test has been observed yet; CI must run `:composeApp:connectedDebugAndroidTest` on the API 35 emulator. The last known green run predates this change, so this session does **not** claim the new code passes.
+- **Next smallest safe step:** Inspect the CI run triggered by this commit, fix any smoke-test or compilation failures, then extend the native adapter conformance tests only where a specific command/lifecycle gap remains. After that, document the reproducible self-compiled Chromium build/package gate before starting a kernel build.
+- **Files:** `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md`, `docs/BROWSER_CORE_ARCHITECTURE.md`, `docs/CHROMIUM_ANDROID_PLAN.md`, `docs/PLATFORM_CAPABILITY_MATRIX.md`, `docs/CORE_GATE_REVIEW.md`, `docs/AI_WORK_LOG.md`, `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidWebViewRuntimeSmokeTest.kt`.
+
 
 ### 2026-10-22 — Module map, package split, module rename, collaboration log
 
