@@ -182,6 +182,38 @@ class DefaultDownloadControllerTest {
         controller.close()
     }
 
+    @Test
+    fun byteCountMismatchFailsTheTaskInsteadOfCompletingIt() = runBlocking {
+        val controller = DefaultDownloadController(
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            // The transport claims a 10-byte total but only reports 4 received bytes.
+            DownloadTransport { _, _ ->
+                DownloadTransportResult.Completed("opaque-location", receivedBytes = 4L, totalBytes = 10L)
+            },
+        )
+        val id = controller.start(request())
+
+        val task = controller.tasks.first { list -> list.any { it.id == id && it.phase == DownloadPhase.FAILED } }
+            .first { it.id == id }
+        assertEquals("BYTE_COUNT_MISMATCH", task.errorCode)
+        controller.close()
+    }
+
+    @Test
+    fun completionWithoutReportedCountsIsNotValidatedAgainstTheRequestHint() = runBlocking {
+        val controller = DefaultDownloadController(
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            // The request carries an expectedBytes hint, but the transport reports no counts.
+            DownloadTransport { _, _ -> DownloadTransportResult.Completed() },
+        )
+        val id = controller.start(request())
+
+        val task = controller.tasks.first { list -> list.any { it.id == id && it.phase == DownloadPhase.COMPLETED } }
+            .first { it.id == id }
+        assertEquals(DownloadPhase.COMPLETED, task.phase)
+        controller.close()
+    }
+
     private fun request() = DownloadRequest(
         requestId = RequestId("request-1"),
         tabId = TabId("tab-1"),

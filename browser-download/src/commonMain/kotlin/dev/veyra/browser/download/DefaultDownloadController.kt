@@ -166,15 +166,33 @@ class DefaultDownloadController(
                     is DownloadTransportResult.Completed -> mutex.withLock {
                         val task = findTask(id) ?: return@withLock
                         if (task.phase == DownloadPhase.RUNNING) {
-                            replaceTask(
-                                task.copy(
-                                    phase = DownloadPhase.COMPLETED,
-                                    receivedBytes = result.receivedBytes ?: task.receivedBytes,
-                                    totalBytes = result.totalBytes ?: task.totalBytes,
-                                    destination = result.location,
-                                    errorCode = null,
-                                ),
-                            )
+                            val received = result.receivedBytes ?: task.receivedBytes
+                            val total = result.totalBytes ?: task.totalBytes
+                            // Validate only counts the transport itself reported: the request's
+                            // expectedBytes is a platform hint that can be absent or wrong for
+                            // chunked or compressed responses, so it must not fail a transfer.
+                            val transportReportedCounts =
+                                result.receivedBytes != null && result.totalBytes != null
+                            if (transportReportedCounts && received != total) {
+                                // A transfer that received a different number of bytes than the
+                                // response declared is a failed download, never a completed one.
+                                replaceTask(
+                                    task.copy(
+                                        phase = DownloadPhase.FAILED,
+                                        errorCode = "BYTE_COUNT_MISMATCH",
+                                    ),
+                                )
+                            } else {
+                                replaceTask(
+                                    task.copy(
+                                        phase = DownloadPhase.COMPLETED,
+                                        receivedBytes = received,
+                                        totalBytes = total,
+                                        destination = result.location,
+                                        errorCode = null,
+                                    ),
+                                )
+                            }
                         }
                     }
                     is DownloadTransportResult.Failed -> mutex.withLock {

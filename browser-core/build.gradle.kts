@@ -1,3 +1,5 @@
+import java.time.Duration
+
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
@@ -30,4 +32,9 @@ android {
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
     }
+}
+
+tasks.withType<Test>().configureEach {
+    // A hung test must fail the build instead of blocking CI until the job timeout.
+    timeout.set(Duration.ofMinutes(5))
 }

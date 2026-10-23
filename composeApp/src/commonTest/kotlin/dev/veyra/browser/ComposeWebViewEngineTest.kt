@@ -2,10 +2,12 @@ package dev.veyra.browser
 
 import dev.veyra.browser.core.BrowserLoadPhase
 import dev.veyra.browser.core.BrowserEngineCreateRequest
+import dev.veyra.browser.core.BrowserErrorCategory
 import dev.veyra.browser.core.BrowserEvent
 import dev.veyra.browser.core.DownloadRequest
 import dev.veyra.browser.core.RequestId
 import dev.veyra.browser.core.NavigationRequest
+import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
 import kotlin.test.Test
@@ -135,6 +137,39 @@ class ComposeWebViewEngineTest {
         assertTrue(runCatching { engine.attachSurface(RecordingSurface()) }.isFailure)
         assertTrue(surface.loadedUrls.isEmpty())
         assertFalse(engine.pageState.value.url == "https://closed.example")
+    }
+
+    @Test
+    fun rendererCrashIsObservableAndIsNotTreatedAsTabClose() = runBlocking {
+        val tabId = TabId("tab-crash")
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        val surface = RecordingSurface()
+        engine.attachSurface(surface)
+        engine.navigate(NavigationRequest(tabId, "https://example.com", NavigationSource.USER))
+
+        val crashed = async(start = CoroutineStart.UNDISPATCHED) {
+            engine.events.first { it is BrowserEvent.RendererCrashed }
+        }
+        engine.reportRendererCrashed(recoverable = true)
+        val event = assertIs<BrowserEvent.RendererCrashed>(crashed.await())
+        assertEquals(true, event.recoverable)
+
+        val state = engine.pageState.value
+        assertEquals(false, state.rendererHealthy)
+        assertEquals(BrowserLoadPhase.FAILED, state.loadPhase)
+        assertEquals("content_process_crashed", state.error?.code)
+        assertEquals(BrowserErrorCategory.CONTENT_PROCESS_CRASHED, state.error?.category)
+
+        // A crashed renderer is not a closed session: the engine keeps accepting commands, and
+        // the Android flow (dead WebView detached, replacement attached) recovers the pending
+        // navigation on the new surface.
+        engine.detachSurface(surface)
+        engine.navigate(NavigationRequest(tabId, "https://example.com/after", NavigationSource.USER))
+        val recoverySurface = RecordingSurface()
+        engine.attachSurface(recoverySurface)
+        assertEquals(listOf("https://example.com/after"), recoverySurface.loadedUrls)
     }
 
     private class RecordingSurface : BrowserSurfacePort {

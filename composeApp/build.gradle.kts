@@ -1,3 +1,5 @@
+import java.time.Duration
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
@@ -89,4 +91,9 @@ afterEvaluate {
             jvmArgs("--add-opens", "java.desktop/sun.lwawt.macosx=ALL-UNNAMED")
         }
     }
+}
+
+tasks.withType<Test>().configureEach {
+    // A hung test must fail the build instead of blocking CI until the job timeout.
+    timeout.set(Duration.ofMinutes(5))
 }

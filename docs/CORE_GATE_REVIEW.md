@@ -1,0 +1,42 @@
+# Veyra Core Readiness Gate Review (C0–C9)
+
+**Purpose.** `AGENTS.md` §9 requires evidence for every C0–C9 category before native-engine integration expands. This review is that evidence pass: each gate is judged only by implementation and tests that exist in the repository, never by document or interface presence.
+
+**Method.** Every verdict below cites concrete test classes and CI runs. "PASS" means the gate's minimum verification list is implemented and green on CI; "PARTIAL" means part of the list is done and the rest is explicitly deferred with the capability held false; "OPEN" means required evidence does not exist yet.
+
+**Review date:** 2026-10-23 · **Reviewed tree:** `e3ddd79` (main)
+
+## Gate verdicts
+
+| Gate | Verdict | Evidence | Gaps |
+| --- | --- | --- | --- |
+| C0 — dependency direction & common compilation | **PASS** | `browser-core` declares only coroutines + kotlin-test (no Compose/Android/Ktor); only `composeApp` depends on `:browser-download`; `ios-compile` CI job (macOS) compiles all three modules for `iosArm64`/`iosSimulatorArm64`/`iosX64`; common/JVM `test` job green | None |
+| C1 — engine ownership, concurrency, failure | **PASS** | `BrowserEngineManagerConcurrencyTest` (5): slow creation does not block other tabs, close-during-create, shutdown-during-create, concurrent duplicate open shares one creation, concurrent close disposes once. `BrowserEngineManagerLifecycleTest` (3): close-during-close, failed close surfaces and leaves the registry terminal, `closeAll` aggregates failures without skipping engines. `BrowserEngineManagerTest` (jvm, 5): reuse, profile mismatch, second factory rejected, shutdown rejects new tabs, closeAll disposes. `DefaultDownloadControllerTest.transportCancellationMarksTaskCancelled` + `BrowserSessionCoordinatorTest.closeTabRethrowsCancellationInsteadOfWrappingItAsFailure` cover cancellation | None |
+| C2 — session vs surface | **PASS** | `ComposeWebViewEngineTest.navigationBeforeSurfaceAttachmentIsDeliveredWhenSurfaceAttaches` and `detachingSurfaceKeepsEngineUsableAndReattachesPendingNavigation`: surface attach/detach never defines session lifetime. `BrowserEngineContract.close()` is documented and tested as idempotent and surface-independent (`closeIsIdempotentAndPreventsFurtherNavigation`). The prototype has no cross-tab shared runtime, so "closing one tab cannot release a shared runtime" holds trivially and is recorded as such | None at the current prototype scope |
+| C3 — tab metadata consistency | **PASS** | `BrowserSessionStoreTest` (9): active/inactive close, last-tab close creates a fresh regular tab, last private tab close returns to a regular tab, private-tab close policy, late callbacks rejected for closed tabs, ID mismatch. `BrowserControllerTest.exposesLatestPageStateAndRemovesItWhenTabCloses`. `BrowserSessionCoordinatorTest` (8): late `NavigationCompleted` after close writes no history/metadata, failed close keeps other tabs live, cancellation rethrown, private tab uses the ephemeral private profile | None |
+| C4 — navigation correctness | **PASS** | `BrowserNavigationCoordinatorTest` (7) + `BrowserControllerTest` (9) cover allow/cancel/external/new-tab/unknown schemes/redirect source/late callbacks. `BrowserNavigationRequestInterceptorAndroidTest` proves a rejected main-frame link is intercepted on a real WebView without loading, in CI | None |
+| C5 — bridge security | **PARTIAL** (deferred, honestly marked) | `BridgeAuthorizationPolicy` + `BrowserOrigin` with `BridgeAuthorizationTest` (5): forged/suffix/subdomain origin, opaque origin, missing origin, profile mismatch, extension mismatch, unsupported version, method allowlist, payload byte limit, missing request ID | End-to-end dispatch does not exist. Per `BROWSER_CORE_ARCHITECTURE.md` §"Bridge authorization implementation status", `nativeMessaging` stays false until a platform adapter proves trusted origins from engine callbacks and routes every call through the policy |
+| C6 — permission boundaries | **OPEN** | Contracts only: `WebsitePermission`/`WebsitePermissionRequest`/`WebsitePermissionDecision`/`WebsitePermissionBroker` in `PermissionContracts.kt`; capability matrix marks the broker unsupported | No broker implementation and none of the required policy tests: no proof that OS runtime permission alone cannot grant, no proof that private-profile decisions never inherit into the regular profile, no test that unsupported/denied/cancelled/time-out stay distinct outcomes |
+| C7 — downloads and interception | **PASS** | `DefaultDownloadControllerTest` (10): duplicate request reuse, cancel running, cancel queued (transport never invoked), close-vs-start race, transport cancellation, unsupported schemes, blank-ID validation, byte-count mismatch fails the task, completion without transport-reported counts is not validated against the request hint. `DownloadRequestHandlerTest` (5): explicit acceptance, non-HTTP(S) rejection, core rejection surfaced. `KtorDownloadTransportTest` (4): streaming/progress, non-200, write-failure abort, cancellation abort. `DownloadPipelineAndroidTest` (5) verified on the CI emulator (job `android-emulator-integration`, run 39820740225) including private-profile attribution and no-partial-file-on-cancel. Android `downloads = true` since `a51484e` | None |
+| C8 — capability truthfulness | **PASS** | `PLATFORM_CAPABILITY_MATRIX.md` is maintained per rule and now linked to evidence: Android downloads verified by the CI emulator run above; `navigationPolicy` held false with the exact missing verifications listed; `nativeMessaging`, `privateProfiles`, `sessionRestore`, website permission broker, popup interception, WebExtensions all explicitly unsupported | None |
+| C9 — adapter boundary | **PASS** | No native view/runtime types in `browser-core` (C0 evidence); fake-surface conformance via `RecordingSurface` in `ComposeWebViewEngineTest`; `detachSurface` does not release the engine; `rendererCrashIsObservableAndIsNotTreatedAsTabClose` proves a renderer crash is observable as `rendererHealthy = false` with a distinct `content_process_crashed` error and is not a tab close; Android renderer recreates the WebView on `onRenderProcessGone` while the engine survives | None |
+
+## Exit-criteria assessment (`BROWSER_CORE_ARCHITECTURE.md` §13)
+
+| # | Criterion | Status |
+| --- | --- | --- |
+| 1 | C0–C9 implementation notes and tests, deferred features marked unsupported | **Not met** — C6 is OPEN; C5 is PARTIAL (deferred with `nativeMessaging` false) |
+| 2 | Common/JVM test suite passes on CI | **Met** — `test` job green on `main`; a 5-minute per-suite test timeout now guards against hung workers |
+| 3 | Single command facade / single registry / metadata-only store | **Met** — `BrowserController`, `BrowserEngineManager`, `BrowserSessionStore`; `create()` owns graph assembly and `App.kt` cannot rebuild it |
+| 4 | Architecture docs agree on the selected engine direction and claim nothing unimplemented | **Met** — Chromium direction per `AGENTS.md` §2 and `CHROMIUM_ANDROID_PLAN.md`; capability matrix claims nothing beyond verified adapters |
+| 5 | Platform surface resource ownership protocol reviewed at the contract level | **Not met** — no written review of who owns/destroys native view and runtime resources |
+
+## Conclusion
+
+The core is **not yet cleared for native-engine integration**. C6 blocks exit criterion 1 (with C5 deferred and honestly marked) and exit criterion 5 has no artifact. All remaining work is platform-neutral core work, so per `AGENTS.md` §9 the next phase stays in core.
+
+## Ordered next steps
+
+1. **C6** — implement the common `WebsitePermissionPolicy` decision point (OS runtime permission is a precondition, never a grant; unsupported/denied/cancelled/time-out stay distinct; per-profile decision storage with no private↔regular inheritance) and its policy tests.
+2. **Exit criterion 5** — write the platform surface resource ownership protocol review (engine owns session, renderer owns view, attach/detach and crash semantics) at the contract level.
+3. Re-run this review; when criteria 1–5 are met, the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md` becomes the next phase.
