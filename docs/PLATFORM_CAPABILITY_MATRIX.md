@@ -3,7 +3,7 @@
 **Purpose:** Separate the long-term browser-engine architecture from capabilities actually wired in the current prototype.
 **Rule:** A capability is advertised only when the active adapter can enforce or deliver it. A capability that the native engine could theoretically support is not automatically a Veyra capability.
 
-## Current prototype (compose-webview-multiplatform 2.0.3)
+## Current validation prototype (Android native System WebView; other temporary surfaces use compose-webview-multiplatform 2.0.3)
 
 | Capability | Android | iOS | Desktop (KCEF/CEF) | Notes |
 | --- | --- | --- | --- | --- |
@@ -12,7 +12,7 @@
 | Broad resource interception | Unsupported | Unsupported | Unsupported | Separate capability from navigation policy. |
 | Private profiles | Unsupported | Unsupported | Unsupported | Current adapter does not isolate cookies/cache/storage per profile. |
 | Session restore | Unsupported | Unsupported | Unsupported | Current adapter does not serialize and restore engine session state. |
-| Downloads | Verified in Android Emulator for the current compose-webview prototype | Unsupported | Unsupported | Android's DownloadListener → app acceptance policy → core task model → Ktor transport → app-specific files dir passed `DownloadPipelineAndroidTest` in CI. This does not claim GeckoView integration is complete. iOS has no page download API; desktop detection is unverified. |
+| Downloads | Verified in Android Emulator for the current native System WebView validation adapter | Unsupported | Unsupported | Android's native `DownloadListener` → app acceptance policy → core task model → Ktor transport → app-specific files dir passed `DownloadPipelineAndroidTest` in CI. The future self-compiled Chromium adapter must independently verify this path. iOS has no page download API; desktop detection is unverified. |
 | Website permission broker | Unsupported | Unsupported | Unsupported | The platform-neutral decision point exists in Browser Core (`WebsitePermissionPolicy` with per-profile site settings, distinct grant/deny/cancel/time-out/unsupported outcomes, and policy tests), but no platform adapter connects an OS permission prompt to it yet. |
 | Popup/new-window interception | Unsupported | Unsupported | Unsupported | A core event type alone is not a platform implementation. |
 | Native messaging / JS bridge policy | Unsupported | Unsupported | Unsupported | No origin-bound permissioned bridge is connected to Browser Core. |
