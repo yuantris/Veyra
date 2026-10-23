@@ -12,16 +12,18 @@
 
 ## Status snapshot
 
-- **Phase:** core-first. The C0–C9 gates are now all evidenced (C5 PARTIAL by design, deferred with `nativeMessaging` honestly false); the formal review lives in `docs/CORE_GATE_REVIEW.md`. Native engine integration has not started — exit criterion 5 (platform surface resource ownership review) is the last artifact before the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md` becomes the next phase.
+- **Phase:** core-first, now **complete and cleared**. All C0–C9 gates are evidenced (C5 PARTIAL by design, deferred with `nativeMessaging` honestly false) and all five exit criteria in `BROWSER_CORE_ARCHITECTURE.md` §13 are MET. The formal reviews live in `docs/CORE_GATE_REVIEW.md` and `docs/SURFACE_OWNERSHIP_REVIEW.md`. **Native engine integration has NOT started** — the next phase is the Android runtime selection in `CHROMIUM_ANDROID_PLAN.md`.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
-- **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests). All modules now carry a 5-minute per-suite test timeout so a hung test fails the build instead of blocking CI.
+- **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
+- **Test suite (last verified green):** `:browser-core:jvmTest` 74, `:browser-download:jvmTest` 10, `:composeApp:desktopTest` 21–22. ~105 platform-neutral tests; Android + iOS compiles green on CI.
 - **Known open issues:**
   - No platform adapter connects an OS permission prompt to `WebsitePermissionPolicy` yet (matrix keeps the broker Unsupported on all platforms).
-  - Exit criterion 5 artifact missing: no written review of who owns/destroys native view and runtime resources.
+  - `navigationPolicy` stays `false` pending its Android integration verification gate (matrix §"Current navigation-policy verification gate").
+  - The prototype runs on compose-webview-multiplatform; none of the architecture-target runtimes (Android Chromium, iOS WKWebView, HarmonyOS ArkWeb, Desktop KCEF) are integrated yet.
 - **Next smallest safe steps:**
-  1. Write the exit-criterion-5 platform surface resource ownership review (engine owns session, renderer owns view, attach/detach and crash semantics) at the contract level.
-  2. Re-run the gate review; when criteria 1–5 are met, formally start the Android runtime selection per `CHROMIUM_ANDROID_PLAN.md`.
-  3. If a platform ever needs prompts, wire the OS layer through the injected provider and keep the matrix claim tied to the adapter, not the core policy.
+  1. Begin the Android runtime selection per `CHROMIUM_ANDROID_PLAN.md` (the first native-engine integration task). Audit the existing `createPlatformBrowserEngineFactory` / `AndroidChromiumSurfaceRenderer` before replacing them.
+  2. If a platform ever needs permission prompts, wire the OS layer through the injected provider and keep the matrix claim tied to the adapter, not the core policy.
+  3. Land the `navigationPolicy` Android verification gate, then flip `navigationPolicy = true`.
 
 ## Session log
 
