@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase:** core-first **complete and cleared**; Android native-adapter validation is underway. **Current decision (2026-10-24):** Android System WebView is a temporary native runtime for validating behavior; the long-term target is a self-compiled Chromium kernel. The current adapter remains behind the single `BrowserEngineContract`; kernel replacement is not implemented yet. See `docs/CHROMIUM_ANDROID_PLAN.md` §8.
+- **Phase:** core-first **complete and cleared**; Android native-adapter validation is underway. **Current decision (2026-10-24):** Android System WebView is a temporary native runtime for validating behavior; the long-term target is a self-compiled Chromium kernel. The current adapter remains behind the single `BrowserEngineContract`; kernel replacement is not implemented yet. The new native smoke test is in CI and has not yet been observed passing. Latest tracked adapter/doc commit: `3b748eb`. See `docs/CHROMIUM_ANDROID_PLAN.md` §8.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -30,6 +30,16 @@
   5. Write the self-compiled Chromium build/packaging plan (source revision, build target, ABI/API support, license, distribution, size/startup and security patch cadence) before attempting the kernel build.
 
 ## Session log
+
+### 2026-10-24 — Clarify Android validation adapter wording
+
+- **Goal:** Keep code comments and the capability matrix aligned with the updated System WebView-validation / self-compiled-Chromium-target decision.
+- **Planned:** Remove stale wording that implied GeckoView or the compose-webview prototype was the Android target.
+- **Completed:** Updated the Android capability comments and `AndroidChromiumSurfaceRenderer` documentation to describe the current implementation as a temporary native System WebView validation adapter; updated `PLATFORM_CAPABILITY_MATRIX.md` to distinguish the Android adapter from temporary iOS/Desktop surfaces.
+- **Test evidence:** Documentation/comment-only changes after the smoke test; the latest `Browser Core Tests` run and `Build Veyra` run are queued/in progress, so no green result is claimed for the new smoke test yet.
+- **Next smallest safe step:** Check the latest CI results, repair any failure, then continue the Android adapter conformance slice.
+- **Files:** `composeApp/src/androidMain/kotlin/dev/veyra/browser/ComposeWebViewPlatformCapabilities.android.kt`, `composeApp/src/androidMain/kotlin/dev/veyra/browser/AndroidChromiumSurfaceRenderer.kt`, `docs/PLATFORM_CAPABILITY_MATRIX.md`, `docs/AI_WORK_LOG.md`.
+
 
 ### 2026-10-24 — Start Android native WebView validation; self-compiled Chromium target
 
