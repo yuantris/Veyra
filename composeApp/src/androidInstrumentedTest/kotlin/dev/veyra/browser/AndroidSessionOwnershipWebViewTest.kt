@@ -552,12 +552,14 @@ class AndroidSessionOwnershipWebViewTest {
             surface = activeSurface
             activeBinding.attachSurface(activeSurface)
 
-            val target = "https://veyra-integration.invalid/"
+            val firstUrl =
+                "data:text/html,%3Chtml%3E%3Chead%3E%3Ctitle%3EVeyra%20first%3C/title%3E%3C/head%3E" +
+                    "%3Cbody%3Efirst%3C/body%3E%3C/html%3E"
             val decision = runBlocking {
                 coordinator.navigate(
                     NavigationRequest(
                         tabId = tabId,
-                        url = target,
+                        url = firstUrl,
                         source = NavigationSource.USER,
                     ),
                 )
@@ -567,45 +569,57 @@ class AndroidSessionOwnershipWebViewTest {
             assertTrue(
                 "Coordinator -> controller -> engine must dispatch navigation to the real WebView port; " +
                     "observed=" + activeSurface.loadedUrls,
-                activeSurface.loadedUrls.lastOrNull() == target,
+                activeSurface.loadedUrls.lastOrNull() == firstUrl,
             )
-            assertEquals(target, engine.pageState.value.url)
-
-            // Use a deterministic inline document with a stable base URL. Native callbacks from
-            // WebViewClient/WebChromeClient must project its real title/loading/url into the
-            // engine and then through Controller -> Coordinator -> tab metadata.
-            val callbackObserved = CountDownLatch(1)
-            scenario.onActivity {
-                activeSurface.webView.loadDataWithBaseURL(
-                    target,
-                    "<!doctype html><html><head><title>Veyra integration</title></head>" +
-                        "<body><main>Native callback integration</main></body></html>",
-                    "text/html",
-                    "UTF-8",
-                    null,
-                )
-            }
-            // The callback observer is wired above; wait until the real native title callback has
-            // propagated all the way into the session projection.
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-            while (System.nanoTime() < deadline) {
-                if (engine.pageState.value.title == "Veyra integration" &&
-                    coordinator.activeTab?.title == "Veyra integration" &&
-                    coordinator.activeTab?.isLoading == false
-                ) {
-                    callbackObserved.countDown()
-                    break
-                }
-                Thread.sleep(25)
-            }
             assertTrue(
-                "Native WebView callbacks must update engine and coordinator page metadata",
-                callbackObserved.await(1, TimeUnit.SECONDS),
+                "The first native document title must flow into the engine and session metadata",
+                waitForPageState(engine) {
+                    it.title == "Veyra first" &&
+                        coordinator.activeTab?.title == "Veyra first" &&
+                        !coordinator.activeTab!!.isLoading
+                },
             )
-            assertEquals("Veyra integration", engine.pageState.value.title)
-            assertEquals(target, coordinator.activeTab?.url)
-            assertEquals("Veyra integration", coordinator.activeTab?.title)
-            assertEquals(false, coordinator.activeTab?.isLoading)
+            assertEquals(firstUrl, coordinator.activeTab?.url)
+
+            // Navigate to a second deterministic document through the coordinator, then verify
+            // native WebView history commands and native callbacks update the session projection.
+            val secondUrl =
+                "data:text/html,%3Chtml%3E%3Chead%3E%3Ctitle%3EVeyra%20second%3C/title%3E%3C/head%3E" +
+                    "%3Cbody%3Esecond%3C/body%3E%3C/html%3E"
+            assertEquals(
+                NavigationDecision.Allow,
+                runBlocking {
+                    coordinator.navigate(
+                        NavigationRequest(tabId, secondUrl, NavigationSource.USER),
+                    )
+                },
+            )
+            assertTrue(
+                "Second native document must update coordinator metadata",
+                waitForPageState(engine) {
+                    it.title == "Veyra second" &&
+                        coordinator.activeTab?.title == "Veyra second" &&
+                        coordinator.activeTab?.canGoBack == true
+                },
+            )
+            assertTrue("Coordinator should dispatch back to the native WebView", coordinator.goBack(tabId))
+            assertTrue(
+                "Native back navigation callback must restore the first page projection",
+                waitForPageState(engine) {
+                    it.title == "Veyra first" &&
+                        coordinator.activeTab?.title == "Veyra first" &&
+                        coordinator.activeTab?.canGoForward == true
+                },
+            )
+            assertTrue("Coordinator should dispatch forward to the native WebView", coordinator.goForward(tabId))
+            assertTrue(
+                "Native forward navigation callback must restore the second page projection",
+                waitForPageState(engine) {
+                    it.title == "Veyra second" &&
+                        coordinator.activeTab?.title == "Veyra second"
+                },
+            )
+
         } finally {
             surface?.let { nativeSurface ->
                 binding?.detachSurface(nativeSurface)
