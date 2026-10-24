@@ -441,3 +441,10 @@
 - **Prior gate:** The Android save/restore instrumentation and full workflow suite passed on commit `0bbc1eb` (`Browser Core Tests` run `40049522228`, `Build Veyra` run `40049522250`). This new common test was committed at `f1c2085`; its fresh CI results are pending and must be checked before calling this change green.
 - **Scope note:** This deterministic core test proves engine reuse/no duplicate command at the surface port. It does not replace the Android instrumentation test for native WebView history restoration or an end-to-end Compose tab-switch test.
 - **Files:** `composeApp/src/commonTest/kotlin/dev/veyra/browser/ComposeWebViewEngineTest.kt`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-24 — Fix nullable renderer-health assertion in reattachment regression
+
+- **CI finding:** Browser Core Tests runs `40051667486` and `40051675863` failed in the common test compilation, not at runtime: `ComposeWebViewEngineTest.kt:83` passed nullable `Boolean?` (`rendererHealthy`) to `assertTrue(Boolean)`. Android emulator integration, iOS compilation, and Android/Desktop compilation passed in those runs.
+- **Fix:** Changed the assertion to `assertEquals(true, engine.pageState.value.rendererHealthy)`, which explicitly verifies the expected non-null healthy state without unsafe null assertions.
+- **Verification status:** Fix committed separately; fresh CI for this fix must complete before the core regression is considered green.
+- **Next step:** Once CI is green, strengthen Android history restoration by actually invoking back after restore and waiting for the navigation callback; then assess whether an end-to-end Compose tab-switch test can be added without exposing production internals solely for testing.
