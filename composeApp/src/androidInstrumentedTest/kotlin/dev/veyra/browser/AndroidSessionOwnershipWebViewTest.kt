@@ -395,6 +395,11 @@ class AndroidSessionOwnershipWebViewTest {
                     }
                 }
             }
+            // Creating an engine with initialUrl initializes its page state, but does not itself
+            // issue a surface navigation. Drive the same explicit navigation command the browser
+            // controller sends when opening a tab, after Compose has attached the renderer.
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            engineA.navigate(NavigationRequest(tabAId, firstUrl, NavigationSource.USER))
 
             assertTrue(
                 "Tab A's first document should load",
@@ -408,6 +413,7 @@ class AndroidSessionOwnershipWebViewTest {
 
             scenario.onActivity { selectTab.get()?.invoke("b") }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            engineB.navigate(NavigationRequest(tabBId, tabBUrl, NavigationSource.USER))
             assertTrue(
                 "Tab B should attach and load while A is detached",
                 waitForPageState(engineB) { it.url == tabBUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
