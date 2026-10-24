@@ -116,21 +116,112 @@ class AndroidMiuixTabActionsTest {
         )
     }
 
+    @Test
+    fun switchingTabsRestoresTheRealWebViewsBackForwardHistory() {
+        val newTab = composeRule.onNodeWithContentDescription("新建标签页")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { newTab.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        val originalSurface = findAttachedWebView()
+            ?: throw AssertionError("Expected the initial tab's system WebView to be attached")
+        composeRule.activity.runOnUiThread {
+            originalSurface.loadDataWithBaseURL(
+                "https://veyra.invalid/first",
+                "<!doctype html><title>Veyra history first</title><p>first</p>",
+                "text/html",
+                "UTF-8",
+                null,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let { it.url == "https://veyra.invalid/first" && it.title == "Veyra history first" } == true
+        }
+
+        composeRule.activity.runOnUiThread {
+            originalSurface.loadDataWithBaseURL(
+                "https://veyra.invalid/second",
+                "<!doctype html><title>Veyra history second</title><p>second</p>",
+                "text/html",
+                "UTF-8",
+                null,
+            )
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == "https://veyra.invalid/second" &&
+                    it.title == "Veyra history second" &&
+                    it.canGoBack
+            } == true
+        }
+
+        newTab.performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            val current = findAttachedWebView()
+            current != null && current !== originalSurface
+        }
+        val selectedTabSurface = findAttachedWebView()
+            ?: throw AssertionError("New tab did not attach its system WebView")
+
+        val closeNodes = composeRule.onAllNodes(hasContentDescription("关闭", substring = true))
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            closeNodes.fetchSemanticsNodes().size >= 2
+        }
+        closeNodes.get(closeNodes.fetchSemanticsNodes().size - 1).performClick()
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            val current = findAttachedWebView()
+            current != null && current !== selectedTabSurface &&
+                attachedWebViewState()?.let {
+                    it.url == "https://veyra.invalid/second" &&
+                        it.title == "Veyra history second" &&
+                        it.canGoBack
+                } == true
+        }
+        assertTrue(
+            "Restored tab should keep its real WebView back/forward history after switching and closing another tab",
+            attachedWebViewState()?.canGoBack == true,
+        )
+    }
+
+    private data class AttachedWebViewState(
+        val url: String?,
+        val title: String?,
+        val canGoBack: Boolean,
+    )
+
+    private fun attachedWebViewState(): AttachedWebViewState? {
+        var state: AttachedWebViewState? = null
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val view = findAttachedWebViewOnMainThread()
+            if (view != null) {
+                state = AttachedWebViewState(view.url, view.title, view.canGoBack())
+            }
+        }
+        return state
+    }
+
+    private fun findAttachedWebViewOnMainThread(): WebView? {
+        var found: WebView? = null
+        fun visit(view: View) {
+            if (found != null) return
+            if (view is WebView) {
+                found = view
+            } else if (view is ViewGroup) {
+                for (index in 0 until view.childCount) {
+                    visit(view.getChildAt(index))
+                    if (found != null) return
+                }
+            }
+        }
+        visit(composeRule.activity.window.decorView)
+        return found
+    }
+
     private fun findAttachedWebView(): WebView? {
         var found: WebView? = null
         androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            fun visit(view: View) {
-                if (found != null) return
-                if (view is WebView) {
-                    found = view
-                } else if (view is ViewGroup) {
-                    for (index in 0 until view.childCount) {
-                        visit(view.getChildAt(index))
-                        if (found != null) return
-                    }
-                }
-            }
-            visit(composeRule.activity.window.decorView)
+            found = findAttachedWebViewOnMainThread()
         }
         return found
     }
