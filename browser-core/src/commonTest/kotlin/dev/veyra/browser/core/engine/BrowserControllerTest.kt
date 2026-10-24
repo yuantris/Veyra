@@ -296,7 +296,7 @@ class BrowserControllerTest {
         replacementEngine.emit(currentEvent)
 
         assertEquals(
-            listOf(currentEvent),
+            listOf<BrowserEvent>(currentEvent),
             received,
             "Events from a closed engine must not leak into a replacement session that reuses its TabId.",
         )
