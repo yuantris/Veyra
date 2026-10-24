@@ -118,7 +118,10 @@ class AndroidSessionOwnershipWebViewTest {
     }
 
     /** Builds a real WebView via the production [createWebView] factory and wraps it as a surface. */
-    private fun makeSurface(tabId: TabId): RealWebViewSurfacePort {
+    private fun makeSurface(
+        tabId: TabId,
+        observe: (WebView, String?, String?, Boolean, String?, String?) -> Unit = { _, _, _, _, _, _ -> },
+    ): RealWebViewSurfacePort {
         lateinit var port: RealWebViewSurfacePort
         scenario.onActivity { activity ->
             val webView = createWebView(
@@ -129,7 +132,7 @@ class AndroidSessionOwnershipWebViewTest {
                 onNavigationRequest = { NavigationDecision.Allow },
                 onNavigationDecision = {},
                 onRendererGone = {},
-                observe = { _, _, _, _, _, _ -> },
+                observe = observe,
             )
             port = RealWebViewSurfacePort(webView)
             // Mirror the shipping renderer: the WebView is attached to the window hierarchy.
@@ -532,7 +535,19 @@ class AndroidSessionOwnershipWebViewTest {
                 ?: error("Coordinator did not register the initial tab engine")
             val activeBinding = engine as? BrowserSurfaceBinding
                 ?: error("Production Android engine does not expose the renderer binding")
-            val activeSurface = makeSurface(tabId)
+            val activeSurface = makeSurface(tabId) { view, url, title, loading, errorCode, errorMessage ->
+                // Exercise the real WebViewClient/WebChromeClient callback path into the engine,
+                // rather than manually calling observe() after navigation.
+                activeBinding.observe(
+                    url = url,
+                    title = title,
+                    isLoading = loading,
+                    canGoBack = view.canGoBack(),
+                    canGoForward = view.canGoForward(),
+                    errorCode = errorCode,
+                    errorMessage = errorMessage,
+                )
+            }
             binding = activeBinding
             surface = activeSurface
             activeBinding.attachSurface(activeSurface)
@@ -556,15 +571,36 @@ class AndroidSessionOwnershipWebViewTest {
             )
             assertEquals(target, engine.pageState.value.url)
 
-            // The production renderer calls observe() from native WebViewClient/WebChromeClient
-            // callbacks. Drive that boundary deterministically here and verify the normalized
-            // page projection flows back through Controller -> Coordinator -> tab metadata.
-            activeBinding.observe(
-                url = target,
-                title = "Veyra integration",
-                isLoading = false,
-                canGoBack = false,
-                canGoForward = false,
+            // Use a deterministic inline document with a stable base URL. Native callbacks from
+            // WebViewClient/WebChromeClient must project its real title/loading/url into the
+            // engine and then through Controller -> Coordinator -> tab metadata.
+            val callbackObserved = CountDownLatch(1)
+            scenario.onActivity {
+                activeSurface.webView.loadDataWithBaseURL(
+                    target,
+                    "<!doctype html><html><head><title>Veyra integration</title></head>" +
+                        "<body><main>Native callback integration</main></body></html>",
+                    "text/html",
+                    "UTF-8",
+                    null,
+                )
+            }
+            // The callback observer is wired above; wait until the real native title callback has
+            // propagated all the way into the session projection.
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+            while (System.nanoTime() < deadline) {
+                if (engine.pageState.value.title == "Veyra integration" &&
+                    coordinator.activeTab?.title == "Veyra integration" &&
+                    coordinator.activeTab?.isLoading == false
+                ) {
+                    callbackObserved.countDown()
+                    break
+                }
+                Thread.sleep(25)
+            }
+            assertTrue(
+                "Native WebView callbacks must update engine and coordinator page metadata",
+                callbackObserved.await(1, TimeUnit.SECONDS),
             )
             assertEquals("Veyra integration", engine.pageState.value.title)
             assertEquals(target, coordinator.activeTab?.url)
