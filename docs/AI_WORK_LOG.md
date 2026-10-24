@@ -613,3 +613,13 @@
 - **Commit:** `b0e14301a3fcd7a14189d0e26015f46dd8e76445` (`test(android): stress WebView tab history restoration`).
 - **Verification status:** CI must compile and run the updated Android instrumentation test. The stress test is not considered stable until emulator results are inspected; no pass is claimed yet.
 - **Next step:** Inspect Browser Core Tests and Build Veyra. If the emulator fails, use the captured native history and command-boundary state to choose the fix rather than adding delays or loosening assertions.
+
+
+### 2026-10-24 — Queue history commands across Android surface replacement
+
+- **Stress-test evidence:** Browser Core Tests [run 40063483978](https://github.com/yuantris/Veyra/actions/runs/40063483978) failed the five-cycle A → B → A test. Crucially, the failure diagnostics showed the native WebView immediately before Back was still tab B (`data:text/html,tab-b`); after the wait, tab A's restored native history was present with entries A-one/A-two and current index 1, but unchanged. This indicates the test could observe A's retained engine metadata before Compose had finished attaching A's replacement native surface; `ComposeWebViewEngine.goBack()` silently discarded the command when `surface == null`.
+- **Fix:** `ComposeWebViewEngine` now queues Back/Forward commands when its surface is detached and replays them in order after the replacement surface attaches. Queued commands are cleared on engine close. This preserves the logical engine's commands during native surface churn instead of dropping user input.
+- **Regression coverage:** Added `historyCommandsIssuedWhileDetachedAreReplayedInOrderAfterAttach` to `ComposeWebViewEngineTest`, asserting that two Back commands and one Forward command are delivered to the newly attached surface in their original order.
+- **Commits:** `8517e1a` (queue commands), `db4626b` (clear on close), `b3e55f5` (regression test).
+- **Verification:** Android stress test failed before this fix; the new fix and common regression test require a fresh CI run. Do not mark the history issue resolved until Android emulator integration passes.
+- **Next step:** Inspect the new Android emulator run. If it still fails, correlate the native history snapshots with the queued-command path before changing restoration behavior again.
