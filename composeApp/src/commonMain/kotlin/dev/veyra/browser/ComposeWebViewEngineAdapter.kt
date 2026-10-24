@@ -312,6 +312,10 @@ internal class ComposeWebViewEngine(
                 error != null -> BrowserLoadPhase.FAILED
                 isLoading -> if (activeNavigationCommitted) BrowserLoadPhase.LOADING else BrowserLoadPhase.STARTING
                 activeNavigationId != null -> BrowserLoadPhase.SUCCEEDED
+                // WebChromeClient may report progress=100 after onPageFinished. Do not let
+                // that trailing idle observation erase the completed navigation state.
+                previous.loadPhase == BrowserLoadPhase.SUCCEEDED && observedUrl == previous.url ->
+                    BrowserLoadPhase.SUCCEEDED
                 else -> BrowserLoadPhase.IDLE
             },
             progress = when {
