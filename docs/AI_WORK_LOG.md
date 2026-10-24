@@ -535,3 +535,9 @@
 - **Responsive behavior:** Compact layouts retain tab selection; expanded layouts keep the tab strip and constrain browser chrome; the home content uses a centered 900 dp maximum width on large windows.
 - **Verification:** CI for the Miuix typography and Compose A → B → A instrumentation changes is still running. Do not mark the responsive pass or the history-restoration scenario green until the latest Build Veyra and Browser Core Tests runs complete, including Android emulator integration.
 
+### 2026-10-24 — Fix Compose A → B → A test helper signature after Android CI compile
+
+- **CI finding:** Android instrumentation run [40056373451](https://github.com/yuantris/Veyra/actions/runs/40056373451) reached test compilation but failed because Kotlin bound trailing lambdas to the final `timeoutMs: Long` parameter of `waitForPageState`, leaving `predicate` missing. No Compose history assertion ran in that attempt.
+- **Fix:** Reordered the helper parameters so the predicate is last and trailing-lambda calls are unambiguous. Fix committed at `6f8cb11`.
+- **Verification:** The new commit's Android emulator run is queued; A → B → A remains unverified until instrumentation compiles and executes. Desktop tests and iOS compile had passed for the preceding Miuix UI commit, and Android/Desktop compilation passed for that commit.
+
