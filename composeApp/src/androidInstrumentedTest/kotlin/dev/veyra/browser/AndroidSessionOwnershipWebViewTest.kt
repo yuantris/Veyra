@@ -357,9 +357,9 @@ class AndroidSessionOwnershipWebViewTest {
 
     @Test
     fun composeTabSwitchAToBToARestoresTabAHistory() {
-        val firstUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-one%3C/body%3E%3C/html%3E"
-        val secondUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-two%3C/body%3E%3C/html%3E"
-        val tabBUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-b%3C/body%3E%3C/html%3E"
+        val firstUrl = "data:text/html,tab-a-one"
+        val secondUrl = "data:text/html,tab-a-two"
+        val tabBUrl = "data:text/html,tab-b"
         val tabAId = TabId("compose-tab-a-${System.nanoTime()}")
         val tabBId = TabId("compose-tab-b-${System.nanoTime()}")
         val engineA = ComposeWebViewEngine(
@@ -398,12 +398,12 @@ class AndroidSessionOwnershipWebViewTest {
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
 
             assertTrue(
-                "Tab A's first document should load",
+                "Tab A's first document should load; state=" + engineA.pageState.value,
                 waitForPageState(engineA) { it.url == firstUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
             engineA.navigate(NavigationRequest(tabAId, secondUrl, NavigationSource.USER))
             assertTrue(
-                "Tab A should reach its second document and have a back entry",
+                "Tab A should reach its second document and have a back entry; state=" + engineA.pageState.value,
                 waitForPageState(engineA) { it.url == secondUrl && it.canGoBack && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
 
