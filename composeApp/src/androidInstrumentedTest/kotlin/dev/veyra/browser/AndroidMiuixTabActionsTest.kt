@@ -118,7 +118,7 @@ class AndroidMiuixTabActionsTest {
 
     private fun findAttachedWebView(): WebView? {
         var found: WebView? = null
-        composeRule.activity.runOnUiThread {
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().runOnMainSync {
             fun visit(view: View) {
                 if (found != null) return
                 if (view is WebView) {
