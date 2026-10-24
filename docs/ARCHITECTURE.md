@@ -66,7 +66,7 @@ The single active engine/session abstraction is `BrowserEngineContract`. The pre
 - a clear distinction between tab metadata and the live native renderer/session;
 - private-profile isolation as an engine/runtime policy, not merely a boolean on tab metadata.
 
-The engine manager owns live engine instances. Selecting or detaching a tab must not implicitly dispose its engine. Closing a tab closes only its owned session. Runtime objects shared across tabs must have a separate owner and lifecycle.
+The engine manager owns live engine instances. Selecting or detaching a tab must not implicitly dispose its engine. Tab selection, native-surface attachment/visibility, engine-session liveness and renderer health are separate state axes: only the selected tab needs to be presented, and background views do not have to remain attached or composed merely to preserve a live logical session. Adapters may throttle/freeze background work, detach views or evict renderer resources under explicit capability-aware policy, but renderer eviction/crash must be observable and recoverable where supported; it must not be silently treated as tab closure. Preserve restorable tab metadata and report honestly whether recovery restores only URL/history or also richer page state. Closing a tab closes only its owned session. Runtime objects shared across tabs must have a separate owner and lifecycle.
 
 ## 5. Subsystem boundaries
 
