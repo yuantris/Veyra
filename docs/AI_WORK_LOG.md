@@ -695,3 +695,12 @@
 - **Test evidence:** Documentation-only change. Before this guideline update, Browser Core Tests [40095971282](https://github.com/yuantris/Veyra/actions/runs/40095971282) and Build Veyra [40095971260](https://github.com/yuantris/Veyra/actions/runs/40095971260) were observed completed successfully at commit dccdd3d26f76bfab22615235ce43f338a4879393. These runs verify that commit, not this documentation commit; the new commit's CI status must be checked separately.
 - **Next smallest safe step:** Verify the documentation commit and its CI status. Then continue the next Android end-to-end blocker only after inspecting current source, latest workflow results, and relevant tests; do not start desktop UI.
 - **Files:** AGENTS.md, docs/AI_WORK_LOG.md.
+
+### 2026-10-24 — Verify real WebView history through App tab switching
+
+- **Goal:** Extend the real-App lifecycle gate beyond checking that a WebView instance changes: verify the production renderer restores the selected tab's native back/forward history after switching away and closing another tab.
+- **Planned:** Add a deterministic instrumentation scenario to the existing MainActivity test. Load two local HTML documents through the attached real WebView using `loadDataWithBaseURL`, wait for native URL/title/history state, open a second tab, close it, and assert the remounted WebView returns to the second document with back history available.
+- **Completed:** Added `switchingTabsRestoresTheRealWebViewsBackForwardHistory()` and main-thread WebView state inspection helpers in `AndroidMiuixTabActionsTest.kt`. The test targets the actual App composition and `AndroidChromiumSurfaceRenderer` snapshot save/restore path, with condition-based waits rather than fixed sleeps.
+- **Test evidence:** Commit `189e63c6fcbe3830e4866e5a50eaae8fffd39f6a`. No local Android SDK/emulator execution was performed in this tool session; the new test is unverified until the corresponding Android emulator CI job completes. Prior baseline at `77ba82d81962108e1a20792317e70798f4a63c51` had both Build Veyra and Browser Core Tests green.
+- **Next smallest safe step:** Inspect the new commit's compile and Android emulator integration results. If the history assertion fails, use the instrumentation XML/log to determine whether the assumption about `loadDataWithBaseURL` history or production snapshot restoration is wrong; do not weaken the assertion without evidence.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
