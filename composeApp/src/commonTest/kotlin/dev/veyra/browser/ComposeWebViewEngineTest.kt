@@ -128,8 +128,7 @@ class ComposeWebViewEngineTest {
         val restoredSurface = RecordingSurface()
         engine.attachSurface(restoredSurface)
 
-        assertEquals(2, restoredSurface.backCount)
-        assertEquals(1, restoredSurface.forwardCount)
+        assertEquals(listOf("back", "forward", "back"), restoredSurface.historyCommands)
     }
 
     @Test
@@ -274,6 +273,7 @@ class ComposeWebViewEngineTest {
         val loadedUrls = mutableListOf<String>()
         var backCount = 0
         var forwardCount = 0
+        val historyCommands = mutableListOf<String>()
         var reloadCount = 0
         var stopCount = 0
 
@@ -283,10 +283,12 @@ class ComposeWebViewEngineTest {
 
         override fun goBack() {
             backCount++
+            historyCommands += "back"
         }
 
         override fun goForward() {
             forwardCount++
+            historyCommands += "forward"
         }
 
         override fun reload() {
