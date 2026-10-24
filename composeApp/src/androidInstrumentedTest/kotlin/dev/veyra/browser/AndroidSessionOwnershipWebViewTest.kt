@@ -227,6 +227,34 @@ class AndroidSessionOwnershipWebViewTest {
     }
 
     @Test
+    fun closingTabDiscardsUnconsumedWebViewSnapshot() {
+        val store = AndroidWebViewStateStore()
+        val snapshot = Bundle().apply { putString("history-marker", "tab-a-history") }
+        store.save("tab-a", snapshot)
+
+        store.onTabClosed("tab-a")
+
+        assertEquals(
+            "A closed tab must not restore its old native navigation history",
+            null,
+            store.takeForRestore("tab-a"),
+        )
+    }
+
+    @Test
+    fun restoringWebViewSnapshotConsumesItExactlyOnce() {
+        val store = AndroidWebViewStateStore()
+        val snapshot = Bundle().apply { putString("history-marker", "tab-a-history") }
+        store.save("tab-a", snapshot)
+
+        assertEquals(snapshot, store.takeForRestore("tab-a"))
+        assertEquals(
+            "A consumed snapshot must not be reused by a later surface",
+            null,
+            store.takeForRestore("tab-a"),
+        )
+    }
+    @Test
     fun webViewSaveRestorePreservesBackForwardHistory() {
         lateinit var original: WebView
         var pageFinished = CountDownLatch(1)
