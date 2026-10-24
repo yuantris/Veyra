@@ -322,12 +322,16 @@ class AndroidSessionOwnershipWebViewTest {
                 assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
                 val historyBeforeBack = restored.copyBackForwardList()
                 assertTrue("Restored current index should be valid", historyBeforeBack.currentIndex >= 0)
-                assertTrue(
+                val previousHistoryItem =
+                    historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1)
+                assertNotNull("Previous history item should exist", previousHistoryItem)
+                expectedBackUrl = previousHistoryItem?.url
+                    ?: throw AssertionError("Previous history item should have a URL")
+                assertEquals(
                     "Restored history should contain the expected previous entry",
-                    historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1).url ==
-                        "https://restore.example/one",
+                    "https://restore.example/one",
+                    expectedBackUrl,
                 )
-                expectedBackUrl = historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1).url
                 restored.goBack()
             }
             assertTrue(
