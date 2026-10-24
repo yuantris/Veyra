@@ -10,7 +10,7 @@ Veyra is a Kotlin Multiplatform / Compose Multiplatform browser. The near-term g
 The required order is:
 
 1. **Make the core actually collaborate:** connect `BrowserController`, `BrowserSessionCoordinator`, `BrowserEngineManager`, `BrowserSessionStore` and the existing contracts into one real command/state path. Audit implementation, not just interfaces.
-2. **Connect Android's native engine boundary:** adapt the existing platform surface to the engine contract; Android's selected target engine is **GeckoView**. Keep native types inside the Android adapter. Do not silently substitute System WebView or Chromium; if the current repository state conflicts with this decision, report the conflict and resolve it explicitly before implementing another engine.
+2. **Connect Android's native engine boundary:** adapt the existing platform surface to the engine contract; Android's selected engine is the **Android platform WebView (`android.webkit.WebView`)**. Use the system-provided WebView for the current implementation. Keep Android-native WebView types inside the Android adapter and translate them to common contracts. Do not introduce GeckoView or a separately bundled Chromium engine. A future Gecko-based engine is out of scope unless the project owner explicitly reopens that decision.
 3. **Connect Compose UI end to end:** the user can enter a URL/search, load and view a page, go back/forward, reload/stop, open/switch/close tabs, and see loading/title/URL/error state. Commands must reach the real engine and engine events must reach the UI.
 4. **Run a focused Android phone acceptance pass** on this complete path. Fix blockers that prevent normal browsing.
 5. **Finish Android tablet/adaptive behavior** after the phone path works, then address high-value touch/accessibility and visual defects.
@@ -53,11 +53,11 @@ Use the current repository and the detailed contracts in `docs/` as implementati
 - **`BrowserEngineManager`**: sole authoritative owner/registry of live engine instances and their creation/closure lifecycle.
 - **`BrowserSessionStore`**: tab/session metadata only; it must not implicitly create or destroy native engines.
 - **`BrowserEngineContract`**: the one platform-neutral engine/session contract. Do not introduce a competing legacy contract or second registry.
-- **Android adapter**: owns GeckoView-specific types, native callbacks and resources; translates them to common contracts.
+- **Android adapter**: owns `android.webkit.WebView`-specific types, native callbacks and resources; translates them to common contracts.
 - **Compose UI**: presentation and user input only. It must not become a competing owner of engine/session lifecycle, navigation policy, security decisions, or the live-engine registry.
 - **`browser-download`**: download implementation and task/transport orchestration behind common contracts.
 
-Dependency direction is one-way: common code must not depend on Compose UI, Android SDK, GeckoView or other native engine types. Avoid new Gradle modules unless a real dependency/lifecycle boundary requires one. Prefer completing the existing module path over adding speculative layers.
+Dependency direction is one-way: common code must not depend on Compose UI, Android SDK, Android WebView or other native engine types. Avoid new Gradle modules unless a real dependency/lifecycle boundary requires one. Prefer completing the existing module path over adding speculative layers.
 
 Keep these lifecycle invariants:
 - Tab metadata, logical session, live engine, rendering surface, and active/visible state are distinct.
@@ -124,7 +124,7 @@ For security-sensitive or lifecycle-affecting changes, add focused regression co
 ## 9. Repository coordination
 
 - Relevant design references include `docs/ARCHITECTURE.md`, `docs/BROWSER_CORE_ARCHITECTURE.md`, `docs/PLATFORM_CAPABILITY_MATRIX.md`, and current adapter docs. Read only what is needed for the task; do not require rereading every document for a cosmetic change.
-- If a document conflicts with this current priority or the chosen GeckoView direction, do not silently follow the stale instruction. Inspect code, record the conflict, and update the relevant decision text in the same change when appropriate.
+- If a document conflicts with this current priority or the chosen Android platform WebView direction, do not silently follow the stale instruction. Inspect code, record the conflict, and update the relevant decision text in the same change when appropriate.
 - Record meaningful implementation sessions in `docs/AI_WORK_LOG.md`: goal, completed work, actual test evidence, files/commit, and next concrete step. Keep prior entries intact; never mark proposed or unverified work as completed.
 - Never claim a feature is finished because a contract or plan exists.
 
@@ -134,7 +134,7 @@ Unless the project owner explicitly redirects, continue with **the next missing 
 
 1. audit the current `BrowserController` ↔ `BrowserSessionCoordinator` ↔ `BrowserEngineManager` command/state flow;
 2. identify and fix the first concrete disconnect or missing lifecycle path;
-3. connect the Android GeckoView adapter to the existing engine contract;
+3. connect the Android system WebView adapter to the existing engine contract;
 4. wire Compose actions and observable state to that path;
 5. verify the complete basic browsing flow.
 
