@@ -22,6 +22,8 @@ import dev.veyra.browser.core.BrowserEngineCreateRequest
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
+import dev.veyra.browser.core.NavigationPolicyHandler
+import dev.veyra.browser.core.navigation.BrowserNavigationCoordinator
 import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
 import org.junit.After
@@ -523,6 +525,11 @@ class AndroidSessionOwnershipWebViewTest {
         val coordinator = BrowserSessionCoordinator.create(
             engineFactory = SurfaceBoundBrowserEngineFactory(),
             scope = ownerScope,
+            // This integration test uses data: documents as deterministic offline pages. The
+            // production default intentionally rejects data: top-level navigations.
+            navigationCoordinator = BrowserNavigationCoordinator(
+                policyHandler = NavigationPolicyHandler { NavigationDecision.Allow },
+            ),
         )
         var binding: BrowserSurfaceBinding? = null
         var surface: RealWebViewSurfacePort? = null
