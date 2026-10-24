@@ -46,12 +46,12 @@ import dev.veyra.browser.core.TabId
 internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     // Saved WebView navigation bundles are kept only while the logical tab remains open.
     // Access occurs on the UI thread from renderer composition/disposal callbacks.
-    private val savedSurfaceStates = mutableMapOf<String, Bundle>()
+    private val savedSurfaceStates = AndroidWebViewStateStore()
 
     override val supportsBackgroundSurfaceDetachment: Boolean = true
 
     override fun onTabClosed(tabId: String) {
-        savedSurfaceStates.remove(tabId)
+        savedSurfaceStates.onTabClosed(tabId)
     }
 
     @Composable
@@ -71,7 +71,7 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val rendererGeneration = rendererGenerationState.intValue
         val rendererCrashed = remember(tab.id, binding, rendererGeneration) { AtomicBoolean(false) }
         val webView = remember(tab.id, context, binding, rendererGeneration) {
-            val savedState = savedSurfaceStates.remove(tab.id)
+            val savedState = savedSurfaceStates.takeForRestore(tab.id)
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
@@ -137,7 +137,7 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                 if (!rendererCrashed.get() && !webView.url.isNullOrBlank()) {
                     val state = Bundle()
                     if (webView.saveState(state) != null) {
-                        savedSurfaceStates[tab.id] = state
+                        savedSurfaceStates.save(tab.id, state)
                     }
                 }
                 webView.stopLoading()
