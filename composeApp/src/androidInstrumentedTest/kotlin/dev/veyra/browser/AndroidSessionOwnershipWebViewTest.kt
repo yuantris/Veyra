@@ -528,7 +528,10 @@ class AndroidSessionOwnershipWebViewTest {
             // This integration test uses data: documents as deterministic offline pages. The
             // production default intentionally rejects data: top-level navigations.
             navigationCoordinator = BrowserNavigationCoordinator(
-                policyHandler = NavigationPolicyHandler { NavigationDecision.Allow },
+                policyHandler = object : NavigationPolicyHandler {
+                    override fun decide(request: NavigationRequest): NavigationDecision =
+                        NavigationDecision.Allow
+                },
             ),
         )
         var binding: BrowserSurfaceBinding? = null
