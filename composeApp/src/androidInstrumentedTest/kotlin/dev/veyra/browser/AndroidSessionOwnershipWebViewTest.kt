@@ -225,4 +225,69 @@ class AndroidSessionOwnershipWebViewTest {
         engine.attachSurface(fresh)
         assertEquals(listOf("https://late2.example"), fresh.loadedUrls)
     }
+
+    @Test
+    fun webViewSaveRestorePreservesBackForwardHistory() {
+        lateinit var original: WebView
+        var pageFinished = CountDownLatch(1)
+        scenario.onActivity { activity ->
+            original = WebView(activity)
+            original.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String) {
+                    pageFinished.countDown()
+                }
+            }
+            activity.setContentView(original)
+            original.loadDataWithBaseURL(
+                "https://restore.example/one",
+                "<html><body>one</body></html>",
+                "text/html",
+                "UTF-8",
+                null,
+            )
+        }
+        assertTrue("First local document should finish loading", pageFinished.await(5, TimeUnit.SECONDS))
+
+        pageFinished = CountDownLatch(1)
+        scenario.onActivity {
+            original.loadDataWithBaseURL(
+                "https://restore.example/two",
+                "<html><body>two</body></html>",
+                "text/html",
+                "UTF-8",
+                null,
+            )
+        }
+        assertTrue("Second local document should finish loading", pageFinished.await(5, TimeUnit.SECONDS))
+
+        lateinit var snapshot: Bundle
+        scenario.onActivity {
+            assertTrue("Second document should have a previous history entry", original.canGoBack())
+            snapshot = Bundle()
+            assertNotNull("saveState should return a history list", original.saveState(snapshot))
+            original.stopLoading()
+            original.destroy()
+        }
+
+        lateinit var restored: WebView
+        lateinit var restoreResult: android.webkit.WebBackForwardList
+        scenario.onActivity { activity ->
+            restored = WebView(activity)
+            activity.setContentView(restored)
+            restoreResult = restored.restoreState(snapshot)
+                ?: throw AssertionError("restoreState should restore the saved navigation list")
+        }
+        try {
+            assertTrue("Restored history should contain at least two entries", restoreResult.size >= 2)
+            scenario.onActivity {
+                assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
+            }
+        } finally {
+            scenario.onActivity {
+                restored.stopLoading()
+                restored.destroy()
+            }
+        }
+    }
+
 }
