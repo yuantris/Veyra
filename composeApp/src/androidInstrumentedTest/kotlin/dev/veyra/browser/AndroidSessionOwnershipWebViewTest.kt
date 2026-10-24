@@ -360,8 +360,8 @@ class AndroidSessionOwnershipWebViewTest {
         val firstUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-one%3C/body%3E%3C/html%3E"
         val secondUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-two%3C/body%3E%3C/html%3E"
         val tabBUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-b%3C/body%3E%3C/html%3E"
-        val tabAId = TabId("compose-tab-a-\${System.nanoTime()}")
-        val tabBId = TabId("compose-tab-b-\${System.nanoTime()}")
+        val tabAId = TabId("compose-tab-a-${System.nanoTime()}")
+        val tabBId = TabId("compose-tab-b-${System.nanoTime()}")
         val engineA = ComposeWebViewEngine(
             BrowserEngineCreateRequest(tabAId, ProfileId("default"), initialUrl = firstUrl),
         )
@@ -426,7 +426,9 @@ class AndroidSessionOwnershipWebViewTest {
                 waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack },
             )
         } finally {
-            scenario.onActivity { selectTab.get()?.invoke("b") }
+            scenario.onActivity { activity ->
+                activity.setContent { }
+            }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             runBlocking {
                 engineA.close()
