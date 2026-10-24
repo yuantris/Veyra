@@ -503,7 +503,7 @@ class AndroidSessionOwnershipWebViewTest {
     }
 
     private fun waitForPageState(
-        engine: ComposeWebViewEngine,
+        engine: dev.veyra.browser.core.BrowserEngineContract,
         timeoutMs: Long = 10_000,
         predicate: (dev.veyra.browser.core.BrowserPageState) -> Boolean,
     ): Boolean {
