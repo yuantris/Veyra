@@ -176,7 +176,7 @@ class BrowserControllerTest {
             NavigationDecision.Cancel,
             controller.navigate(NavigationRequest(tabId, "https://example.com")),
         )
-        assertEquals("A closed engine must not receive the pending navigation", 0, engine.navigateCount)
+        assertEquals(0, engine.navigateCount, "A closed engine must not receive the pending navigation")
         assertFalse(manager.contains(tabId))
 
         controller.close()
