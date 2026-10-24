@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.veyra.browser.core.session.BrowserTab
+import dev.veyra.browser.core.session.BrowserSessionCoordinator
 import java.util.concurrent.atomic.AtomicReference
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -30,6 +31,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.junit.runner.RunWith
@@ -507,5 +512,56 @@ class AndroidSessionOwnershipWebViewTest {
         }
         return false
     }
+
+
+    @Test
+    fun coordinatorNavigationReachesTheProductionSystemWebViewSurface() {
+        val ownerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val coordinator = BrowserSessionCoordinator.create(
+            engineFactory = SurfaceBoundBrowserEngineFactory(),
+            scope = ownerScope,
+        )
+        var binding: BrowserSurfaceBinding? = null
+        var surface: RealWebViewSurfacePort? = null
+
+        try {
+            runBlocking { coordinator.start() }
+            val tab = coordinator.activeTab ?: error("Coordinator did not create its initial tab")
+            val tabId = TabId(tab.id)
+            val engine = coordinator.engines.value[tabId]
+                ?: error("Coordinator did not register the initial tab engine")
+            binding = engine as? BrowserSurfaceBinding
+                ?: error("Production Android engine does not expose the renderer binding")
+            surface = makeSurface(tabId)
+            binding.attachSurface(surface)
+
+            val target = "https://veyra-integration.invalid/"
+            val decision = runBlocking {
+                coordinator.navigate(
+                    NavigationRequest(
+                        tabId = tabId,
+                        url = target,
+                        source = NavigationSource.USER,
+                    ),
+                )
+            }
+
+            assertEquals(NavigationDecision.Allow, decision)
+            assertEquals(
+                listOf(target),
+                surface.loadedUrls,
+                "Coordinator -> controller -> engine must dispatch navigation to the real WebView port",
+            )
+            assertEquals(target, engine.pageState.value.url)
+        } finally {
+            surface?.let { nativeSurface ->
+                binding?.detachSurface(nativeSurface)
+                scenario.onActivity { nativeSurface.destroyWebView() }
+            }
+            runBlocking { coordinator.close() }
+            ownerScope.cancel()
+        }
+    }
+
 
 }
