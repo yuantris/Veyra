@@ -271,7 +271,7 @@ class AndroidSessionOwnershipWebViewTest {
 
         lateinit var restored: WebView
         lateinit var restoreResult: android.webkit.WebBackForwardList
-        val backNavigationFinished = CountDownLatch(1)
+        var backNavigationFinished = CountDownLatch(1)
         var restoredCurrentIndex = -1
         scenario.onActivity { activity ->
             restored = WebView(activity)
@@ -289,6 +289,7 @@ class AndroidSessionOwnershipWebViewTest {
             assertTrue("Restored history should contain at least two entries", restoreResult.size >= 2)
             scenario.onActivity {
                 assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
+                backNavigationFinished = CountDownLatch(1)
                 restored.goBack()
             }
             assertTrue(
