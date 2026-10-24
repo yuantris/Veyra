@@ -398,19 +398,19 @@ class AndroidSessionOwnershipWebViewTest {
 
             assertTrue(
                 "Tab A's first document should load",
-                waitForPageState(engineA) { it.url == firstUrl },
+                waitForPageState(engineA) { it.url == firstUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
             engineA.navigate(NavigationRequest(tabAId, secondUrl, NavigationSource.USER))
             assertTrue(
                 "Tab A should reach its second document and have a back entry",
-                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack },
+                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
 
             scenario.onActivity { selectTab.get()?.invoke("b") }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             assertTrue(
                 "Tab B should attach and load while A is detached",
-                waitForPageState(engineB) { it.url == tabBUrl },
+                waitForPageState(engineB) { it.url == tabBUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
 
             scenario.onActivity { selectTab.get()?.invoke("a") }
