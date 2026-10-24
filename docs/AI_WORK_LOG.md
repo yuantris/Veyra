@@ -671,3 +671,10 @@
 - **Next smallest safe step:** Wait for the fix commit's Android emulator integration and build CI. If compilation succeeds, inspect runtime assertions and fix genuine semantics/layout or lifecycle issues without weakening the >=48 dp target and close-flow requirements. A1 remains in progress; do not start A2 before phone acceptance.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
 
+### 2026-10-24 — Fix Compose instrumentation-test API imports
+
+- **Observed failure:** Browser Core Tests run 40069560551 failed at `:composeApp:compileDebugAndroidTestKotlinAndroid`; the compiler reported unresolved imports for `androidx.compose.ui.test.fetchSemanticsNode` and `androidx.compose.ui.test.onAllNodes`. Core/app adapter tests and iOS compile passed; the Android emulator test never reached runtime assertions.
+- **Correction:** Removed the two invalid imports. These APIs are exposed through the Compose test interaction/rule API surface in this project's resolved dependency; keep the actual >=48 dp and new-tab-close assertions unchanged.
+- **Commit:** `435d178a8f366185b4820af96c2b41163a9888dc`.
+- **Validation status:** Pending CI for this commit. A1 phone acceptance remains blocked until Android instrumentation compilation and emulator execution both pass.
+- **Next step:** Check Browser Core Tests and Build Veyra for this exact commit; if either fails, inspect the failing job log before making another change.
