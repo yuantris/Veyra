@@ -80,7 +80,7 @@ class ComposeWebViewEngineTest {
 
         assertEquals(emptyList(), restoredSurface.loadedUrls)
         assertEquals("https://page-a.example", engine.pageState.value.url)
-        assertTrue(engine.pageState.value.rendererHealthy)
+        assertEquals(true, engine.pageState.value.rendererHealthy)
     }
 
     @Test
