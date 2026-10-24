@@ -1,6 +1,5 @@
 package dev.veyra.browser
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -31,13 +30,11 @@ class AndroidMiuixTabActionsTest {
         composeRule.waitUntil(timeoutMillis = 10_000) {
             runCatching { newTab.fetchSemanticsNode(); true }.getOrDefault(false)
         }
-        newTab.assertExists()
         assertAtLeast48Dp(newTab.fetchSemanticsNode().boundsInRoot.width, density, "new-tab")
 
         // Bottom navigation controls must also meet the same touch-target baseline.
         listOf("标签页", "收藏夹", "菜单").forEach { description ->
             val node = composeRule.onNodeWithContentDescription(description)
-            node.assertExists()
             assertAtLeast48Dp(
                 node.fetchSemanticsNode().boundsInRoot.width,
                 density,
@@ -56,7 +53,12 @@ class AndroidMiuixTabActionsTest {
             closeTabs.fetchSemanticsNodes().size == originalTabCount + 1
         }
 
-        val newestClose = closeTabs.onLast()
+        // Re-query after composition settles; the last close affordance belongs to the new tab.
+        composeRule.waitForIdle()
+        val closeNodes = closeTabs.fetchSemanticsNodes()
+        assertTrue("Expected one close control for each tab", closeNodes.size == originalTabCount + 1)
+        val newestClose = composeRule.onAllNodes(hasContentDescription("关闭", substring = true))
+            .get(originalTabCount)
         assertAtLeast48Dp(
             newestClose.fetchSemanticsNode().boundsInRoot.width,
             density,
