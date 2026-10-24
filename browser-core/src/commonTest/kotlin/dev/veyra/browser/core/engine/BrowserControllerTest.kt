@@ -265,6 +265,47 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun lateEventsFromClosedEngineAreNotForwardedAfterSameTabReopens() = runBlocking {
+        val createdEngines = mutableListOf<FakeEngine>()
+        val factory = object : BrowserEngineFactory {
+            override suspend fun create(request: BrowserEngineCreateRequest): BrowserEngineContract =
+                FakeEngine(request.tabId, request.profileId).also(createdEngines::add)
+        }
+        val hub = BrowserEventHub()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val controller = BrowserController(
+            BrowserEngineManager(factory),
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(),
+            hub,
+            scope,
+        )
+        val tabId = TabId("reused-tab")
+        val oldEngine = controller.openTab(tabId) as FakeEngine
+        assertTrue(controller.closeTab(tabId))
+        val replacementEngine = controller.openTab(tabId) as FakeEngine
+        assertEquals(2, createdEngines.size)
+        assertFalse(oldEngine === replacementEngine)
+
+        val received = mutableListOf<BrowserEvent>()
+        val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            hub.events.collect { received += it }
+        }
+        oldEngine.emit(BrowserEvent.TitleChanged(tabId, "stale title"))
+        val currentEvent = BrowserEvent.TitleChanged(tabId, "current title")
+        replacementEngine.emit(currentEvent)
+
+        assertEquals(
+            listOf(currentEvent),
+            received,
+            "Events from a closed engine must not leak into a replacement session that reuses its TabId.",
+        )
+        collector.cancel()
+        controller.close()
+        scope.cancel()
+    }
+
+    @Test
     fun dropsLateCompletionFromPreviousNavigation() = runBlocking {
         val factory = FakeFactory()
         val hub = BrowserEventHub()
