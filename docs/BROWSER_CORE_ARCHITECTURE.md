@@ -124,8 +124,13 @@ A browser session is the lifetime boundary for a tab's engine state. A coordinat
 - Closing the last tab creates a fresh empty tab according to product policy; it does not reuse the already-closed engine.
 - Engine close must be idempotent. Duplicate UI events must not double-release native resources.
 - Runtime lifetime is above individual tabs where the chosen engine exposes a shared runtime. Closing one tab must not shut down a process/profile-scoped runtime used by other tabs.
-- A detached session remains live unless a platform explicitly evicts it under a documented memory policy. Any eviction must be surfaced as a recoverable session-loss event.
+- **Tab selection is not engine lifecycle.** Selecting a tab activates its existing session when available; it must not recreate the engine solely because the tab became active/inactive or the window resized.
+- **Visibility, native-view attachment, engine/session liveness, and renderer-process liveness are independent axes.** Only the selected tab needs to be presented as the active page surface. The architecture does not require every background native view to stay composed, attached, or visible to keep its logical session alive.
+- A surface may be detached or hidden while its session remains live. Surface disposal must not implicitly close the session.
+- Background resource policy is adapter- and capability-aware. An adapter may throttle/freeze background activity, detach views, or evict renderer resources under explicit product/memory policy; it must not silently equate these actions with closing the logical tab.
+- Renderer/session eviction or crash must emit a typed recoverable SessionLost/renderer-health event and preserve restorable metadata where possible. The UI/core must distinguish restoration levels: metadata/URL only, navigation history, and full in-memory page continuity are not equivalent. Do not promise DOM, JavaScript heap, form state, scroll position, or in-flight navigation survives process death/renderer eviction unless that platform path is specifically proven.
 - Process death is not a tab close. Persist restorable metadata separately; recreate engines after process restart and do not claim in-memory JavaScript state survived.
+- Closing a tab is an explicit operation that closes its owned session; closing one tab must not tear down a runtime shared by other tabs.
 
 ### Normal and private profiles
 
@@ -135,6 +140,27 @@ A browser session is the lifetime boundary for a tab's engine state. A coordinat
 - Private navigation must not enter normal history, normal session restore, or normal profile data stores.
 - If a platform cannot provide the required isolation, private mode must be disabled or clearly marked as limited until an implementation passes isolation tests.
 - Do not mix private and normal tabs in a single engine session.
+
+### Tab activation, surface attachment and background resource policy
+
+The following state axes must not be collapsed into one boolean:
+
+- **Selected/active tab:** which tab the user is currently viewing.
+- **Surface attachment/visibility:** whether that tab's native view is attached to a host and presented.
+- **Session/engine liveness:** whether Veyra still owns a usable logical engine session.
+- **Renderer health:** whether the underlying renderer/process is alive, frozen, crashed, or evicted.
+
+A platform adapter may implement background throttling, freezing, view detachment, or renderer eviction according to native engine capabilities and explicit memory/product policy. These are implementation strategies, not universal requirements. The core contract requires observable lifecycle outcomes and a defined recovery path; it does not require every platform to keep every native view alive.
+
+On tab selection, reuse the live engine if one exists, attach/present its surface as needed, and restore the last known state. On deselection, the adapter may hide or detach the surface and apply supported background limits; it must not close the logical session merely because Compose stopped presenting that surface. On eviction/crash, emit session/renderer loss, keep the tab metadata, and recreate the engine through the existing manager/coordinator path. State restoration guarantees must be declared honestly per platform and tested.
+
+Required conformance tests:
+1. Select A → B → A does not create a second engine for A when A's session remains live.
+2. Surface detach → reattach does not close the engine or issue an unintended navigation.
+3. Window resize/fold/unfold changes presentation only; it does not reset the session.
+4. Explicit tab close closes only that tab's session and rejects stale callbacks.
+5. Simulated renderer loss preserves tab metadata and reports the supported restoration level; it does not claim in-memory page state survived.
+6. Background freeze/eviction policy, if implemented, has deterministic tests for activation, recovery, cancellation and close races.
 
 ## 4. State, navigation events and errors
 
