@@ -423,7 +423,7 @@ class AndroidSessionOwnershipWebViewTest {
             engineA.goBack()
             assertTrue(
                 "Back navigation after A → B → A should reach A's first history entry",
-                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack },
+                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
             )
         } finally {
             scenario.onActivity { activity ->
