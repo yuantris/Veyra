@@ -397,12 +397,15 @@ private fun BarGlyph(text: String, enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HomeScreen(onOpen: (String) -> Unit) {
     val scroll = rememberScrollState()
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(scroll)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .widthIn(max = 900.dp)
+                .align(Alignment.TopCenter)
+                .verticalScroll(scroll)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
         Spacer(Modifier.height(8.dp))
         SearchPill(onOpen)
         Spacer(Modifier.height(26.dp))
@@ -416,6 +419,7 @@ private fun HomeScreen(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(18.dp))
         CustomizeButton()
         Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
