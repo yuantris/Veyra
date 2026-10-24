@@ -490,3 +490,12 @@
 - **Verification:** Fix committed at `37f7f14`; fresh CI is required. The prior failure was a compile-time issue, so it did not yet retest the suspected callback race.
 - **Next smallest safe step:** Check the latest Browser Core Tests run for commit `37f7f14`; if compilation passes, inspect the Android emulator result to see whether the URL-specific wait resolves the original back-navigation failure.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-24 — Fix second nullable WebHistoryItem access found by CI
+
+- **CI result:** Browser Core Tests run [40054160954](https://github.com/yuantris/Veyra/actions/runs/40054160954) failed during Android instrumentation-test compilation at line 344: `historyAfterBack.currentItem` is also nullable. The `test` and `ios-compile` jobs succeeded; Build Veyra succeeded, but Android emulator tests did not execute.
+- **Fix:** Added an explicit non-null check and safe URL extraction for the current history item after back navigation. The expected destination and history-index assertions remain in place.
+- **Verification:** Fix committed at `3f69081`; fresh CI is pending. The callback-race hypothesis is still untested until Android instrumentation compiles and executes.
+- **Next smallest safe step:** Inspect the latest CI run; first confirm Android test compilation, then evaluate actual WebView back navigation.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
