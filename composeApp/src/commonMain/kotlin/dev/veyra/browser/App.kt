@@ -39,6 +39,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -300,9 +304,13 @@ private fun BrowserTabStrip(
                     color = c.onBackground.copy(alpha = 0.6f),
                     fontSize = 16.sp,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .clickable { onCloseTab(tab.id) }
+                        .semantics {
+                            contentDescription = "关闭 $label 标签页"
+                            role = Role.Button
+                        }
+                        .clickable(role = Role.Button) { onCloseTab(tab.id) }
                         .padding(4.dp),
                 )
             }
@@ -312,9 +320,14 @@ private fun BrowserTabStrip(
             color = c.onBackground,
             fontSize = 18.sp,
             modifier = Modifier
+                .size(48.dp)
                 .clip(CircleShape)
-                .clickable(onClick = onNewTab)
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .semantics {
+                    contentDescription = "新建标签页"
+                    role = Role.Button
+                }
+                .clickable(role = Role.Button, onClick = onNewTab)
+                .padding(4.dp),
         )
     }
 }
