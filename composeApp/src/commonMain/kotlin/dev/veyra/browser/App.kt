@@ -273,6 +273,12 @@ private fun BrowserTabStrip(
     onCloseTab: (String) -> Unit,
 ) {
     val c = MiuixTheme.colorScheme
+    val tabScrollState = rememberScrollState()
+    // Keep the newest tab's close action visible after opening a tab. Otherwise the
+    // semantics node exists off-screen and has zero visible bounds on narrow phones.
+    LaunchedEffect(tabs.size) {
+        tabScrollState.animateScrollTo(tabScrollState.maxValue)
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -280,7 +286,7 @@ private fun BrowserTabStrip(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .horizontalScroll(rememberScrollState()),
+                .horizontalScroll(tabScrollState),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
