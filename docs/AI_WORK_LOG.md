@@ -499,3 +499,13 @@
 - **Verification:** Fix committed at `3f69081`; fresh CI is pending. The callback-race hypothesis is still untested until Android instrumentation compiles and executes.
 - **Next smallest safe step:** Inspect the latest CI run; first confirm Android test compilation, then evaluate actual WebView back navigation.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-24 — Use real WebView data URLs in save/restore history instrumentation
+
+- **Observed CI failure:** Browser Core Tests run [40054481114](https://github.com/yuantris/Veyra/actions/runs/40054481114) reached Android instrumentation and failed before calling `goBack()`: the previous history item's URL was `data:text/html;charset=utf-8;base64,`, not the synthetic base URL supplied to `loadDataWithBaseURL()`.
+- **Change:** Replaced the two `loadDataWithBaseURL()` calls in `webViewSaveRestorePreservesBackForwardHistory` with two explicit `loadUrl(data:text/html,...)` navigations. The test now uses those actual URLs as the expected history entries, while retaining the checks for restored history size, `canGoBack()`, the destination callback, the resulting current URL, and the earlier history index.
+- **Why:** The test must assert the URLs WebView actually records rather than assuming `loadDataWithBaseURL()` preserves its base URL as the history item's URL.
+- **Verification:** Change committed; Android emulator instrumentation must run again. This is not yet evidence that save/restore and back navigation pass.
+- **Next step:** Inspect the new Browser Core Tests run and diagnose the runtime result if it still fails.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`.
