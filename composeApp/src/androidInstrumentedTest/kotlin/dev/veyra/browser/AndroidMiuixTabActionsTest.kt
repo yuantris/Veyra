@@ -7,6 +7,8 @@ import android.webkit.WebView
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
+import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -71,6 +73,28 @@ class AndroidMiuixTabActionsTest {
             closeTabs.fetchSemanticsNodes().size == originalTabCount
         }
         assertTrue("Closing the new tab must leave the original tab present", originalTabCount >= 1)
+    }
+
+    @Test
+    fun addressBarSubmissionReachesTheRealSystemWebView() {
+        val targetUrl = "https://veyra.invalid/address-entry-test"
+        val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        addressBar.performTextReplacement(targetUrl)
+        addressBar.performImeAction()
+
+        // .invalid is reserved for tests. We assert delivery to the production WebView,
+        // not successful internet access or a remote server response.
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.url == targetUrl
+        }
+        assertTrue(
+            "Submitting the address bar must navigate the attached system WebView",
+            attachedWebViewState()?.url == targetUrl,
+        )
     }
 
     @Test
