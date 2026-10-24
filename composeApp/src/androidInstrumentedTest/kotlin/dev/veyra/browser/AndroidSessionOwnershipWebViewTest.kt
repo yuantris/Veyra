@@ -576,7 +576,7 @@ class AndroidSessionOwnershipWebViewTest {
                 waitForPageState(engine) {
                     it.title == "Veyra first" &&
                         coordinator.activeTab?.title == "Veyra first" &&
-                        !coordinator.activeTab!!.isLoading
+                        coordinator.activeTab?.isLoading == false
                 },
             )
             assertEquals(firstUrl, coordinator.activeTab?.url)
