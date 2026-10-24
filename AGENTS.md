@@ -139,3 +139,28 @@ Unless the project owner explicitly redirects, continue with **the next missing 
 5. verify the complete basic browsing flow.
 
 Do not start with another button polish pass, desktop UI, a new architecture proposal, or an exhaustive emulator run.
+
+## 11. AI change-quality gate: prevent avoidable CI failures
+
+The AI must optimize for **correct changes per commit**, not number of commits or speed of producing a diff. CI is a verification layer, not a substitute for reading code or checking obvious mistakes. Repeated avoidable failures are a process defect and must change the next iteration's workflow.
+
+### Before editing
+- Read the exact current implementation, interface declarations, nearby call sites, and the closest existing tests. Do not infer SAM/lambda support, lifecycle ownership, threading guarantees, or policy behavior from a type's name.
+- Identify the intended invariant and production behavior first. Tests must respect production security defaults; if deterministic test input needs special policy, inject a narrowly scoped test policy rather than weakening production behavior.
+- Check the current branch/HEAD and latest workflow results. Do not stack a new speculative fix on top of an unresolved failure without understanding that failure.
+
+### Before committing/pushing
+- Review the full diff for type/API correctness, Kotlin syntax, nullability, lifecycle ownership, threading, and unintended production behavior changes.
+- Run the cheapest relevant local compile/test that is available. At minimum, reason through the exact changed call sites and test setup; never claim a local check ran when it did not.
+- For UI/instrumentation tests, use condition-based synchronization for the state under test (for example, wait until the real WebView is attached), not immediate assertions against asynchronous Compose/UI work. Keep view-tree access on the main thread. Avoid arbitrary sleeps where a deterministic condition is available.
+- Ensure each test proves the intended production path. A mock, interface-only test, successful compile, or unrelated green job is not proof of end-to-end behavior.
+- If local execution is unavailable, state that limitation before pushing and use the narrowest CI feedback loop appropriate to the risk; do not pretend CI is a pre-commit check.
+
+### After a failure
+- Read the failing job's actual test report and relevant log lines before editing. Classify the failure (compile/API, assertion/behavior, timing/lifecycle, infrastructure/flaky environment) using evidence.
+- Fix the root cause with the smallest complete change. Do not weaken assertions, loosen security policy, disable tests, or add retries merely to get a green result.
+- Re-run the relevant check and inspect the newest commit's workflow result. Distinguish clearly between failed, running, skipped, and passed; do not report success until observed.
+- If a change causes an avoidable failure, record the specific missed preflight check and add that check to the workflow for subsequent edits. Do not repeat the same class of mistake.
+
+### Required report
+For each meaningful change, report: the concrete behavior changed; commit/branch; checks actually executed and their observed outcomes; any failed run and its evidence-based root cause; what remains unverified; and the next smallest useful step. Never use a green compile or a different successful workflow to imply that a failing emulator test passed.
