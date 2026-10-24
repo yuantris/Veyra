@@ -471,3 +471,13 @@
 - **Tests added:** closingTabDiscardsUnconsumedWebViewSnapshot verifies close removes an unconsumed snapshot; restoringWebViewSnapshotConsumesItExactlyOnce verifies restore consumption is one-shot.
 - **Scope:** These tests cover snapshot ownership/cleanup, not full Compose tab-close integration. The existing Android emulator suite remains the gate for the native WebView save/restore path.
 - **Verification:** Awaiting fresh Browser Core Tests and Build Veyra CI runs for this commit.
+
+
+### 2026-10-24 — Make WebView restore/back instrumentation wait for the actual destination
+
+- **Goal:** Remove a race in the native history test where any delayed `onPageFinished` callback could satisfy the back-navigation latch, even if it belonged to the restored current page rather than the requested back destination.
+- **Change:** The callback now counts down only when the URL equals the expected previous history entry (`https://restore.example/one`). The test also verifies that this URL is the immediate previous history item before calling `goBack()`, then checks both the current URL and history index after the destination callback.
+- **Scope:** This strengthens the assertion and callback synchronization; it does not weaken the back-navigation requirement or claim that WebView restore preserves JavaScript heap/DOM continuity.
+- **Verification:** Fresh Android emulator integration and full CI are required; no runtime result is claimed in this entry.
+- **Next smallest safe step:** Inspect the fresh CI run. If the assertion still fails, capture the restored history item's URLs and current index from the emulator result artifact before changing production restore behavior.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
