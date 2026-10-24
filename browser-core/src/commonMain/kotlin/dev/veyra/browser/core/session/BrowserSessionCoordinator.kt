@@ -256,11 +256,12 @@ class BrowserSessionCoordinator(
             store: BrowserSessionStore = BrowserSessionStore(),
             profileProvider: BrowserProfileProvider = InMemoryBrowserProfileProvider(),
             downloadController: DownloadController? = null,
+            navigationCoordinator: BrowserNavigationCoordinator = BrowserNavigationCoordinator(),
         ): BrowserSessionCoordinator {
             val controller = BrowserController(
                 engineManager = BrowserEngineManager(engineFactory),
                 profileProvider = profileProvider,
-                navigationCoordinator = BrowserNavigationCoordinator(),
+                navigationCoordinator = navigationCoordinator,
                 eventHub = BrowserEventHub(),
                 scope = scope,
                 downloadController = downloadController,
