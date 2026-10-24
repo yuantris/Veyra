@@ -129,7 +129,9 @@ fun App() {
             address = target
             session.launchCommand {
                 val current = coordinator.activeTab ?: coordinator.openTab(url = "about:blank")
-                coordinator.updateTab(current.id, url = target, title = target, isLoading = true)
+                // The engine/page-state projection is the source of truth for URL, title and
+                // loading state. Do not publish the requested URL as if it were already accepted:
+                // navigation policy may cancel or route it elsewhere.
                 when (coordinator.navigate(NavigationRequest(TabId(current.id), target, NavigationSource.USER))) {
                     NavigationDecision.Allow -> Unit
                     NavigationDecision.Cancel -> coordinator.updateTab(current.id, isLoading = false)
@@ -376,7 +378,9 @@ private fun AddressBar(
         BasicTextField(
             value = address,
             onValueChange = onAddressChange,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = "地址栏" },
             singleLine = true,
             textStyle = TextStyle(color = c.onBackground, fontSize = 14.sp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
