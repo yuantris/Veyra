@@ -448,3 +448,10 @@
 - **Fix:** Changed the assertion to `assertEquals(true, engine.pageState.value.rendererHealthy)`, which explicitly verifies the expected non-null healthy state without unsafe null assertions.
 - **Verification status:** Fix committed separately; fresh CI for this fix must complete before the core regression is considered green.
 - **Next step:** Once CI is green, strengthen Android history restoration by actually invoking back after restore and waiting for the navigation callback; then assess whether an end-to-end Compose tab-switch test can be added without exposing production internals solely for testing.
+
+### 2026-10-24 — Verify back navigation actually works after WebView restore
+
+- **Goal:** Strengthen the save/restore instrumentation beyond checking that a restored history list exists and `canGoBack()` returns true.
+- **Completed:** After restoring the saved Bundle into a replacement WebView, the test now invokes `goBack()`, resets a latch immediately before the action so the restore callback cannot satisfy it accidentally, waits for the back-navigation page-finished callback, and verifies the live history current index moves backwards.
+- **Verification status:** This test change is committed, but fresh Android emulator CI is required to validate its callback timing. The separate nullable renderer-health assertion fix is also awaiting fresh common-test CI.
+- **Scope note:** This verifies native WebView history restoration and back navigation. It still does not prove full Compose A → B → A tab switching or preservation of JavaScript heap/DOM state.
