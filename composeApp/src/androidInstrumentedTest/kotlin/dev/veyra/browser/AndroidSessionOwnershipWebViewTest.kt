@@ -530,10 +530,12 @@ class AndroidSessionOwnershipWebViewTest {
             val tabId = TabId(tab.id)
             val engine = coordinator.engines.value[tabId]
                 ?: error("Coordinator did not register the initial tab engine")
-            binding = engine as? BrowserSurfaceBinding
+            val activeBinding = engine as? BrowserSurfaceBinding
                 ?: error("Production Android engine does not expose the renderer binding")
-            surface = makeSurface(tabId)
-            binding.attachSurface(surface)
+            val activeSurface = makeSurface(tabId)
+            binding = activeBinding
+            surface = activeSurface
+            activeBinding.attachSurface(activeSurface)
 
             val target = "https://veyra-integration.invalid/"
             val decision = runBlocking {
@@ -549,7 +551,7 @@ class AndroidSessionOwnershipWebViewTest {
             assertEquals(NavigationDecision.Allow, decision)
             assertEquals(
                 listOf(target),
-                surface.loadedUrls,
+                activeSurface.loadedUrls,
                 "Coordinator -> controller -> engine must dispatch navigation to the real WebView port",
             )
             assertEquals(target, engine.pageState.value.url)
