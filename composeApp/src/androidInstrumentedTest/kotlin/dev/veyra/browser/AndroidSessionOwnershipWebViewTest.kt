@@ -3,6 +3,8 @@ package dev.veyra.browser
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
+import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
@@ -407,27 +409,42 @@ class AndroidSessionOwnershipWebViewTest {
                 waitForPageState(engineA) { it.url == secondUrl && it.canGoBack && it.progress == 100 && it.navigationId == null },
             )
 
-            scenario.onActivity { selectTab.get()?.invoke("b") }
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            assertTrue(
-                "Tab B should attach and load while A is detached",
-                waitForPageState(engineB) { it.url == tabBUrl && it.progress == 100 && it.navigationId == null },
-            )
+            // Repeat surface disposal/recreation several times before exercising Back. Each cycle
+            // must save the native history, restore it into the new WebView, and leave the engine
+            // bound to the currently attached surface.
+            repeat(5) { cycle ->
+                scenario.onActivity { selectTab.get()?.invoke("b") }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                assertTrue(
+                    "Tab B should attach and load while A is detached (cycle ${cycle + 1})",
+                    waitForPageState(engineB) {
+                        it.url == tabBUrl && it.progress == 100 && it.navigationId == null
+                    },
+                )
 
-            scenario.onActivity { selectTab.get()?.invoke("a") }
-            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-            assertTrue(
-                "Tab A's restored surface should retain the second URL and back history",
-                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack },
-            )
+                scenario.onActivity { selectTab.get()?.invoke("a") }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+                assertTrue(
+                    "Tab A should restore its second URL and back history (cycle ${cycle + 1}); " +
+                        nativeWebViewHistoryDiagnostics(),
+                    waitForPageState(engineA) { it.url == secondUrl && it.canGoBack },
+                )
+            }
 
+            // Capture the native list immediately before issuing Back and again if the engine fails
+            // to observe the expected callback. This distinguishes a lost command from a lost
+            // history entry or a callback/state synchronization problem.
+            val nativeHistoryBeforeBack = nativeWebViewHistoryDiagnostics()
             engineA.goBack()
             val returnedToFirstEntry = waitForPageState(engineA) {
                 it.url == firstUrl && !it.canGoBack && it.progress == 100 && it.navigationId == null
             }
+            val nativeHistoryAfterBack = nativeWebViewHistoryDiagnostics()
             assertTrue(
-                "Back navigation after A → B → A should reach A's first history entry; " +
-                    "final engine state=${engineA.pageState.value}",
+                "Back navigation after repeated A → B → A switches should reach A's first history entry; " +
+                    "final engine state=${engineA.pageState.value}; " +
+                    "native history before Back=$nativeHistoryBeforeBack; " +
+                    "native history after Back=$nativeHistoryAfterBack",
                 returnedToFirstEntry,
             )
         } finally {
@@ -442,6 +459,39 @@ class AndroidSessionOwnershipWebViewTest {
                 engineB.close()
             }
         }
+    }
+
+    /**
+     * Reads the live WebView history from the currently composed surface on the UI thread.
+     * Included in failure messages so an intermittent Back failure shows whether the native list
+     * itself was restored and whether the goBack command changed its current index.
+     */
+    private fun nativeWebViewHistoryDiagnostics(): String {
+        var diagnostics = "no WebView found in activity view tree"
+        scenario.onActivity { activity ->
+            fun findWebView(view: View): WebView? {
+                if (view is WebView) return view
+                if (view is ViewGroup) {
+                    for (index in 0 until view.childCount) {
+                        findWebView(view.getChildAt(index))?.let { return it }
+                    }
+                }
+                return null
+            }
+
+            val webView = findWebView(activity.window.decorView)
+            if (webView != null) {
+                val history = webView.copyBackForwardList()
+                val entries = (0 until history.size).joinToString(separator = " | ") { index ->
+                    val item = history.getItemAtIndex(index)
+                    "${if (index == history.currentIndex) "*" else ""}$index:${item.url}"
+                }
+                diagnostics = "url=${webView.url}, canGoBack=${webView.canGoBack()}, " +
+                    "canGoForward=${webView.canGoForward()}, currentIndex=${history.currentIndex}, " +
+                    "size=${history.size}, entries=[$entries]"
+            }
+        }
+        return diagnostics
     }
 
     private fun waitForPageState(
