@@ -529,3 +529,9 @@
 - **Remaining acceptance:** Inspect the emulator result for the Compose switching test; fix any real lifecycle/history failure. Then run/inspect current desktop and Android builds and add responsive layout assertions where useful. This test exercises the production renderer through a Compose host; it does not yet claim full end-to-end automation of clicking the production App tab-strip widget.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/BrowserScaffold.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`.
 
+### 2026-10-24 — Align browser typography with Miuix and complete responsive chrome pass
+
+- **Miuix consistency:** Replaced the Material 3 `Text` imports in `App.kt` and `BrowserScaffold.kt` with `top.yukonga.miuix.kmp.basic.Text`, so browser chrome and status text use the selected Miuix design system rather than mixing Material 3 typography into a Miuix theme.
+- **Responsive behavior:** Compact layouts retain tab selection; expanded layouts keep the tab strip and constrain browser chrome; the home content uses a centered 900 dp maximum width on large windows.
+- **Verification:** CI for the Miuix typography and Compose A → B → A instrumentation changes is still running. Do not mark the responsive pass or the history-restoration scenario green until the latest Build Veyra and Browser Core Tests runs complete, including Android emulator integration.
+
