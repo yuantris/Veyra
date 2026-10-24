@@ -164,7 +164,7 @@ class AndroidMiuixTabActionsTest {
             val current = findAttachedWebView()
             current != null && current !== selectedTabSurface &&
                 attachedWebViewState()?.let {
-                    it.url == "https://veyra.invalid/second" &&
+                    it.url == secondUrl &&
                         it.title == "Veyra history second" &&
                         it.canGoBack
                 } == true
