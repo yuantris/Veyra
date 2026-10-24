@@ -432,3 +432,12 @@
 - **Verification status:** The preceding lifecycle implementation revision (638505d) passed Build Veyra (40048858103) and Browser Core Tests (40048858128), including Android emulator integration and iOS compile. The new instrumentation test was pushed at b3cd784; its fresh Build Veyra and Browser Core Tests workflows are queued/running and have not yet been verified. Do not treat this new test as green until android-emulator-integration completes successfully.
 - **Next step:** Inspect the latest workflow results. If the test fails, use the emulator log to correct the test or adapter before relying on Android background detachment. Even if it passes, this covers platform saveState/restoreState mechanics; it does not by itself prove full Compose tab-switch integration or in-flight navigation continuity.
 - **Files:** composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt, docs/AI_WORK_LOG.md.
+
+
+### 2026-10-24 — Verify detached engine reattachment does not trigger duplicate navigation
+
+- **Goal:** Add a core regression test for the A → B → A tab-switch contract: reattaching a native surface to an already-live engine must not issue a duplicate URL load when there is no buffered navigation.
+- **Completed:** Added `detachAndReattachWithoutPendingNavigationDoesNotIssueDuplicateLoad` to `ComposeWebViewEngineTest`. It attaches a recording surface, navigates once, detaches that surface, reattaches a fresh surface to the same engine, and asserts the new surface receives no duplicate `loadUrl`, while the logical URL and renderer-health state remain intact.
+- **Prior gate:** The Android save/restore instrumentation and full workflow suite passed on commit `0bbc1eb` (`Browser Core Tests` run `40049522228`, `Build Veyra` run `40049522250`). This new common test was committed at `f1c2085`; its fresh CI results are pending and must be checked before calling this change green.
+- **Scope note:** This deterministic core test proves engine reuse/no duplicate command at the surface port. It does not replace the Android instrumentation test for native WebView history restoration or an end-to-end Compose tab-switch test.
+- **Files:** `composeApp/src/commonTest/kotlin/dev/veyra/browser/ComposeWebViewEngineTest.kt`, `docs/AI_WORK_LOG.md`.
