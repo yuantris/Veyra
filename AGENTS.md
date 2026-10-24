@@ -6,7 +6,7 @@ This file is the repository-wide source of truth for AI coding agents and human 
 
 Veyra is a Kotlin Multiplatform / Compose Multiplatform browser for Android, iOS, HarmonyOS and desktop.
 
-**Current priority: make the platform-neutral browser core correct and testable before expanding native-engine integration.** Do not interpret a request to "continue" as permission to jump to Android UI, add a new engine integration, or polish the UI. Continue from the core architecture and its unmet acceptance gates.
+**Current phase (explicitly selected by the project owner): Android Miuix UI for phones and tablets.** Follow the ordered acceptance gates in `docs/ANDROID_MIUIX_ACCEPTANCE.md`. Do not schedule desktop UI work until the Android phone/tablet gates pass. Do not add a new engine integration as part of this UI phase. The platform-neutral browser core and its lifecycle/security ownership invariants remain normative; UI work must preserve them.
 
 Compose is the presentation/assembly layer. It must not become the owner of browser session lifetime, navigation policy, security decisions, or the authoritative live-engine registry.
 
