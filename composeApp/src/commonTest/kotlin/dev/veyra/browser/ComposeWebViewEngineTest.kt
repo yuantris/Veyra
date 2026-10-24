@@ -110,6 +110,29 @@ class ComposeWebViewEngineTest {
 
 
     @Test
+    fun historyCommandsIssuedWhileDetachedAreReplayedInOrderAfterAttach() {
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(TabId("tab-history-commands"), ProfileId("default")),
+        )
+        val firstSurface = RecordingSurface()
+        engine.attachSurface(firstSurface)
+        engine.detachSurface(firstSurface)
+
+        engine.goBack()
+        engine.goForward()
+        engine.goBack()
+
+        assertEquals(0, firstSurface.backCount)
+        assertEquals(0, firstSurface.forwardCount)
+
+        val restoredSurface = RecordingSurface()
+        engine.attachSurface(restoredSurface)
+
+        assertEquals(2, restoredSurface.backCount)
+        assertEquals(1, restoredSurface.forwardCount)
+    }
+
+    @Test
     fun detachAndReattachWithoutPendingNavigationDoesNotIssueDuplicateLoad() {
         val tabId = TabId("tab-switch")
         val engine = ComposeWebViewEngine(
