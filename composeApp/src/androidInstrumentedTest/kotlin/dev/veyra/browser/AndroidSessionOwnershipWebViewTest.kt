@@ -555,6 +555,21 @@ class AndroidSessionOwnershipWebViewTest {
                 "Coordinator -> controller -> engine must dispatch navigation to the real WebView port",
             )
             assertEquals(target, engine.pageState.value.url)
+
+            // The production renderer calls observe() from native WebViewClient/WebChromeClient
+            // callbacks. Drive that boundary deterministically here and verify the normalized
+            // page projection flows back through Controller -> Coordinator -> tab metadata.
+            activeBinding.observe(
+                url = target,
+                title = "Veyra integration",
+                isLoading = false,
+                canGoBack = false,
+                canGoForward = false,
+            )
+            assertEquals("Veyra integration", engine.pageState.value.title)
+            assertEquals(target, coordinator.activeTab?.url)
+            assertEquals("Veyra integration", coordinator.activeTab?.title)
+            assertEquals(false, coordinator.activeTab?.isLoading)
         } finally {
             surface?.let { nativeSurface ->
                 binding?.detachSurface(nativeSurface)
