@@ -72,6 +72,10 @@ class ComposeWebViewEngineTest {
         engine.navigate(NavigationRequest(tabId, "https://page-a.example"))
         assertEquals(listOf("https://page-a.example"), firstSurface.loadedUrls)
 
+        // Capture health as represented by this adapter: null means the renderer has not
+        // reported an explicit health state. Reattachment must preserve that state, not invent one.
+        val rendererHealthBeforeDetach = engine.pageState.value.rendererHealthy
+
         // A tab switch disposes only the native surface; it must not close or re-navigate
         // the logical engine when the same tab becomes selected again.
         engine.detachSurface(firstSurface)
@@ -80,7 +84,7 @@ class ComposeWebViewEngineTest {
 
         assertEquals(emptyList(), restoredSurface.loadedUrls)
         assertEquals("https://page-a.example", engine.pageState.value.url)
-        assertEquals(true, engine.pageState.value.rendererHealthy)
+        assertEquals(rendererHealthBeforeDetach, engine.pageState.value.rendererHealthy)
     }
 
     @Test
