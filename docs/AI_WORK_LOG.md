@@ -481,3 +481,12 @@
 - **Verification:** Fresh Android emulator integration and full CI are required; no runtime result is claimed in this entry.
 - **Next smallest safe step:** Inspect the fresh CI run. If the assertion still fails, capture the restored history item's URLs and current index from the emulator result artifact before changing production restore behavior.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-24 — Fix Android history test compile error found by CI
+
+- **CI result:** Browser Core Tests run [40053824216](https://github.com/yuantris/Veyra/actions/runs/40053824216) and the earlier run [40053820064](https://github.com/yuantris/Veyra/actions/runs/40053820064) failed before instrumentation execution because Kotlin treats `WebBackForwardList.getItemAtIndex(...)` as nullable; Build Veyra passed, and the common test and iOS compile jobs passed.
+- **Fix:** The test now checks the previous history item exists, reads its URL through a safe nullable access with an explicit failure if absent, then asserts the expected URL. No force unwrap and no weakening of the history/back-navigation checks.
+- **Verification:** Fix committed at `37f7f14`; fresh CI is required. The prior failure was a compile-time issue, so it did not yet retest the suspected callback race.
+- **Next smallest safe step:** Check the latest Browser Core Tests run for commit `37f7f14`; if compilation passes, inspect the Android emulator result to see whether the URL-specific wait resolves the original back-navigation failure.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt`, `docs/AI_WORK_LOG.md`.
