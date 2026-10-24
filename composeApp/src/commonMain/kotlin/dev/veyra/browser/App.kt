@@ -218,6 +218,10 @@ fun App() {
                         showBrowser = true
                         session.launchCommand { coordinator.openTab(url = "about:blank") }
                     },
+                    onCloseTab = { tabId ->
+                        showBrowser = true
+                        session.launchCommand { coordinator.closeTab(tabId) }
+                    },
                 )
             },
             bottomBar = {
@@ -261,6 +265,7 @@ private fun BrowserTabStrip(
     activeTabId: String?,
     onSelect: (String) -> Unit,
     onNewTab: () -> Unit,
+    onCloseTab: (String) -> Unit,
 ) {
     val c = MiuixTheme.colorScheme
     Row(
@@ -271,19 +276,36 @@ private fun BrowserTabStrip(
         tabs.forEach { tab ->
             val selected = tab.id == activeTabId
             val label = tab.title.takeIf { it.isNotBlank() } ?: tab.url.ifBlank { "新标签页" }
-            Text(
-                text = label,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                color = if (selected) c.primary else c.onBackground.copy(alpha = 0.75f),
-                fontSize = 12.sp,
+            Row(
                 modifier = Modifier
-                    .widthIn(min = 96.dp, max = 220.dp)
+                    .widthIn(min = 112.dp, max = 244.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (selected) c.surfaceContainer else c.surface)
-                    .clickable { onSelect(tab.id) }
-                    .padding(horizontal = 14.dp, vertical = 9.dp),
-            )
+                    .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = label,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = if (selected) c.primary else c.onBackground.copy(alpha = 0.75f),
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onSelect(tab.id) }
+                        .padding(vertical = 6.dp),
+                )
+                Text(
+                    text = "×",
+                    color = c.onBackground.copy(alpha = 0.6f),
+                    fontSize = 16.sp,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .clickable { onCloseTab(tab.id) }
+                        .padding(4.dp),
+                )
+            }
         }
         Text(
             text = "＋",
