@@ -603,3 +603,13 @@
 - **Commit:** `30525a035c1f55d5895b6665d74b14d0f72b5e14` (`fix(android): restore WebView history before attaching surface`).
 - **Test status:** The change has been pushed and CI must confirm whether the race is resolved; this entry does **not** declare the regression fixed yet.
 - **Next smallest safe step:** Inspect the new Browser Core Tests emulator result and Build Veyra run. If the regression still reproduces, capture the native WebView back-forward list at the command boundary and fix the observed failure mode rather than weakening the test.
+
+
+### 2026-10-24 — Stress repeated Android tab-history restoration and capture native diagnostics
+
+- **Goal:** Verify the intermittent A → B → A history issue under repeated surface recreation without weakening the Back assertion or adding timing sleeps.
+- **Test change:** The production-renderer instrumentation test now repeats the A → B → A switch five times before invoking Back. It checks that tab A still reports its second URL and a back entry after every restore.
+- **Failure diagnostics:** On a failed assertion, the test records the live WebView URL, `canGoBack`/`canGoForward`, back-forward list current index, size, and every history URL both immediately before Back and after the wait. This should distinguish native-history loss from a dropped command or missing engine callback.
+- **Commit:** `b0e14301a3fcd7a14189d0e26015f46dd8e76445` (`test(android): stress WebView tab history restoration`).
+- **Verification status:** CI must compile and run the updated Android instrumentation test. The stress test is not considered stable until emulator results are inspected; no pass is claimed yet.
+- **Next step:** Inspect Browser Core Tests and Build Veyra. If the emulator fails, use the captured native history and command-boundary state to choose the fix rather than adding delays or loosening assertions.
