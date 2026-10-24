@@ -430,6 +430,8 @@ class AndroidSessionOwnershipWebViewTest {
                 activity.setContent { }
             }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            AndroidChromiumSurfaceRenderer.onTabClosed(tabAId.value)
+            AndroidChromiumSurfaceRenderer.onTabClosed(tabBId.value)
             runBlocking {
                 engineA.close()
                 engineB.close()
