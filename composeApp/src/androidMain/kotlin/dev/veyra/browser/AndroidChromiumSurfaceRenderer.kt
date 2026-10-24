@@ -64,7 +64,6 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
     ) {
         val binding = engine as? BrowserSurfaceBinding ?: return
         val context = LocalContext.current
-        val initialUrl = binding.pageState.value.url
         val currentOnNavigationRequest by rememberUpdatedState(onNavigationRequest)
         val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
         val rendererGenerationState = remember(tab.id, binding) { mutableIntStateOf(0) }
@@ -149,11 +148,6 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
             if (isVisible) webView.onResume() else webView.onPause()
         }
 
-        LaunchedEffect(webView, initialUrl) {
-            if (initialUrl.isNotBlank() && initialUrl != "about:blank" && webView.url != initialUrl) {
-                webView.loadUrl(initialUrl)
-            }
-        }
 
         AndroidView(
             factory = { webView },
