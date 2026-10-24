@@ -77,18 +77,23 @@ History and bookmarks: `BrowserSessionStore` owns in-memory history/bookmark met
 
 ## 5. Non-negotiable lifecycle rules
 
-1. A tab's metadata, browser session/engine, and attached rendering surface are separate concepts.
-2. Switching tabs or detaching/recreating a Compose surface must not implicitly close a session or erase navigation state.
-3. Closing a tab is an explicit operation that closes its engine/session and releases resources owned exclusively by that tab.
-4. App shutdown closes all owned sessions and waits for in-flight create/close work to settle.
-5. Closing one tab must not tear down a runtime/process resource shared by other tabs.
-6. Engine close and controller shutdown should be idempotent; concurrent callers must observe a defined outcome.
-7. Late callbacks/events from a closed tab or superseded navigation must not mutate current state.
-8. Creation failure must not leave a registered half-open engine or orphaned tab metadata. Cleanup failures must be observable; do not silently swallow them.
-9. Cancellation is not an ordinary engine failure. Preserve coroutine cancellation where safe, while using `finally`/completion signaling so waiters cannot hang.
-10. Do not "fix" a native resource leak by simply removing `destroy()`; define one explicit resource owner and release path first.
+1. A tab's metadata, logical browser session, live engine/runtime, native rendering surface, and visibility/activation state are separate concepts.
+2. Tab selection is a UI/state transition, not an engine-lifecycle operation. Switching tabs or detaching/recreating a Compose surface must not implicitly close a session or erase navigation state.
+3. Only the selected tab should be presented as the active page surface. Do not require every background tab's native view to remain attached, composed, or visible just to preserve its logical session.
+4. Surface visibility, surface attachment, engine/session liveness, and renderer-process liveness must be modeled as distinct states. Detaching or hiding a surface must not be treated as closing the session.
+5. A normal tab switch should reuse the existing live session when available; it must not create a replacement engine merely because the tab became inactive or the window resized.
+6. Background resource policy is explicit and capability-aware: adapters may throttle/freeze background work, detach native views, or evict/recreate renderer resources under documented memory pressure/product policy. They must not silently close the logical tab/session or pretend in-memory JavaScript/DOM state survived an eviction or process crash.
+7. If an engine/session is evicted or lost, surface a typed recoverable session/renderer-loss event, preserve restorable tab metadata (URL/history/profile where supported), and expose whether restoration is full, partial, or impossible. Do not promise scroll/DOM/JS continuity when the platform cannot serialize it.
+8. Closing a tab is an explicit operation that closes its engine/session and releases resources owned exclusively by that tab.
+9. App shutdown closes all owned sessions and waits for in-flight create/close work to settle.
+10. Closing one tab must not tear down a runtime/process resource shared by other tabs.
+11. Engine close and controller shutdown should be idempotent; concurrent callers must observe a defined outcome.
+12. Late callbacks/events from a closed tab or superseded navigation must not mutate current state.
+13. Creation failure must not leave a registered half-open engine or orphaned tab metadata. Cleanup failures must be observable; do not silently swallow them.
+14. Cancellation is not an ordinary engine failure. Preserve coroutine cancellation where safe, while using `finally`/completion signaling so waiters cannot hang.
+15. Do not "fix" a native resource leak by simply removing `destroy()`; define one explicit resource owner and release path first.
 
-Before implementing native surfaces, document and test the attach/detach/re-attach/crash/close protocol. Surface disposal is not session disposal.
+Before implementing native surfaces, document and test the attach/detach/re-attach/background/eviction/crash/close protocol. Surface disposal is not session disposal; renderer eviction is not tab closure.
 
 ## 6. Security and permission rules
 
