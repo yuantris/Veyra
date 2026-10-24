@@ -387,6 +387,7 @@ internal class ComposeWebViewEngine(
         closed = true
         surface = null
         pendingUrl = null
+        pendingHistoryCommands.clear()
         initialNavigationPending = false
         activeNavigationId = null
         activeNavigationUrl = null
