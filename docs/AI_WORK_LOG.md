@@ -462,3 +462,12 @@
 - **Fix:** The test now captures `rendererHealthy` before detachment and asserts that reattachment preserves the same value. It no longer incorrectly assumes that a healthy/unreported renderer must be represented as explicit `true`.
 - **Verification status:** Fix committed at `a7bd4c9`; fresh CI is required. Earlier run `40052226416` (Build Veyra at `3ddeeaf`) passed compilation, but Browser Core Tests did not pass due to this test assertion.
 - **Next step:** Wait for the latest Browser Core Tests run. If green, proceed with the Android history-restoration result and then test explicit tab-close cleanup; if red, diagnose the newest failing job rather than assuming this fix is sufficient.
+
+
+### 2026-10-24 — Make Android WebView snapshot ownership explicit and test tab-close cleanup
+
+- **Goal:** Ensure explicit tab closure clears native WebView restoration state and that a saved snapshot cannot be replayed indefinitely.
+- **Changes:** Extracted the Android renderer's per-tab Bundle cache into AndroidWebViewStateStore. Saving, one-time restore consumption, and explicit-close cleanup now have a small testable ownership boundary. The renderer still saves only non-crashed WebViews and consumes snapshots when creating a replacement surface.
+- **Tests added:** closingTabDiscardsUnconsumedWebViewSnapshot verifies close removes an unconsumed snapshot; restoringWebViewSnapshotConsumesItExactlyOnce verifies restore consumption is one-shot.
+- **Scope:** These tests cover snapshot ownership/cleanup, not full Compose tab-close integration. The existing Android emulator suite remains the gate for the native WebView save/restore path.
+- **Verification:** Awaiting fresh Browser Core Tests and Build Veyra CI runs for this commit.
