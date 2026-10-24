@@ -302,7 +302,7 @@ private fun BrowserTabStrip(
                 )
                 Box(
                     modifier = Modifier
-                        .requiredSize(48.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .semantics {
                             contentDescription = "关闭 $label 标签页"
@@ -321,7 +321,7 @@ private fun BrowserTabStrip(
         }
         Box(
             modifier = Modifier
-                .requiredSize(48.dp)
+                .size(48.dp)
                 .clip(CircleShape)
                 .semantics {
                     contentDescription = "新建标签页"
