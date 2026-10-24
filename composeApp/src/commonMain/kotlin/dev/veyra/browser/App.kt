@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -301,7 +302,7 @@ private fun BrowserTabStrip(
                 )
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .requiredSize(48.dp)
                         .clip(CircleShape)
                         .semantics {
                             contentDescription = "关闭 $label 标签页"
@@ -320,7 +321,7 @@ private fun BrowserTabStrip(
         }
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .requiredSize(48.dp)
                 .clip(CircleShape)
                 .semantics {
                     contentDescription = "新建标签页"
