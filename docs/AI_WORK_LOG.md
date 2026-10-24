@@ -678,3 +678,10 @@
 - **Commit:** `435d178a8f366185b4820af96c2b41163a9888dc`.
 - **Validation status:** Pending CI for this commit. A1 phone acceptance remains blocked until Android instrumentation compilation and emulator execution both pass.
 - **Next step:** Check Browser Core Tests and Build Veyra for this exact commit; if either fails, inspect the failing job log before making another change.
+
+### 2026-10-24 — Fix measured Android tab touch-target regression
+
+- **New evidence:** After fixing the instrumentation-test imports, the emulator suite compiled and executed. Browser Core Tests run 40070478510 failed in the new A1 test because the "新建标签页" semantics node measured only 28 dp wide, below the 48 dp acceptance threshold. The other 19 instrumentation tests passed, including navigation policy, session ownership, runtime smoke, and download pipeline tests.
+- **Implementation fix:** Changed the new-tab and per-tab close controls from preferred `size(48.dp)` to `requiredSize(48.dp)` so their measured layout/touch targets cannot shrink under incoming constraints. The test still enforces >=48 dp and the create/close lifecycle; no assertion was weakened.
+- **Commit:** `746dead970ba15c3cf8be7c3db54c508a00d33b5`.
+- **Validation status:** CI is pending. Do not mark A1 accepted until the new-tab and close-control bounds, bottom navigation bounds, create/close flow, and all existing integration tests pass on emulator.
