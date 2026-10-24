@@ -60,6 +60,29 @@ class ComposeWebViewEngineTest {
         assertEquals(listOf("https://after-detach.example"), secondSurface.loadedUrls)
     }
 
+
+    @Test
+    fun detachAndReattachWithoutPendingNavigationDoesNotIssueDuplicateLoad() {
+        val tabId = TabId("tab-switch")
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        val firstSurface = RecordingSurface()
+        engine.attachSurface(firstSurface)
+        engine.navigate(NavigationRequest(tabId, "https://page-a.example"))
+        assertEquals(listOf("https://page-a.example"), firstSurface.loadedUrls)
+
+        // A tab switch disposes only the native surface; it must not close or re-navigate
+        // the logical engine when the same tab becomes selected again.
+        engine.detachSurface(firstSurface)
+        val restoredSurface = RecordingSurface()
+        engine.attachSurface(restoredSurface)
+
+        assertEquals(emptyList(), restoredSurface.loadedUrls)
+        assertEquals("https://page-a.example", engine.pageState.value.url)
+        assertTrue(engine.pageState.value.rendererHealthy)
+    }
+
     @Test
     fun navigationEventsAreNormalizedAndCompletedBySurfaceObservation() = runBlocking {
         val engine = ComposeWebViewEngine(
