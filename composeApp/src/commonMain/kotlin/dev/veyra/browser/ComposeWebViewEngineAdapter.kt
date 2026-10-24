@@ -130,6 +130,9 @@ internal class ComposeWebViewEngine(
                 navigationId = navigationId,
             )
             mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, initialUrl))
+            // initialUrl is a real navigation request, not just initial page metadata.
+            // Deliver it to the surface when the tab first attaches.
+            surface.loadUrl(initialUrl)
         }
         pendingUrl?.let { url ->
             pendingUrl = null
