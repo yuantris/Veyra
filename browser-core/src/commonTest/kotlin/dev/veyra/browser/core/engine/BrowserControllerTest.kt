@@ -150,6 +150,40 @@ class BrowserControllerTest {
     }
 
     @Test
+    fun navigationIsCancelledIfTabClosesDuringPolicyEvaluation() = runBlocking {
+        val factory = FakeFactory()
+        val manager = BrowserEngineManager(factory)
+        val tabId = TabId("tab-closes-during-policy")
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val policy = object : NavigationPolicyHandler {
+            override fun decide(request: NavigationRequest): NavigationDecision {
+                // Re-enter the lifecycle from policy evaluation to deterministically model a
+                // tab-close race between the controller's initial lookup and command dispatch.
+                runBlocking { manager.closeTab(request.tabId) }
+                return NavigationDecision.Allow
+            }
+        }
+        val controller = BrowserController(
+            manager,
+            InMemoryBrowserProfileProvider(),
+            BrowserNavigationCoordinator(policy),
+            BrowserEventHub(),
+            scope,
+        )
+        val engine = controller.openTab(tabId) as FakeEngine
+
+        assertEquals(
+            NavigationDecision.Cancel,
+            controller.navigate(NavigationRequest(tabId, "https://example.com")),
+        )
+        assertEquals("A closed engine must not receive the pending navigation", 0, engine.navigateCount)
+        assertFalse(manager.contains(tabId))
+
+        controller.close()
+        scope.cancel()
+    }
+
+    @Test
     fun surfaceNavigationEvaluatesPolicyWithoutDispatchingAnotherLoad() = runBlocking {
         val factory = FakeFactory()
         val controller = BrowserController(
