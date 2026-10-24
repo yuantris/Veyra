@@ -61,12 +61,15 @@ internal fun BrowserScaffold(
                         }
                     }
 
-                    if (expanded && tabStrip != null) {
+                    // Tab selection is a primary browser action on phones as well as desktops.
+                    // Keep the horizontally scrollable strip available at every breakpoint; only
+                    // its spacing/max width changes with the available window size.
+                    if (tabStrip != null) {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = chromeHorizontalPadding)
-                                .padding(bottom = 8.dp),
+                                .padding(bottom = if (expanded) 8.dp else 4.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             Box(Modifier.fillMaxWidth().widthIn(max = 1200.dp)) {
