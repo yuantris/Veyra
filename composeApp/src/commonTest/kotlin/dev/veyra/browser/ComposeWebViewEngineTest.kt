@@ -22,6 +22,54 @@ import kotlinx.coroutines.runBlocking
 
 class ComposeWebViewEngineTest {
     @Test
+    fun initialUrlIsLoadedWhenSurfaceFirstAttaches() {
+        val initialUrl = "https://initial.example"
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(
+                tabId = TabId("tab-initial"),
+                profileId = ProfileId("default"),
+                initialUrl = initialUrl,
+            ),
+        )
+        val surface = RecordingSurface()
+
+        engine.attachSurface(surface)
+
+        assertEquals(listOf(initialUrl), surface.loadedUrls)
+        assertEquals(BrowserLoadPhase.STARTING, engine.pageState.value.loadPhase)
+    }
+
+    @Test
+    fun trailingIdleObservationDoesNotEraseSuccessfulNavigation() {
+        val url = "https://example.com"
+        val tabId = TabId("tab-complete")
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        engine.navigate(NavigationRequest(tabId, url))
+
+        engine.observe(
+            url = url,
+            title = "Example",
+            isLoading = false,
+            canGoBack = true,
+            canGoForward = false,
+        )
+        assertEquals(BrowserLoadPhase.SUCCEEDED, engine.pageState.value.loadPhase)
+
+        // Android WebChromeClient can emit progress=100 after WebViewClient.onPageFinished.
+        engine.observe(
+            url = url,
+            title = "Example",
+            isLoading = false,
+            canGoBack = true,
+            canGoForward = false,
+        )
+
+        assertEquals(BrowserLoadPhase.SUCCEEDED, engine.pageState.value.loadPhase)
+    }
+
+    @Test
     fun navigationBeforeSurfaceAttachmentIsDeliveredWhenSurfaceAttaches() {
         val engine = ComposeWebViewEngine(
             BrowserEngineCreateRequest(
