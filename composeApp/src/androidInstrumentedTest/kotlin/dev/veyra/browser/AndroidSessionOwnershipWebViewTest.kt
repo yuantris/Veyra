@@ -550,9 +550,9 @@ class AndroidSessionOwnershipWebViewTest {
 
             assertEquals(NavigationDecision.Allow, decision)
             assertEquals(
+                "Coordinator -> controller -> engine must dispatch navigation to the real WebView port",
                 listOf(target),
                 activeSurface.loadedUrls,
-                "Coordinator -> controller -> engine must dispatch navigation to the real WebView port",
             )
             assertEquals(target, engine.pageState.value.url)
 
