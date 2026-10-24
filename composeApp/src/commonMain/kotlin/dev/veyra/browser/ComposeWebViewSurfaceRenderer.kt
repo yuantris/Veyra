@@ -22,6 +22,17 @@ import dev.veyra.browser.core.TabId
  * a concrete engine implementation or a WebView navigator.
  */
 internal interface BrowserSurfaceRenderer {
+    /**
+     * True only when this renderer can detach a background surface and restore its native
+     * navigation state on reattachment. Otherwise the host keeps background surfaces composed
+     * until that platform has a verified save/restore implementation.
+     */
+    val supportsBackgroundSurfaceDetachment: Boolean
+        get() = false
+
+    /** Called when a tab is explicitly closed; implementations may release saved surface state. */
+    fun onTabClosed(tabId: String) = Unit
+
     @Composable
     fun Render(
         tab: BrowserTab,
