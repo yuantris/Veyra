@@ -299,10 +299,7 @@ private fun BrowserTabStrip(
                         .clickable { onSelect(tab.id) }
                         .padding(vertical = 6.dp),
                 )
-                Text(
-                    text = "×",
-                    color = c.onBackground.copy(alpha = 0.6f),
-                    fontSize = 16.sp,
+                Box(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
@@ -310,15 +307,18 @@ private fun BrowserTabStrip(
                             contentDescription = "关闭 $label 标签页"
                             role = Role.Button
                         }
-                        .clickable(role = Role.Button) { onCloseTab(tab.id) }
-                        .padding(4.dp),
-                )
+                        .clickable(role = Role.Button) { onCloseTab(tab.id) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "×",
+                        color = c.onBackground.copy(alpha = 0.6f),
+                        fontSize = 16.sp,
+                    )
+                }
             }
         }
-        Text(
-            text = "＋",
-            color = c.onBackground,
-            fontSize = 18.sp,
+        Box(
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape)
@@ -326,9 +326,15 @@ private fun BrowserTabStrip(
                     contentDescription = "新建标签页"
                     role = Role.Button
                 }
-                .clickable(role = Role.Button, onClick = onNewTab)
-                .padding(4.dp),
-        )
+                .clickable(role = Role.Button, onClick = onNewTab),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = "＋",
+                color = c.onBackground,
+                fontSize = 18.sp,
+            )
+        }
     }
 }
 
