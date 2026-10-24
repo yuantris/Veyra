@@ -1,8 +1,10 @@
 package dev.veyra.browser
 
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.veyra.browser.core.BrowserEngineCreateRequest
@@ -13,10 +15,13 @@ import dev.veyra.browser.core.ProfileId
 import dev.veyra.browser.core.TabId
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.runner.RunWith
 
 /**
