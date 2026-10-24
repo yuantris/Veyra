@@ -409,30 +409,44 @@ private fun BottomBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
-        BarGlyph("‹", canGoBack, onBack)
-        BarGlyph("›", canGoForward, onForward)
+        BarGlyph("‹", "后退", canGoBack, onBack)
+        BarGlyph("›", "前进", canGoForward, onForward)
         BarGlyph(
             text = if (isBrowsing) tabCount.toString() else "＋",
+            description = "标签页",
             enabled = true,
             onClick = onTabs,
         )
-        BarGlyph("☆", enabled = isBrowsing, onClick = { /* bookmarks: placeholder */ })
-        BarGlyph("≡", enabled = true, onClick = { /* menu: placeholder */ })
+        BarGlyph("☆", "收藏夹", enabled = isBrowsing, onClick = { /* bookmarks: placeholder */ })
+        BarGlyph("≡", "菜单", enabled = true, onClick = { /* menu: placeholder */ })
     }
 }
 
 @Composable
-private fun BarGlyph(text: String, enabled: Boolean, onClick: () -> Unit) {
+private fun BarGlyph(
+    text: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
     val c = MiuixTheme.colorScheme
-    Text(
-        text,
-        color = if (enabled) c.onBackground else c.onBackground.copy(alpha = 0.3f),
-        fontSize = 20.sp,
+    Box(
         modifier = Modifier
+            .size(48.dp)
             .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    )
+            .semantics {
+                contentDescription = description
+                role = Role.Button
+            }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text,
+            color = if (enabled) c.onBackground else c.onBackground.copy(alpha = 0.3f),
+            fontSize = 20.sp,
+        )
+    }
 }
 
 @Composable
