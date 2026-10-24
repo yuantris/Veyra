@@ -299,35 +299,49 @@ class AndroidSessionOwnershipWebViewTest {
 
         lateinit var restored: WebView
         lateinit var restoreResult: android.webkit.WebBackForwardList
-        var backNavigationFinished = CountDownLatch(1)
-        var restoredCurrentIndex = -1
+        // Only count completion of the expected destination. A delayed onPageFinished callback
+        // for the restored current page must not accidentally satisfy the back-navigation wait.
+        val backNavigationFinished = CountDownLatch(1)
         scenario.onActivity { activity ->
             restored = WebView(activity)
             restored.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    backNavigationFinished.countDown()
+                    if (url == "https://restore.example/one") {
+                        backNavigationFinished.countDown()
+                    }
                 }
             }
             activity.setContentView(restored)
             restoreResult = restored.restoreState(snapshot)
                 ?: throw AssertionError("restoreState should restore the saved navigation list")
-            restoredCurrentIndex = restored.copyBackForwardList().currentIndex
         }
         try {
             assertTrue("Restored history should contain at least two entries", restoreResult.size >= 2)
+            lateinit var expectedBackUrl: String
             scenario.onActivity {
                 assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
-                backNavigationFinished = CountDownLatch(1)
+                val historyBeforeBack = restored.copyBackForwardList()
+                assertTrue("Restored current index should be valid", historyBeforeBack.currentIndex >= 0)
+                assertTrue(
+                    "Restored history should contain the expected previous entry",
+                    historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1).url ==
+                        "https://restore.example/one",
+                )
+                expectedBackUrl = historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1).url
                 restored.goBack()
             }
             assertTrue(
-                "Back navigation after restore should finish",
+                "Back navigation should finish at the expected previous URL: $expectedBackUrl",
                 backNavigationFinished.await(5, TimeUnit.SECONDS),
             )
             scenario.onActivity {
+                val historyAfterBack = restored.copyBackForwardList()
+                assertEquals("Back navigation should land on the expected previous URL",
+                    expectedBackUrl, historyAfterBack.currentItem.url)
                 assertTrue(
                     "Back navigation should move to an earlier history entry",
-                    restored.copyBackForwardList().currentIndex < restoredCurrentIndex,
+                    historyAfterBack.currentIndex >= 0 &&
+                        historyAfterBack.currentIndex < historyAfterBack.size - 1,
                 )
             }
         } finally {
