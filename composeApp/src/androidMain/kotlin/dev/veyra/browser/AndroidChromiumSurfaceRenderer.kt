@@ -69,8 +69,13 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val rendererGenerationState = remember(tab.id, binding) { mutableIntStateOf(0) }
         val rendererGeneration = rendererGenerationState.intValue
         val rendererCrashed = remember(tab.id, binding, rendererGeneration) { AtomicBoolean(false) }
+        // Consume the saved snapshot once for this surface generation. Apply it in AndroidView's
+        // factory (rather than while merely remembering the WebView) so restoration is part of
+        // native-surface creation and precedes attachSurface command delivery.
+        val savedState = remember(tab.id, context, binding, rendererGeneration) {
+            savedSurfaceStates.takeForRestore(tab.id)
+        }
         val webView = remember(tab.id, context, binding, rendererGeneration) {
-            val savedState = savedSurfaceStates.takeForRestore(tab.id)
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
@@ -96,10 +101,6 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                     errorCode = errorCode,
                     errorMessage = errorMessage,
                 )
-            }.also { view ->
-                // restoreState restores WebView's native back/forward list and scroll state where
-                // supported. A renderer crash is deliberately not restored as if it were healthy.
-                if (!rendererCrashed.get()) savedState?.let(view::restoreState)
             }
         }
         // All WebView method calls must occur on the thread that created the WebView (main).
@@ -150,7 +151,13 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
 
 
         AndroidView(
-            factory = { webView },
+            factory = {
+                // restoreState restores the native back/forward list and scroll position where
+                // supported. Do this at native view creation, before the surface is attached to
+                // the engine and can receive browser commands. A crashed renderer is never restored.
+                if (!rendererCrashed.get()) savedState?.let(webView::restoreState)
+                webView
+            },
             modifier = Modifier.fillMaxSize(),
             update = { },
         )
