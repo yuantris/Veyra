@@ -455,3 +455,10 @@
 - **Completed:** After restoring the saved Bundle into a replacement WebView, the test now invokes `goBack()`, resets a latch immediately before the action so the restore callback cannot satisfy it accidentally, waits for the back-navigation page-finished callback, and verifies the live history current index moves backwards.
 - **Verification status:** This test change is committed, but fresh Android emulator CI is required to validate its callback timing. The separate nullable renderer-health assertion fix is also awaiting fresh common-test CI.
 - **Scope note:** This verifies native WebView history restoration and back navigation. It still does not prove full Compose A → B → A tab switching or preservation of JavaScript heap/DOM state.
+
+### 2026-10-24 — Correct the reattachment test's renderer-health expectation
+
+- **CI finding:** The nullable compile error was fixed, but the next desktop test run exposed a second issue: the new regression expected `rendererHealthy == true`, while this adapter legitimately represents an unreported health state as `null`. CI run `40052226457` failed at the assertion in `ComposeWebViewEngineTest.kt:83`; Android emulator integration and iOS compilation succeeded in that run.
+- **Fix:** The test now captures `rendererHealthy` before detachment and asserts that reattachment preserves the same value. It no longer incorrectly assumes that a healthy/unreported renderer must be represented as explicit `true`.
+- **Verification status:** Fix committed at `a7bd4c9`; fresh CI is required. Earlier run `40052226416` (Build Veyra at `3ddeeaf`) passed compilation, but Browser Core Tests did not pass due to this test assertion.
+- **Next step:** Wait for the latest Browser Core Tests run. If green, proceed with the Android history-restoration result and then test explicit tab-close cleanup; if red, diagnose the newest failing job rather than assuming this fix is sufficient.
