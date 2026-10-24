@@ -2,6 +2,7 @@ package dev.veyra.browser
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import java.util.concurrent.atomic.AtomicBoolean
@@ -43,6 +44,16 @@ import dev.veyra.browser.core.TabId
  * self-compiled Chromium embedder is ready; keep Browser Core and its single engine contract stable.
  */
 internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
+    // Saved WebView navigation bundles are kept only while the logical tab remains open.
+    // Access occurs on the UI thread from renderer composition/disposal callbacks.
+    private val savedSurfaceStates = mutableMapOf<String, Bundle>()
+
+    override val supportsBackgroundSurfaceDetachment: Boolean = true
+
+    override fun onTabClosed(tabId: String) {
+        savedSurfaceStates.remove(tabId)
+    }
+
     @Composable
     override fun Render(
         tab: BrowserTab,
@@ -58,7 +69,9 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val currentOnNavigationDecision by rememberUpdatedState(onNavigationDecision)
         val rendererGenerationState = remember(tab.id, binding) { mutableIntStateOf(0) }
         val rendererGeneration = rendererGenerationState.intValue
+        val rendererCrashed = remember(tab.id, binding, rendererGeneration) { AtomicBoolean(false) }
         val webView = remember(tab.id, context, binding, rendererGeneration) {
+            val savedState = savedSurfaceStates.remove(tab.id)
             createWebView(
                 context = context,
                 tabId = TabId(tab.id),
@@ -67,6 +80,7 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                 onNavigationRequest = { currentOnNavigationRequest(it) },
                 onNavigationDecision = { currentOnNavigationDecision(it) },
                 onRendererGone = {
+                    rendererCrashed.set(true)
                     binding.reportRendererCrashed(recoverable = true)
                     // Changing the key replaces the dead WebView while preserving the tab engine.
                     if (rendererGenerationState.intValue == rendererGeneration) {
@@ -83,6 +97,10 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                     errorCode = errorCode,
                     errorMessage = errorMessage,
                 )
+            }.also { view ->
+                // restoreState restores WebView's native back/forward list and scroll state where
+                // supported. A renderer crash is deliberately not restored as if it were healthy.
+                if (!rendererCrashed.get()) savedState?.let(view::restoreState)
             }
         }
         // All WebView method calls must occur on the thread that created the WebView (main).
@@ -116,6 +134,12 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
             onDispose {
                 surfaceDestroyed.set(true)
                 binding.detachSurface(surface)
+                if (!rendererCrashed.get() && !webView.url.isNullOrBlank()) {
+                    val state = Bundle()
+                    if (webView.saveState(state) != null) {
+                        savedSurfaceStates[tab.id] = state
+                    }
+                }
                 webView.stopLoading()
                 webView.destroy()
             }
