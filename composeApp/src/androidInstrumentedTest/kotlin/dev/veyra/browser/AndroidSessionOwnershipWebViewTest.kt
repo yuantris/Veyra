@@ -256,37 +256,31 @@ class AndroidSessionOwnershipWebViewTest {
     }
     @Test
     fun webViewSaveRestorePreservesBackForwardHistory() {
+        // Use actual data: URLs rather than loadDataWithBaseURL(). The latter synthesizes a
+        // data:text/html;charset=utf-8;base64,... history URL on WebView, so the supplied base URL
+        // is not a reliable assertion target after save/restore.
+        val firstUrl = "data:text/html,%3Chtml%3E%3Cbody%3Eone%3C/body%3E%3C/html%3E"
+        val secondUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etwo%3C/body%3E%3C/html%3E"
         lateinit var original: WebView
-        var pageFinished = CountDownLatch(1)
+        val firstPageFinished = CountDownLatch(1)
+        val secondPageFinished = CountDownLatch(1)
         scenario.onActivity { activity ->
             original = WebView(activity)
             original.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    pageFinished.countDown()
+                    when (url) {
+                        firstUrl -> firstPageFinished.countDown()
+                        secondUrl -> secondPageFinished.countDown()
+                    }
                 }
             }
             activity.setContentView(original)
-            original.loadDataWithBaseURL(
-                "https://restore.example/one",
-                "<html><body>one</body></html>",
-                "text/html",
-                "UTF-8",
-                null,
-            )
+            original.loadUrl(firstUrl)
         }
-        assertTrue("First local document should finish loading", pageFinished.await(5, TimeUnit.SECONDS))
+        assertTrue("First document should finish loading", firstPageFinished.await(5, TimeUnit.SECONDS))
 
-        pageFinished = CountDownLatch(1)
-        scenario.onActivity {
-            original.loadDataWithBaseURL(
-                "https://restore.example/two",
-                "<html><body>two</body></html>",
-                "text/html",
-                "UTF-8",
-                null,
-            )
-        }
-        assertTrue("Second local document should finish loading", pageFinished.await(5, TimeUnit.SECONDS))
+        scenario.onActivity { original.loadUrl(secondUrl) }
+        assertTrue("Second document should finish loading", secondPageFinished.await(5, TimeUnit.SECONDS))
 
         lateinit var snapshot: Bundle
         scenario.onActivity {
@@ -299,16 +293,12 @@ class AndroidSessionOwnershipWebViewTest {
 
         lateinit var restored: WebView
         lateinit var restoreResult: android.webkit.WebBackForwardList
-        // Only count completion of the expected destination. A delayed onPageFinished callback
-        // for the restored current page must not accidentally satisfy the back-navigation wait.
         val backNavigationFinished = CountDownLatch(1)
         scenario.onActivity { activity ->
             restored = WebView(activity)
             restored.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView, url: String) {
-                    if (url == "https://restore.example/one") {
-                        backNavigationFinished.countDown()
-                    }
+                    if (url == firstUrl) backNavigationFinished.countDown()
                 }
             }
             activity.setContentView(restored)
@@ -322,16 +312,11 @@ class AndroidSessionOwnershipWebViewTest {
                 assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
                 val historyBeforeBack = restored.copyBackForwardList()
                 assertTrue("Restored current index should be valid", historyBeforeBack.currentIndex >= 0)
-                val previousHistoryItem =
-                    historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1)
+                val previousHistoryItem = historyBeforeBack.getItemAtIndex(historyBeforeBack.currentIndex - 1)
                 assertNotNull("Previous history item should exist", previousHistoryItem)
                 expectedBackUrl = previousHistoryItem?.url
                     ?: throw AssertionError("Previous history item should have a URL")
-                assertEquals(
-                    "Restored history should contain the expected previous entry",
-                    "https://restore.example/one",
-                    expectedBackUrl,
-                )
+                assertEquals("Restored history should contain the expected previous entry", firstUrl, expectedBackUrl)
                 restored.goBack()
             }
             assertTrue(
@@ -345,8 +330,7 @@ class AndroidSessionOwnershipWebViewTest {
                 assertEquals(
                     "Back navigation should land on the expected previous URL",
                     expectedBackUrl,
-                    currentHistoryItem?.url
-                        ?: throw AssertionError("Current history item should have a URL"),
+                    currentHistoryItem?.url ?: throw AssertionError("Current history item should have a URL"),
                 )
                 assertTrue(
                     "Back navigation should move to an earlier history entry",
