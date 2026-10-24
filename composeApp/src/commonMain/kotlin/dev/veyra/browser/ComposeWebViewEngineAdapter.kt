@@ -99,6 +99,11 @@ internal class ComposeWebViewEngine(
 
     private var surface: BrowserSurfacePort? = null
     private var pendingUrl: String? = null
+    // History commands can arrive while Compose is replacing a tab's native surface. Preserve
+    // their order and replay them only after the restored surface is attached.
+    private val pendingHistoryCommands = mutableListOf<HistoryCommand>()
+
+    private enum class HistoryCommand { BACK, FORWARD }
     private var initialNavigationPending = request.initialUrl != "about:blank"
     private var navigationCounter = 0L
     private var activeNavigationId: NavigationId? = null
@@ -138,6 +143,16 @@ internal class ComposeWebViewEngine(
             pendingUrl = null
             surface.loadUrl(url)
         }
+        if (pendingHistoryCommands.isNotEmpty()) {
+            val commands = pendingHistoryCommands.toList()
+            pendingHistoryCommands.clear()
+            commands.forEach { command ->
+                when (command) {
+                    HistoryCommand.BACK -> surface.goBack()
+                    HistoryCommand.FORWARD -> surface.goForward()
+                }
+            }
+        }
     }
 
     override fun detachSurface(surface: BrowserSurfacePort) {
@@ -171,11 +186,23 @@ internal class ComposeWebViewEngine(
     }
 
     override fun goBack() {
-        if (!closed) surface?.goBack()
+        if (closed) return
+        val currentSurface = surface
+        if (currentSurface == null) {
+            pendingHistoryCommands += HistoryCommand.BACK
+        } else {
+            currentSurface.goBack()
+        }
     }
 
     override fun goForward() {
-        if (!closed) surface?.goForward()
+        if (closed) return
+        val currentSurface = surface
+        if (currentSurface == null) {
+            pendingHistoryCommands += HistoryCommand.FORWARD
+        } else {
+            currentSurface.goForward()
+        }
     }
 
     override fun reload() {
