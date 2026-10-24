@@ -125,31 +125,22 @@ class AndroidMiuixTabActionsTest {
 
         val originalSurface = findAttachedWebView()
             ?: throw AssertionError("Expected the initial tab's system WebView to be attached")
-        composeRule.activity.runOnUiThread {
-            originalSurface.loadDataWithBaseURL(
-                "https://veyra.invalid/first",
-                "<!doctype html><title>Veyra history first</title><p>first</p>",
-                "text/html",
-                "UTF-8",
-                null,
-            )
-        }
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            attachedWebViewState()?.let { it.url == "https://veyra.invalid/first" && it.title == "Veyra history first" } == true
-        }
-
-        composeRule.activity.runOnUiThread {
-            originalSurface.loadDataWithBaseURL(
-                "https://veyra.invalid/second",
-                "<!doctype html><title>Veyra history second</title><p>second</p>",
-                "text/html",
-                "UTF-8",
-                null,
-            )
-        }
+        // Use explicit data: history entries, matching the already-verified native
+        // saveState/restoreState test. loadDataWithBaseURL synthesizes a data: history URL,
+        // so the supplied base URL is not a reliable value for WebView.url assertions.
+        val firstUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20history%20first%3C/title%3E%3Cp%3Efirst%3C/p%3E"
+        val secondUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20history%20second%3C/title%3E%3Cp%3Esecond%3C/p%3E"
+        composeRule.activity.runOnUiThread { originalSurface.loadUrl(firstUrl) }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             attachedWebViewState()?.let {
-                it.url == "https://veyra.invalid/second" &&
+                it.url == firstUrl && it.title == "Veyra history first"
+            } == true
+        }
+
+        composeRule.activity.runOnUiThread { originalSurface.loadUrl(secondUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == secondUrl &&
                     it.title == "Veyra history second" &&
                     it.canGoBack
             } == true
