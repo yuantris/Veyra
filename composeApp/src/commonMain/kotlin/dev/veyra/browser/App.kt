@@ -73,6 +73,16 @@ fun App() {
         var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
         var showBrowser by remember { mutableStateOf(false) }
         val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
+        val currentTabIds = sessionState.tabs.map { it.id }.toSet()
+        val knownTabIds = remember { mutableSetOf<String>() }
+
+        // Release adapter-owned snapshots when a tab is explicitly closed. Surface detachment
+        // alone must not erase its restorable state.
+        LaunchedEffect(currentTabIds) {
+            (knownTabIds - currentTabIds).forEach(surfaceRenderer::onTabClosed)
+            knownTabIds.clear()
+            knownTabIds.addAll(currentTabIds)
+        }
 
         // The core coordinator owns startup, tab metadata, engine creation/closure and page projection.
         // Compose only observes state and forwards user actions.
@@ -142,14 +152,15 @@ fun App() {
             },
             content = { contentModifier ->
                 Box(contentModifier.fillMaxSize()) {
-                    // Keep tab/session coordination outside the adaptive shell. A window resize
-                    // only changes this host's constraints; it must not recreate the session graph.
-                    // Keep every native surface composed while its tab is live: disposing a WebView
-                    // destroys native back/forward history even though the core engine survives.
+                    // A selected surface is presented here. Renderers that can preserve native
+                    // navigation state on detach may release background views; renderers without
+                    // a verified restoration path opt into the conservative keep-composed fallback.
+                    // Surface lifecycle remains separate from BrowserSession/engine ownership.
                     sessionState.tabs.forEach { tab ->
                         val selected = tab.id == sessionState.activeTabId
+                        val shouldComposeSurface = selected || !surfaceRenderer.supportsBackgroundSurfaceDetachment
                         val engine = engines[TabId(tab.id)]
-                        if (engine != null) {
+                        if (engine != null && shouldComposeSurface) {
                             key(tab.id) {
                                 Box(
                                     Modifier
