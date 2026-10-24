@@ -278,7 +278,7 @@ private fun BrowserTabStrip(
             val label = tab.title.takeIf { it.isNotBlank() } ?: tab.url.ifBlank { "新标签页" }
             Row(
                 modifier = Modifier
-                    .widthIn(min = 112.dp, max = 244.dp)
+                    .widthIn(min = 128.dp, max = 260.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (selected) c.surfaceContainer else c.surface)
                     .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
@@ -300,7 +300,7 @@ private fun BrowserTabStrip(
                     color = c.onBackground.copy(alpha = 0.6f),
                     fontSize = 16.sp,
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
                         .clickable { onCloseTab(tab.id) }
                         .padding(4.dp),
