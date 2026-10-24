@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase (verified 2026-10-24):** Android real-system-WebView lifecycle and history verification. The latest history-test revision `189e63c6fcbe3830e4866e5a50eaae8fffd39f6a` compiled successfully ([Build Veyra #40100754634](https://github.com/yuantris/Veyra/actions/runs/40100754634)), but Android emulator integration failed in `switchingTabsRestoresTheRealWebViewsBackForwardHistory` while waiting for the first `loadDataWithBaseURL` URL/title state. The production-path `WebView.saveState`/`restoreState` history test and the other app-level tab tests passed. Root cause: `loadDataWithBaseURL` synthesizes a `data:` history URL, so the test incorrectly asserted the supplied base URL; the new test revision `75b09479e8403f8a15aed31fc3e41b76c0168965` now uses explicit `data:` URLs consistent with the existing verified native history test. CI for this correction is pending. Desktop UI remains deferred; Android phone flow remains the priority.
+- **Phase (verified 2026-10-24):** Android real-system-WebView lifecycle and history verification. The app-level history test's first emulator run exposed a `loadDataWithBaseURL` URL assumption; revision `75b09479e8403f8a15aed31fc3e41b76c0168965` switched to explicit `data:` history URLs. The next emulator run reached the post-close restoration assertion and failed because that assertion still expected the former base URL instead of the explicit `secondUrl`. Revision `fcf45ff6bb13ef5fb73662f8ff8da32be60a8b0a` fixes that stale expectation; its CI is pending. In both runs, the native `WebView.saveState`/`restoreState` history test and other app-level tab tests passed. Desktop UI remains deferred; Android phone flow remains the priority.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -715,4 +715,17 @@
   - Commit: `75b09479e8403f8a15aed31fc3e41b76c0168965` (`test(android): use explicit URLs for WebView history`).
 - **Test evidence:** The preceding revision's Android emulator run failed as above; the correction has not yet completed CI. Do not consider the end-to-end history test green until the emulator job passes.
 - **Next smallest safe step:** Inspect CI for `75b09479`; if it fails, read the new instrumentation report and diagnose the next exact cause before modifying code. If green, proceed to the next Android phone-flow slice (address entry and real navigation).
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-24 — Fix the remaining restored-history URL assertion
+
+- **Goal:** Resolve the exact second emulator failure in the real-app history test without changing production code or weakening the assertion.
+- **Planned:** Read the latest instrumentation XML, map the timeout line to the current test source, and correct only the stale expected URL if confirmed.
+- **Completed:**
+  - The second Android emulator run still failed only in `switchingTabsRestoresTheRealWebViewsBackForwardHistory`, now at the post-close wait. The new setup had correctly switched to explicit `data:` URLs, but the final restored-state assertion still compared `WebView.url` to the former `https://veyra.invalid/second` base URL.
+  - Changed that final comparison to the same `secondUrl` used when creating the second history entry. Title and `canGoBack` assertions remain intact; production implementation is unchanged.
+  - Commit: `fcf45ff6bb13ef5fb73662f8ff8da32be60a8b0a` (`test(android): assert restored data URL consistently`).
+- **Test evidence:** Android emulator integration failed on the preceding revision due to this stale test expectation. The correction has not yet completed CI.
+- **Next smallest safe step:** Check the Android emulator job for `fcf45ff`; if green, proceed with the address-entry and real-navigation phone flow. If red, inspect the exact instrumentation XML before editing further.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
