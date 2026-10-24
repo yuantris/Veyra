@@ -422,9 +422,13 @@ class AndroidSessionOwnershipWebViewTest {
             )
 
             engineA.goBack()
+            val returnedToFirstEntry = waitForPageState(engineA) {
+                it.url == firstUrl && !it.canGoBack && it.progress == 100 && it.navigationId == null
+            }
             assertTrue(
-                "Back navigation after A → B → A should reach A's first history entry",
-                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack && it.progress == 100 && it.navigationId == null },
+                "Back navigation after A → B → A should reach A's first history entry; " +
+                    "final engine state=${engineA.pageState.value}",
+                returnedToFirstEntry,
             )
         } finally {
             scenario.onActivity { activity ->
