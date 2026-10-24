@@ -274,54 +274,61 @@ private fun BrowserTabStrip(
 ) {
     val c = MiuixTheme.colorScheme
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { tab ->
-            val selected = tab.id == activeTabId
-            val label = tab.title.takeIf { it.isNotBlank() } ?: tab.url.ifBlank { "新标签页" }
-            Row(
-                modifier = Modifier
-                    .widthIn(min = 128.dp, max = 260.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (selected) c.surfaceContainer else c.surface)
-                    .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = if (selected) c.primary else c.onBackground.copy(alpha = 0.75f),
-                    fontSize = 12.sp,
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEach { tab ->
+                val selected = tab.id == activeTabId
+                val label = tab.title.takeIf { it.isNotBlank() } ?: tab.url.ifBlank { "新标签页" }
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .clickable { onSelect(tab.id) }
-                        .padding(vertical = 6.dp),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .semantics {
-                            contentDescription = "关闭 $label 标签页"
-                            role = Role.Button
-                        }
-                        .clickable(role = Role.Button) { onCloseTab(tab.id) },
-                    contentAlignment = Alignment.Center,
+                        .widthIn(min = 128.dp, max = 260.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (selected) c.surfaceContainer else c.surface)
+                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "×",
-                        color = c.onBackground.copy(alpha = 0.6f),
-                        fontSize = 16.sp,
+                        text = label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = if (selected) c.primary else c.onBackground.copy(alpha = 0.75f),
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelect(tab.id) }
+                            .padding(vertical = 6.dp),
                     )
+                    Box(
+                        modifier = Modifier
+                            .requiredSize(48.dp)
+                            .clip(CircleShape)
+                            .semantics {
+                                contentDescription = "关闭 $label 标签页"
+                                role = Role.Button
+                            }
+                            .clickable(role = Role.Button) { onCloseTab(tab.id) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "×",
+                            color = c.onBackground.copy(alpha = 0.6f),
+                            fontSize = 16.sp,
+                        )
+                    }
                 }
             }
         }
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .requiredSize(48.dp)
                 .clip(CircleShape)
                 .semantics {
                     contentDescription = "新建标签页"
