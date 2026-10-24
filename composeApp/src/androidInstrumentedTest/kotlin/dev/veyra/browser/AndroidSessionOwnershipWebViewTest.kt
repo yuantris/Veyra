@@ -399,19 +399,19 @@ class AndroidSessionOwnershipWebViewTest {
 
             assertTrue(
                 "Tab A's first document should load; state=" + engineA.pageState.value,
-                waitForPageState(engineA) { it.url == firstUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
+                waitForPageState(engineA) { it.url == firstUrl && it.progress == 100 && it.navigationId == null },
             )
             engineA.navigate(NavigationRequest(tabAId, secondUrl, NavigationSource.USER))
             assertTrue(
                 "Tab A should reach its second document and have a back entry; state=" + engineA.pageState.value,
-                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
+                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack && it.progress == 100 && it.navigationId == null },
             )
 
             scenario.onActivity { selectTab.get()?.invoke("b") }
             InstrumentationRegistry.getInstrumentation().waitForIdleSync()
             assertTrue(
                 "Tab B should attach and load while A is detached",
-                waitForPageState(engineB) { it.url == tabBUrl && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
+                waitForPageState(engineB) { it.url == tabBUrl && it.progress == 100 && it.navigationId == null },
             )
 
             scenario.onActivity { selectTab.get()?.invoke("a") }
@@ -424,7 +424,7 @@ class AndroidSessionOwnershipWebViewTest {
             engineA.goBack()
             assertTrue(
                 "Back navigation after A → B → A should reach A's first history entry",
-                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack && it.loadPhase == dev.veyra.browser.core.BrowserLoadPhase.SUCCEEDED },
+                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack && it.progress == 100 && it.navigationId == null },
             )
         } finally {
             scenario.onActivity { activity ->
