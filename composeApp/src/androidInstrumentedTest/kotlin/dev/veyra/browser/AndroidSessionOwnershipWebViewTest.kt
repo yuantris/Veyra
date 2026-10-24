@@ -271,16 +271,35 @@ class AndroidSessionOwnershipWebViewTest {
 
         lateinit var restored: WebView
         lateinit var restoreResult: android.webkit.WebBackForwardList
+        val backNavigationFinished = CountDownLatch(1)
+        var restoredCurrentIndex = -1
         scenario.onActivity { activity ->
             restored = WebView(activity)
+            restored.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String) {
+                    backNavigationFinished.countDown()
+                }
+            }
             activity.setContentView(restored)
             restoreResult = restored.restoreState(snapshot)
                 ?: throw AssertionError("restoreState should restore the saved navigation list")
+            restoredCurrentIndex = restored.copyBackForwardList().currentIndex
         }
         try {
             assertTrue("Restored history should contain at least two entries", restoreResult.size >= 2)
             scenario.onActivity {
                 assertTrue("Restored WebView should be able to navigate back", restored.canGoBack())
+                restored.goBack()
+            }
+            assertTrue(
+                "Back navigation after restore should finish",
+                backNavigationFinished.await(5, TimeUnit.SECONDS),
+            )
+            scenario.onActivity {
+                assertTrue(
+                    "Back navigation should move to an earlier history entry",
+                    restored.copyBackForwardList().currentIndex < restoredCurrentIndex,
+                )
             }
         } finally {
             scenario.onActivity {
