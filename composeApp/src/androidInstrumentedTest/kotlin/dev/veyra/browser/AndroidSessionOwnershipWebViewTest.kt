@@ -340,8 +340,14 @@ class AndroidSessionOwnershipWebViewTest {
             )
             scenario.onActivity {
                 val historyAfterBack = restored.copyBackForwardList()
-                assertEquals("Back navigation should land on the expected previous URL",
-                    expectedBackUrl, historyAfterBack.currentItem.url)
+                val currentHistoryItem = historyAfterBack.currentItem
+                assertNotNull("Current history item should exist after back navigation", currentHistoryItem)
+                assertEquals(
+                    "Back navigation should land on the expected previous URL",
+                    expectedBackUrl,
+                    currentHistoryItem?.url
+                        ?: throw AssertionError("Current history item should have a URL"),
+                )
                 assertTrue(
                     "Back navigation should move to an earlier history entry",
                     historyAfterBack.currentIndex >= 0 &&
