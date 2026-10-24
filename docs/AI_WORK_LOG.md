@@ -422,3 +422,13 @@
 - **Test evidence:** Source changes committed; no test or CI result has yet been observed for this revision. Android runtime behavior (back/forward list and scroll restoration), tab switching and renderer-crash recovery remain to be confirmed by emulator tests. This change does not claim iOS/Desktop detachment support.
 - **Next smallest safe step:** Add/extend Android instrumentation coverage for saving a WebView state bundle, recreating a WebView and restoring back/forward history; then run Android emulator integration plus common/Desktop/iOS compile workflows and fix any regressions.
 - **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/ComposeWebViewSurfaceRenderer.kt`, `composeApp/src/androidMain/kotlin/dev/veyra/browser/AndroidChromiumSurfaceRenderer.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-24 — Add Android WebView save/restore history instrumentation coverage
+
+- **Goal:** Verify the Android adapter's new background-surface detachment assumption: a healthy WebView can save its navigation list into a Bundle, be destroyed, and restore that list into a replacement WebView.
+- **Completed:** Added webViewSaveRestorePreservesBackForwardHistory to AndroidSessionOwnershipWebViewTest. It loads two local HTML documents (no external network), asserts the second has a back entry, snapshots via saveState, destroys the original view, calls restoreState on a replacement, and checks the restored history contains at least two entries and supports back navigation.
+- **Test reliability:** The test waits for each local document's onPageFinished callback and does not assert WebView.url equals the base URL; loadDataWithBaseURL does not guarantee that representation.
+- **Verification status:** The preceding lifecycle implementation revision (638505d) passed Build Veyra (40048858103) and Browser Core Tests (40048858128), including Android emulator integration and iOS compile. The new instrumentation test was pushed at b3cd784; its fresh Build Veyra and Browser Core Tests workflows are queued/running and have not yet been verified. Do not treat this new test as green until android-emulator-integration completes successfully.
+- **Next step:** Inspect the latest workflow results. If the test fails, use the emulator log to correct the test or adapter before relying on Android background detachment. Even if it passes, this covers platform saveState/restoreState mechanics; it does not by itself prove full Compose tab-switch integration or in-flight navigation continuity.
+- **Files:** composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidSessionOwnershipWebViewTest.kt, docs/AI_WORK_LOG.md.
