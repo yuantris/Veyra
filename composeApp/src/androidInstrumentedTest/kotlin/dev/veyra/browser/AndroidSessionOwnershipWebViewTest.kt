@@ -5,6 +5,14 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.setContent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.test.platform.app.InstrumentationRegistry
+import dev.veyra.browser.core.session.BrowserTab
+import java.util.concurrent.atomic.AtomicReference
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.veyra.browser.core.BrowserEngineCreateRequest
@@ -344,6 +352,101 @@ class AndroidSessionOwnershipWebViewTest {
                 restored.destroy()
             }
         }
+    }
+
+
+    @Test
+    fun composeTabSwitchAToBToARestoresTabAHistory() {
+        val firstUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-one%3C/body%3E%3C/html%3E"
+        val secondUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-a-two%3C/body%3E%3C/html%3E"
+        val tabBUrl = "data:text/html,%3Chtml%3E%3Cbody%3Etab-b%3C/body%3E%3C/html%3E"
+        val tabAId = TabId("compose-tab-a-\${System.nanoTime()}")
+        val tabBId = TabId("compose-tab-b-\${System.nanoTime()}")
+        val engineA = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabAId, ProfileId("default"), initialUrl = firstUrl),
+        )
+        val engineB = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabBId, ProfileId("default"), initialUrl = tabBUrl),
+        )
+        val selectTab = AtomicReference<((String) -> Unit)?>(null)
+
+        try {
+            scenario.onActivity { activity ->
+                activity.setContent {
+                    var selectedTab by remember { mutableStateOf("a") }
+                    selectTab.set { selectedTab = it }
+                    val renderer = AndroidChromiumSurfaceRenderer
+                    if (selectedTab == "a") {
+                        renderer.Render(
+                            tab = BrowserTab(id = tabAId.value, url = engineA.pageState.value.url, title = "A"),
+                            engine = engineA,
+                            isVisible = true,
+                            onNavigationRequest = { NavigationDecision.Allow },
+                            onNavigationDecision = {},
+                        )
+                    } else {
+                        renderer.Render(
+                            tab = BrowserTab(id = tabBId.value, url = engineB.pageState.value.url, title = "B"),
+                            engine = engineB,
+                            isVisible = true,
+                            onNavigationRequest = { NavigationDecision.Allow },
+                            onNavigationDecision = {},
+                        )
+                    }
+                }
+            }
+
+            assertTrue(
+                "Tab A's first document should load",
+                waitForPageState(engineA) { it.url == firstUrl },
+            )
+            engineA.navigate(NavigationRequest(tabAId, secondUrl, NavigationSource.USER))
+            assertTrue(
+                "Tab A should reach its second document and have a back entry",
+                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack },
+            )
+
+            scenario.onActivity { selectTab.get()?.invoke("b") }
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            assertTrue(
+                "Tab B should attach and load while A is detached",
+                waitForPageState(engineB) { it.url == tabBUrl },
+            )
+
+            scenario.onActivity { selectTab.get()?.invoke("a") }
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            assertTrue(
+                "Tab A's restored surface should retain the second URL and back history",
+                waitForPageState(engineA) { it.url == secondUrl && it.canGoBack },
+            )
+
+            engineA.goBack()
+            assertTrue(
+                "Back navigation after A → B → A should reach A's first history entry",
+                waitForPageState(engineA) { it.url == firstUrl && !it.canGoBack },
+            )
+        } finally {
+            scenario.onActivity { selectTab.get()?.invoke("b") }
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            runBlocking {
+                engineA.close()
+                engineB.close()
+            }
+        }
+    }
+
+    private fun waitForPageState(
+        engine: ComposeWebViewEngine,
+        predicate: (dev.veyra.browser.core.BrowserPageState) -> Boolean,
+        timeoutMs: Long = 10_000,
+    ): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+            if (predicate(engine.pageState.value)) return true
+            Thread.sleep(50)
+        }
+        return false
     }
 
 }
