@@ -441,8 +441,8 @@ class AndroidSessionOwnershipWebViewTest {
 
     private fun waitForPageState(
         engine: ComposeWebViewEngine,
-        predicate: (dev.veyra.browser.core.BrowserPageState) -> Boolean,
         timeoutMs: Long = 10_000,
+        predicate: (dev.veyra.browser.core.BrowserPageState) -> Boolean,
     ): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
