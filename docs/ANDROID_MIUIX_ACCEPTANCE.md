@@ -10,7 +10,7 @@ Compose remains the presentation layer. Browser session, tab metadata, navigatio
 
 ### A1 — Android phone baseline
 - Validate the home screen, address/search input, address submission, loading/stop/reload, tab selection, new-tab action, back/forward controls, and bottom navigation on a compact phone-sized viewport.
-- Ensure interactive controls have clear enabled/disabled states, adequate touch targets, and no horizontal overflow at narrow widths.
+- Ensure interactive controls have clear enabled/disabled states, at least 48 dp targets for primary tab actions (close/new tab), accessible action descriptions, and no horizontal overflow at narrow widths.
 - Add or update focused tests for layout decisions and important UI behavior where they can be tested reliably.
 - Acceptance: Android build and automated tests pass; a phone emulator smoke test confirms the main navigation path.
 
