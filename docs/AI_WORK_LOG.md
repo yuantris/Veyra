@@ -875,3 +875,5 @@
 - **Change:** Added an explicit stop latch. After `stop()`, renderer observations are prevented from creating inferred navigations or changing URL/loading/error state until a user-initiated navigate, reload, back, or forward command clears the latch. This also covers callbacks delivered synchronously from the native stop call. Added a regression sequence with an idle callback between stop and trailing progress, followed by a stale-URL loading observation.
 - **Commits:** Latch fix `c8ddd3c6728792f1ecf0845c562392779c7773a0`; regression test `1cabe5973b25eb244ddc8e0b587999236bf01d62`.
 - **Verification:** CI for the prior guard is still running at the time of this entry; the new latch and test will trigger another full CI run. Do not treat the stop/reload issue as resolved until Android emulator integration passes.
+
+- **Additional hardening:** Commit `0b1f2bd83da1d6c6b4f99c2f37de977f6081bf56` also suppresses late native error events while the explicit-stop latch is active, so cancellation callbacks cannot publish a false navigation failure after the user stopped loading.
