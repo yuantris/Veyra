@@ -194,6 +194,16 @@ class ComposeWebViewEngineTest {
         engine.stop()
         assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
 
+        // An idle callback can arrive between stop() and a later trailing progress callback.
+        engine.observe(
+            url = url,
+            title = null,
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+        )
+        assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
+
         // A late WebChromeClient progress callback must not restore loading for the stopped URL.
         engine.observe(
             url = url,
