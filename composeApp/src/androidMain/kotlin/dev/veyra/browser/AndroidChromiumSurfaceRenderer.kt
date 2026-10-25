@@ -109,9 +109,15 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         // calls that race with disposal.
         val mainHandler = remember { Handler(Looper.getMainLooper()) }
         val surfaceDestroyed = remember(webView) { AtomicBoolean(false) }
-        val surface = remember(webView) {
+        // Keep the latest requested URL separately from WebView.url: a navigation stopped
+        // before response headers may never commit a current URL, but reload must still retry it.
+        val lastRequestedUrl = remember(webView) {
+            java.util.concurrent.atomic.AtomicReference<String?>(webView.url)
+        }
+        val surface = remember(webView, lastRequestedUrl) {
             object : BrowserSurfacePort {
                 override fun loadUrl(url: String) {
+                    lastRequestedUrl.set(url)
                     mainHandler.post { if (!surfaceDestroyed.get()) webView.loadUrl(url) }
                 }
                 override fun goBack() {
@@ -121,7 +127,16 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                     mainHandler.post { if (!surfaceDestroyed.get() && webView.canGoForward()) webView.goForward() }
                 }
                 override fun reload() {
-                    mainHandler.post { if (!surfaceDestroyed.get()) webView.reload() }
+                    mainHandler.post {
+                        if (!surfaceDestroyed.get()) {
+                            val currentUrl = webView.url
+                            if (!currentUrl.isNullOrBlank()) {
+                                webView.reload()
+                            } else {
+                                lastRequestedUrl.get()?.let(webView::loadUrl)
+                            }
+                        }
+                    }
                 }
                 override fun stop() {
                     mainHandler.post {
