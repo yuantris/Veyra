@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performTextReplacement
@@ -37,13 +38,14 @@ class AndroidMiuixTabActionsTest {
         assertAtLeast48Dp(newTab.fetchSemanticsNode().boundsInRoot.width, density, "new-tab")
 
         // Bottom navigation controls must also meet the same touch-target baseline.
-        listOf("标签页", "收藏夹", "菜单").forEach { description ->
+        listOf("标签页", "收藏夹（暂未开放）", "菜单（暂未开放）").forEach { description ->
             val node = composeRule.onNodeWithContentDescription(description)
             assertAtLeast48Dp(
                 node.fetchSemanticsNode().boundsInRoot.width,
                 density,
                 description,
             )
+            if (description != "标签页") node.assertIsNotEnabled()
         }
 
         val closeTabs = composeRule.onAllNodes(hasContentDescription("关闭", substring = true))
