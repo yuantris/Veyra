@@ -823,3 +823,12 @@
 - **Verification:** CI pending. The Android emulator suite must pass before calling this fixed; phone/tablet acceptance is still open.
 - **Next smallest safe step:** Inspect CI for these commits. If the same UI test still fails, inspect actual instrumentation/logcat output and trace state from the native error callback through the active coordinator state; do not weaken the test.
 - **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/ComposeWebViewEngineAdapter.kt`, `composeApp/src/commonTest/kotlin/dev/veyra/browser/ComposeWebViewEngineTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-25 — Make the Android main-frame error test deterministic
+
+- **Evidence:** The adapter predicate fix and common regression test passed common tests, iOS compile and Android/Desktop compilation, but the full emulator workflow still failed only at `mainFrameLoadFailureIsVisibleInBrowserChrome` (run [#40170499218](https://github.com/yuantris/Veyra/actions/runs/40170499218)). The other 29 instrumentation cases passed. Therefore, retaining the failure against late loading observations alone did not resolve the end-to-end failure.
+- **Test change:** Replaced the hard-coded `127.0.0.1:1` destination with a real ephemeral loopback `ServerSocket`. The test waits until the attached WebView's request is received, then deliberately closes the socket without sending HTTP headers. This removes uncertainty around a hard-coded port and proves the native WebView actually attempted the failing request before checking browser chrome.
+- **Commit:** Android instrumentation test `441f1d69568359c1afebf54295641ea44143fb95`.
+- **Verification:** CI pending. This is a diagnostic test improvement, not a claim that the UI error is fixed. If it still fails, the request-received latch and failing test output will narrow the issue to WebView callback/state projection rather than address-bar routing.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`.
