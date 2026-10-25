@@ -434,6 +434,22 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun addressBarReloadControlHasAccessibleTouchTarget() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+
+        val reloadButton = composeRule.onNodeWithContentDescription("重新加载")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { reloadButton.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        val density = composeRule.activity.resources.displayMetrics.density
+        val bounds = reloadButton.fetchSemanticsNode().boundsInRoot
+        assertAtLeast48Dp(bounds.width, density, "address-reload")
+        assertAtLeast48Dp(bounds.height, density, "address-reload-height")
+    }
+
+    @Test
     fun reloadControlReloadsTheCurrentRealWebViewDocument() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
