@@ -119,7 +119,7 @@ class AndroidMiuixTabActionsTest {
 
         // Search routing is deterministic and can be asserted at the native navigation
         // boundary without depending on external DNS or the search provider's response.
-        val expectedUrl = "https://www.baidu.com/search?q=veyra+browser+search+test"
+        val expectedUrl = "https://www.baidu.com/search?q=veyra%20browser%20search%20test"
         composeRule.waitUntil(timeoutMillis = 10_000) {
             attachedWebViewState()?.url == expectedUrl
         }
