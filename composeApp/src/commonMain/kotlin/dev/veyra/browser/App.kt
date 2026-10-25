@@ -304,6 +304,13 @@ fun App() {
 }
 
 
+/** Returns the URL scheme label without implying that TLS verification has succeeded. */
+internal fun browserAddressProtocolLabel(pageUrl: String): String = when {
+    pageUrl.startsWith("https://", ignoreCase = true) -> "HTTPS"
+    pageUrl.startsWith("http://", ignoreCase = true) -> "HTTP"
+    else -> ""
+}
+
 /**
  * Converts address-bar input to a navigable URL. Search text is encoded as a single query
  * component so reserved characters such as &, +, # and non-ASCII text cannot alter the URL.
@@ -446,19 +453,16 @@ private fun AddressBar(
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val securityLabel = when {
-            pageUrl.startsWith("https://", ignoreCase = true) -> "安全连接"
-            pageUrl.startsWith("http://", ignoreCase = true) -> "连接未加密"
+        val protocolLabel = browserAddressProtocolLabel(pageUrl)
+        val protocolDescription = when (protocolLabel) {
+            "HTTPS" -> "HTTPS 地址，连接安全状态尚未验证"
+            "HTTP" -> "HTTP 地址，连接未加密"
             else -> "未加载网页"
         }
         Text(
-            text = when (securityLabel) {
-                "安全连接" -> "🔒"
-                "连接未加密" -> "ⓘ"
-                else -> "◉"
-            },
-            fontSize = 15.sp,
-            modifier = Modifier.semantics { contentDescription = securityLabel },
+            text = protocolLabel.ifEmpty { "◉" },
+            fontSize = if (protocolLabel.isEmpty()) 15.sp else 11.sp,
+            modifier = Modifier.semantics { contentDescription = protocolDescription },
         )
         Spacer(Modifier.width(10.dp))
         BasicTextField(
