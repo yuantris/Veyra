@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.net.ServerSocket
 
 /**
  * A1 phone-interaction regression for the real app composition:
@@ -243,6 +244,43 @@ class AndroidMiuixTabActionsTest {
             "Back and forward controls must navigate the real WebView history",
             attachedWebViewState()?.let { it.url == secondUrl && it.canGoBack } == true,
         )
+    }
+
+    @Test
+    fun stopLoadingControlEndsARealInFlightWebViewNavigation() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+
+        val server = ServerSocket(0)
+        val serverThread = Thread {
+            runCatching {
+                server.accept().use { socket ->
+                    socket.soTimeout = 2_000
+                    val reader = socket.getInputStream().bufferedReader()
+                    reader.readLine()
+                    while (reader.readLine().isNotEmpty()) Unit
+                    Thread.sleep(15_000)
+                }
+            }
+        }.apply { isDaemon = true; start() }
+        val targetUrl = "http://127.0.0.1:" + server.localPort + "/stop-loading"
+        try {
+            composeRule.activity.runOnUiThread {
+                findAttachedWebView()?.loadUrl(targetUrl)
+            }
+            val stopButton = composeRule.onNodeWithContentDescription("停止加载")
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                runCatching { stopButton.fetchSemanticsNode(); true }.getOrDefault(false)
+            }
+            stopButton.performClick()
+            val reloadButton = composeRule.onNodeWithContentDescription("重新加载")
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                runCatching { reloadButton.fetchSemanticsNode(); true }.getOrDefault(false)
+            }
+        } finally {
+            server.close()
+            serverThread.join(2_500)
+        }
     }
 
     @Test
