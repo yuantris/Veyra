@@ -153,6 +153,7 @@ fun App() {
                     onAddressChange = { address = it },
                     onGo = { openAddress(address) },
                     isBrowsing = showBrowser,
+                    pageUrl = activeTab?.url.orEmpty(),
                     isLoading = activeTab?.isLoading == true,
                     onStopOrReload = {
                         activeTab?.let { tab ->
@@ -431,6 +432,7 @@ private fun AddressBar(
     onAddressChange: (String) -> Unit,
     onGo: () -> Unit,
     isBrowsing: Boolean,
+    pageUrl: String,
     isLoading: Boolean,
     onStopOrReload: () -> Unit,
 ) {
@@ -444,7 +446,20 @@ private fun AddressBar(
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("🔒", fontSize = 15.sp)
+        val securityLabel = when {
+            pageUrl.startsWith("https://", ignoreCase = true) -> "安全连接"
+            pageUrl.startsWith("http://", ignoreCase = true) -> "连接未加密"
+            else -> "未加载网页"
+        }
+        Text(
+            text = when (securityLabel) {
+                "安全连接" -> "🔒"
+                "连接未加密" -> "ⓘ"
+                else -> "◉"
+            },
+            fontSize = 15.sp,
+            modifier = Modifier.semantics { contentDescription = securityLabel },
+        )
         Spacer(Modifier.width(10.dp))
         BasicTextField(
             value = address,
