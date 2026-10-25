@@ -803,3 +803,11 @@
 - **CI:** [Browser Core Tests #40168586452](https://github.com/yuantris/Veyra/actions/runs/40168586452) passed, including common tests, iOS compile, and Android emulator integration. [Build Veyra #40168586446](https://github.com/yuantris/Veyra/actions/runs/40168586446) passed Android/Desktop compilation.
 - **Outcome:** The regression test for a stale idle observation after a main-frame failure passes, and the emulator suite including visible error feedback passes. This verifies the observed failure path; it does not complete Android phone/tablet acceptance.
 - **Next:** Continue A1 on the real Android browsing path, focusing on any remaining lifecycle/state gap rather than cosmetic churn. Tablet and desktop UI remain deferred.
+
+
+### 2026-10-25 — Prevent stale callbacks from completing the next navigation
+
+- **Finding:** While checking the now-green failure-feedback path, the same callback-ordering issue exposed a related state risk: an idle observation from the previous document can arrive after the user starts a new navigation. If its URL does not match the new target/redirect, the adapter must not report the new navigation as succeeded.
+- **Change:** The adapter now preserves the current loading phase when an idle observation does not match the active navigation's target/redirect. Added a common regression test that completes one navigation, starts a second, then injects a stale idle observation for the first URL and asserts the second remains STARTING at its target URL.
+- **Commits:** Adapter `10b99819a632b15f55284c2ad16dbfc8a1469aa7`; regression test `460ab487e13a971b0fa845ed1ea917653cbe8bd4`.
+- **Verification:** Pending CI. This is a correctness regression test, not evidence of full phone acceptance. Tablet and desktop UI remain deferred.
