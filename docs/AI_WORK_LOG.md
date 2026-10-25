@@ -840,3 +840,12 @@
 - **Outcome:** The previously recurring `mainFrameLoadFailureIsVisibleInBrowserChrome` failure is now green in the full Android emulator workflow using a real ephemeral loopback endpoint. The test still asserts the accessible browser-chrome error notice; it was not weakened. Android/Desktop build, common test, iOS compile, and emulator jobs all passed for the verified change.
 - **Scope:** This closes that specific regression only. A1 phone acceptance remains in progress; this CI run is not tablet runtime evidence and does not authorize desktop UI work.
 - **Next:** Continue A1 by auditing visible browser controls for misleading placeholder actions and verifying touch/accessibility behavior on compact Android layouts. Tablet validation remains after phone acceptance.
+
+
+### 2026-10-25 — Make unfinished Android home actions explicit
+
+- **A1 finding:** The bottom bar exposed clickable-looking 收藏夹 and 菜单 controls whose handlers were placeholders. The home screen also showed a hard-coded “最近 7 天已阻止 19 个跟踪器” privacy report and a 自定义 action with no implementation, which could mislead users into treating unfinished features as functional.
+- **Change:** Marked the 收藏夹 and 菜单 bottom-bar actions as “暂未开放” and disabled them while preserving their 48dp touch-target geometry. Removed the fake tracker-count/privacy-report card and nonfunctional customize action from the home screen rather than displaying invented status or implying unsupported behavior.
+- **Regression coverage:** Updated `tabActionsHaveAccessibleTouchTargetsAndNewTabCanBeClosed` to assert both unfinished bottom-bar actions are disabled and still meet the touch-target baseline.
+- **Commits:** UI `9e21db2dcd991ea8cc874c79aea2ef50c751d9cd`; instrumentation test `d5f285b84b1fc79e77f469b4270522f97c1502ff`.
+- **Verification:** CI pending for the UI and instrumentation commits. Do not mark this change verified until the emulator and build workflows finish. A1 remains in progress; tablet and desktop UI remain deferred.
