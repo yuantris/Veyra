@@ -247,19 +247,38 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
-    fun stopLoadingControlEndsARealInFlightWebViewNavigation() {
+    fun stopLoadingControlEndsNavigationAndReloadCanLoadThePage() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
 
+        val releaseFirstRequest = java.util.concurrent.CountDownLatch(1)
         val server = ServerSocket(0)
         val serverThread = Thread {
             runCatching {
+                // Hold the first response until the app explicitly stops that navigation.
                 server.accept().use { socket ->
                     socket.soTimeout = 2_000
                     val reader = socket.getInputStream().bufferedReader()
                     reader.readLine()
                     while (reader.readLine().isNotEmpty()) Unit
-                    Thread.sleep(15_000)
+                    releaseFirstRequest.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                }
+                // The stopped request is deliberately not answered. The next request must
+                // be the user's explicit reload and receives a deterministic local page.
+                server.accept().use { socket ->
+                    socket.soTimeout = 2_000
+                    val reader = socket.getInputStream().bufferedReader()
+                    reader.readLine()
+                    while (reader.readLine().isNotEmpty()) Unit
+                    val body = "<!doctype html><title>Veyra stopped reload</title><p>reloaded</p>"
+                    val bytes = body.toByteArray(Charsets.UTF_8)
+                    val output = socket.getOutputStream()
+                    output.write(
+                        ("HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\nContent-Length: " +
+                            bytes.size + "\\r\\nConnection: close\\r\\n\\r\\n").toByteArray(Charsets.US_ASCII),
+                    )
+                    output.write(bytes)
+                    output.flush()
                 }
             }
         }.apply { isDaemon = true; start() }
@@ -273,11 +292,27 @@ class AndroidMiuixTabActionsTest {
                 runCatching { stopButton.fetchSemanticsNode(); true }.getOrDefault(false)
             }
             stopButton.performClick()
+
             val reloadButton = composeRule.onNodeWithContentDescription("重新加载")
             composeRule.waitUntil(timeoutMillis = 10_000) {
                 runCatching { reloadButton.fetchSemanticsNode(); true }.getOrDefault(false)
             }
+            releaseFirstRequest.countDown()
+            reloadButton.performClick()
+
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                attachedWebViewState()?.let {
+                    it.url == targetUrl && it.title == "Veyra stopped reload"
+                } == true
+            }
+            assertTrue(
+                "Reload after stopping must complete a real local WebView navigation",
+                attachedWebViewState()?.let {
+                    it.url == targetUrl && it.title == "Veyra stopped reload"
+                } == true,
+            )
         } finally {
+            releaseFirstRequest.countDown()
             server.close()
             serverThread.join(2_500)
         }
