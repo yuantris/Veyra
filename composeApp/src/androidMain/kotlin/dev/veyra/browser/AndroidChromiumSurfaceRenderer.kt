@@ -114,10 +114,12 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
         val lastRequestedUrl = remember(webView) {
             java.util.concurrent.atomic.AtomicReference<String?>(webView.url)
         }
-        val surface = remember(webView, lastRequestedUrl) {
+        val stoppedBeforeCommit = remember(webView) { AtomicBoolean(false) }
+        val surface = remember(webView, lastRequestedUrl, stoppedBeforeCommit) {
             object : BrowserSurfacePort {
                 override fun loadUrl(url: String) {
                     lastRequestedUrl.set(url)
+                    stoppedBeforeCommit.set(false)
                     mainHandler.post { if (!surfaceDestroyed.get()) webView.loadUrl(url) }
                 }
                 override fun goBack() {
@@ -130,17 +132,23 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                     mainHandler.post {
                         if (!surfaceDestroyed.get()) {
                             val currentUrl = webView.url
-                            if (!currentUrl.isNullOrBlank()) {
+                            if (stoppedBeforeCommit.get()) {
+                                (lastRequestedUrl.get() ?: currentUrl)
+                                    ?.takeIf(String::isNotBlank)
+                                    ?.let(webView::loadUrl)
+                            } else if (!currentUrl.isNullOrBlank()) {
                                 webView.reload()
                             } else {
                                 lastRequestedUrl.get()?.let(webView::loadUrl)
                             }
+                            stoppedBeforeCommit.set(false)
                         }
                     }
                 }
                 override fun stop() {
                     mainHandler.post {
                         if (!surfaceDestroyed.get()) {
+                            stoppedBeforeCommit.set(true)
                             webView.stopLoading()
                             // WebView does not guarantee onPageFinished after stopLoading().
                             // Publish the terminal loading state explicitly so the address-bar
