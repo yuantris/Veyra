@@ -355,10 +355,14 @@ class AndroidMiuixTabActionsTest {
             }.getOrDefault(false)
         }
 
-        assertTrue(
-            "A newly opened browser surface should have no back history",
-            attachedWebViewState()?.canGoBack == false,
-        )
+        val webView = findAttachedWebView()
+            ?: throw AssertionError("Expected the active tab's system WebView to be attached")
+        // Startup can seed a history entry before this UI path is exercised. Establish the
+        // exact precondition under test instead of assuming a fresh WebView has an empty stack.
+        composeRule.activity.runOnUiThread { webView.clearHistory() }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.canGoBack == false
+        }
 
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
 
