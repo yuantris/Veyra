@@ -344,6 +344,10 @@ internal class ComposeWebViewEngine(
         } else {
             observedUrl
         }
+        // WebView can dispatch a final progress callback after stopLoading() has already
+        // published STOPPED. Ignore a stale same-URL callback; explicit navigate/reload starts anew.
+        val trailingLoadingAfterStop = previous.loadPhase == BrowserLoadPhase.STOPPED &&
+            activeNavigationId == null && observedUrl == previous.url && isLoading
 
         mutablePageState.value = previous.copy(
             url = stateUrl,
@@ -351,6 +355,7 @@ internal class ComposeWebViewEngine(
             title = title ?: previous.title,
             loadPhase = when {
                 error != null -> BrowserLoadPhase.FAILED
+                trailingLoadingAfterStop -> BrowserLoadPhase.STOPPED
                 isLoading -> if (activeNavigationCommitted) BrowserLoadPhase.LOADING else BrowserLoadPhase.STARTING
                 activeNavigationId != null ->
                     if (observedUrlMatchesNavigation) BrowserLoadPhase.SUCCEEDED else previous.loadPhase
@@ -361,7 +366,7 @@ internal class ComposeWebViewEngine(
                 else -> BrowserLoadPhase.IDLE
             },
             progress = when {
-                error != null -> null
+                error != null || trailingLoadingAfterStop -> null
                 isLoading -> previous.progress?.coerceIn(0, 99) ?: 10
                 else -> 100
             },
