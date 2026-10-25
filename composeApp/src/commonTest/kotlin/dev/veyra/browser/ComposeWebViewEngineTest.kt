@@ -176,6 +176,41 @@ class ComposeWebViewEngineTest {
     }
 
     @Test
+    fun trailingLoadingObservationDoesNotUndoAnExplicitStop() {
+        val tabId = TabId("tab-stopped")
+        val url = "http://127.0.0.1:18080/slow"
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        engine.navigate(NavigationRequest(tabId, url))
+        engine.observe(
+            url = url,
+            title = null,
+            isLoading = true,
+            canGoBack = false,
+            canGoForward = false,
+        )
+
+        engine.stop()
+        assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
+
+        // A late WebChromeClient progress callback must not restore loading for the stopped URL.
+        engine.observe(
+            url = url,
+            title = null,
+            isLoading = true,
+            canGoBack = false,
+            canGoForward = false,
+        )
+
+        assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
+        assertEquals(null, engine.pageState.value.progress)
+
+        engine.reload()
+        assertEquals(BrowserLoadPhase.STARTING, engine.pageState.value.loadPhase)
+    }
+
+    @Test
     fun navigationBeforeSurfaceAttachmentIsDeliveredWhenSurfaceAttaches() {
         val engine = ComposeWebViewEngine(
             BrowserEngineCreateRequest(
