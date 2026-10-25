@@ -394,7 +394,7 @@ internal class ComposeWebViewEngine(
             mutableEvents.tryEmit(BrowserEvent.NavigationCommitted(tabId, navigationId, observedUrl))
         }
 
-        if (nativeError != null) {
+        if (nativeError != null && !stoppedObservation) {
             mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, nativeError))
             activeNavigationId = null
             activeNavigationUrl = null
