@@ -324,7 +324,7 @@ internal class ComposeWebViewEngine(
         // callback immediately erase it. A new navigation clears the error in navigate/reload.
         val error = nativeError ?: previous.error?.takeIf {
             previous.loadPhase == BrowserLoadPhase.FAILED &&
-                observedUrl == previous.url &&
+                activeNavigationId == null &&
                 !isLoading
         }
         // A redirect is a valid commit too. Ignore only the old page URL while a requested
