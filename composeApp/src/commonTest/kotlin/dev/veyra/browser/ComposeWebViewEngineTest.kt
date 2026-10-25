@@ -70,6 +70,41 @@ class ComposeWebViewEngineTest {
     }
 
     @Test
+    fun staleIdleObservationDoesNotCompleteANewNavigation() {
+        val tabId = TabId("tab-stale-idle")
+        val oldUrl = "https://previous.example"
+        val targetUrl = "https://target.example"
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        engine.navigate(NavigationRequest(tabId, oldUrl))
+        engine.observe(
+            url = oldUrl,
+            title = "Previous",
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+        )
+        assertEquals(BrowserLoadPhase.SUCCEEDED, engine.pageState.value.loadPhase)
+
+        engine.navigate(NavigationRequest(tabId, targetUrl))
+        assertEquals(BrowserLoadPhase.STARTING, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.url)
+
+        // A trailing callback from the previous document must not mark the target navigation done.
+        engine.observe(
+            url = oldUrl,
+            title = "Previous",
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+        )
+
+        assertEquals(BrowserLoadPhase.STARTING, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.url)
+    }
+
+    @Test
     fun trailingIdleObservationDoesNotEraseMainFrameFailureWhenUrlIsStale() {
         val tabId = TabId("tab-failed")
         val targetUrl = "http://127.0.0.1:1/veyra-main-frame-error"
