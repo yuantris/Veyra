@@ -278,6 +278,7 @@ class AndroidMiuixTabActionsTest {
         val url: String?,
         val title: String?,
         val canGoBack: Boolean,
+        val canGoForward: Boolean,
     )
 
     private fun attachedWebViewState(): AttachedWebViewState? {
@@ -285,7 +286,7 @@ class AndroidMiuixTabActionsTest {
         androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val view = findAttachedWebViewOnMainThread()
             if (view != null) {
-                state = AttachedWebViewState(view.url, view.title, view.canGoBack())
+                state = AttachedWebViewState(view.url, view.title, view.canGoBack(), view.canGoForward())
             }
         }
         return state
