@@ -110,6 +110,7 @@ internal class ComposeWebViewEngine(
     private var activeNavigationUrl: String? = null
     private var activeNavigationPreviousUrl: String? = null
     private var activeNavigationCommitted = false
+    private var stoppedAwaitingExplicitNavigation = false
     private var closed = false
 
     override fun attachSurface(surface: BrowserSurfacePort) {
@@ -165,6 +166,7 @@ internal class ComposeWebViewEngine(
         if (target.isEmpty()) return
 
         initialNavigationPending = false
+        stoppedAwaitingExplicitNavigation = false
         val previousUrl = mutablePageState.value.url
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
         activeNavigationId = navigationId
@@ -187,6 +189,7 @@ internal class ComposeWebViewEngine(
 
     override fun goBack() {
         if (closed) return
+        stoppedAwaitingExplicitNavigation = false
         val currentSurface = surface
         if (currentSurface == null) {
             pendingHistoryCommands += HistoryCommand.BACK
@@ -197,6 +200,7 @@ internal class ComposeWebViewEngine(
 
     override fun goForward() {
         if (closed) return
+        stoppedAwaitingExplicitNavigation = false
         val currentSurface = surface
         if (currentSurface == null) {
             pendingHistoryCommands += HistoryCommand.FORWARD
@@ -207,6 +211,7 @@ internal class ComposeWebViewEngine(
 
     override fun reload() {
         if (closed) return
+        stoppedAwaitingExplicitNavigation = false
         initialNavigationPending = false
         val currentUrl = mutablePageState.value.url
         val navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
@@ -227,6 +232,7 @@ internal class ComposeWebViewEngine(
 
     override fun stop() {
         if (closed) return
+        stoppedAwaitingExplicitNavigation = true
         surface?.stop()
         val navigationId = activeNavigationId
         if (navigationId != null) {
@@ -299,6 +305,7 @@ internal class ComposeWebViewEngine(
         val previous = mutablePageState.value
         val observedUrl = url?.takeIf { it.isNotBlank() } ?: previous.url
         var navigationId = activeNavigationId
+        val stoppedObservation = stoppedAwaitingExplicitNavigation && navigationId == null
 
         // An idle callback with a stale URL can arrive after a failed main-frame load.
         // Do not reinterpret that callback as a new navigation: explicit navigate/reload
@@ -306,6 +313,7 @@ internal class ComposeWebViewEngine(
         if (
             observedUrl != previous.url &&
             navigationId == null &&
+            !stoppedAwaitingExplicitNavigation &&
             !(previous.loadPhase == BrowserLoadPhase.FAILED && !isLoading)
         ) {
             navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
@@ -329,16 +337,21 @@ internal class ComposeWebViewEngine(
         // WebView may deliver onPageFinished after onReceivedError. Keep the main-frame
         // failure visible for that same failed URL instead of letting the trailing idle
         // callback immediately erase it. A new navigation clears the error in navigate/reload.
-        val error = nativeError ?: previous.error?.takeIf {
-            previous.loadPhase == BrowserLoadPhase.FAILED &&
-                activeNavigationId == null
+        val error = if (stoppedObservation) {
+            null
+        } else {
+            nativeError ?: previous.error?.takeIf {
+                previous.loadPhase == BrowserLoadPhase.FAILED &&
+                    activeNavigationId == null
+            }
         }
         // A redirect is a valid commit too. Ignore only the old page URL while a requested
         // navigation is still waiting for its target/redirect to appear.
         val observedUrlMatchesNavigation = activeNavigationPreviousUrl == null ||
             observedUrl != activeNavigationPreviousUrl || observedUrl == activeNavigationUrl
         val stateUrl = if (
-            activeNavigationId != null && !activeNavigationCommitted && !observedUrlMatchesNavigation
+            stoppedObservation ||
+            (activeNavigationId != null && !activeNavigationCommitted && !observedUrlMatchesNavigation)
         ) {
             previous.url
         } else {
@@ -346,14 +359,14 @@ internal class ComposeWebViewEngine(
         }
         // WebView can dispatch a final progress callback after stopLoading() has already
         // published STOPPED. Ignore a stale same-URL callback; explicit navigate/reload starts anew.
-        val trailingLoadingAfterStop = previous.loadPhase == BrowserLoadPhase.STOPPED &&
-            activeNavigationId == null && isLoading
+        val trailingLoadingAfterStop = stoppedObservation && isLoading
 
         mutablePageState.value = previous.copy(
             url = stateUrl,
             displayUrl = stateUrl,
             title = title ?: previous.title,
             loadPhase = when {
+                stoppedObservation -> BrowserLoadPhase.STOPPED
                 error != null -> BrowserLoadPhase.FAILED
                 trailingLoadingAfterStop -> BrowserLoadPhase.STOPPED
                 isLoading -> if (activeNavigationCommitted) BrowserLoadPhase.LOADING else BrowserLoadPhase.STARTING
@@ -366,7 +379,7 @@ internal class ComposeWebViewEngine(
                 else -> BrowserLoadPhase.IDLE
             },
             progress = when {
-                error != null || trailingLoadingAfterStop -> null
+                stoppedObservation || error != null || trailingLoadingAfterStop -> null
                 isLoading -> previous.progress?.coerceIn(0, 99) ?: 10
                 else -> 100
             },
