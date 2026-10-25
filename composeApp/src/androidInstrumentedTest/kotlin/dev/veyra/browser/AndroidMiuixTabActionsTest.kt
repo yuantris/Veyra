@@ -77,6 +77,11 @@ class AndroidMiuixTabActionsTest {
 
     @Test
     fun addressBarSubmissionReachesTheRealSystemWebView() {
+        // Start from the browser surface rather than the home page so this test isolates
+        // address submission, not the separate home-to-browser presentation transition.
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+
         val targetUrl = "https://veyra.invalid/address-entry-test"
         val addressBar = composeRule.onNodeWithContentDescription("地址栏")
         composeRule.waitUntil(timeoutMillis = 10_000) {
