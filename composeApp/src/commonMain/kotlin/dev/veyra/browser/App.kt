@@ -401,7 +401,13 @@ private fun AddressBar(
             if (isLoading) "■" else "↻",
             color = c.onBackground.copy(alpha = if (isBrowsing) 1f else 0.35f),
             fontSize = 18.sp,
-            modifier = Modifier.clickable(enabled = isBrowsing, onClick = onStopOrReload).padding(4.dp),
+            modifier = Modifier
+                .semantics {
+                    contentDescription = if (isLoading) "停止加载" else "重新加载"
+                    role = Role.Button
+                }
+                .clickable(enabled = isBrowsing, role = Role.Button, onClick = onStopOrReload)
+                .padding(4.dp),
         )
     }
 }
