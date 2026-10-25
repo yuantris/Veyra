@@ -199,6 +199,47 @@ class AndroidMiuixTabActionsTest {
         )
     }
 
+    @Test
+    fun backAndForwardControlsDriveTheRealSystemWebViewHistory() {
+        val newTab = composeRule.onNodeWithContentDescription("新建标签页")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { newTab.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        val webView = findAttachedWebView()
+            ?: throw AssertionError("Expected the active tab's system WebView to be attached")
+
+        val firstUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20back%3C/title%3E%3Cp%3Efirst%3C/p%3E"
+        val secondUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20forward%3C/title%3E%3Cp%3Esecond%3C/p%3E"
+        composeRule.activity.runOnUiThread { webView.loadUrl(firstUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let { it.url == firstUrl && it.title == "Veyra back" } == true
+        }
+        composeRule.activity.runOnUiThread { webView.loadUrl(secondUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == secondUrl && it.title == "Veyra forward" && it.canGoBack
+            } == true
+        }
+
+        composeRule.onNodeWithContentDescription("后退").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == firstUrl && it.title == "Veyra back" && it.canGoForward
+            } == true
+        }
+
+        composeRule.onNodeWithContentDescription("前进").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == secondUrl && it.title == "Veyra forward" && it.canGoBack
+            } == true
+        }
+        assertTrue(
+            "Back and forward controls must navigate the real WebView history",
+            attachedWebViewState()?.let { it.url == secondUrl && it.canGoBack } == true,
+        )
+    }
+
     private data class AttachedWebViewState(
         val url: String?,
         val title: String?,
