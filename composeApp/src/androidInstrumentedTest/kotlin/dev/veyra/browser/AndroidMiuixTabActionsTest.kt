@@ -104,6 +104,30 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun searchQuerySubmissionRoutesToTheConfiguredSearchEndpoint() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+
+        val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        addressBar.performTextReplacement("veyra browser search test")
+        addressBar.performImeAction()
+
+        // Search routing is deterministic and can be asserted at the native navigation
+        // boundary without depending on external DNS or the search provider's response.
+        val expectedUrl = "https://www.baidu.com/search?q=veyra+browser+search+test"
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.url == expectedUrl
+        }
+        assertTrue(
+            "Submitting plain text must route to the configured search endpoint",
+            attachedWebViewState()?.url == expectedUrl,
+        )
+    }
+
+    @Test
     fun closingSelectedTabReleasesItsRealWebViewAndRestoresPreviousTabSurface() {
         val newTab = composeRule.onNodeWithContentDescription("新建标签页")
         composeRule.waitUntil(timeoutMillis = 10_000) {
