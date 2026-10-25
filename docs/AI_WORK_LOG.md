@@ -858,3 +858,12 @@
 - **Fix:** The adapter now preserves `STOPPED` and a null progress value for a late same-URL loading observation when no navigation is active. Explicit navigate/reload still creates a new active navigation and is not blocked. Added common regression test `trailingLoadingObservationDoesNotUndoAnExplicitStop`.
 - **Commits:** Adapter fix `2152b85c9f13790b1b2e6321adad2b917e519576`; common regression test `b94f89f0e2d3431bddc1da34cc3273f36fd3abce`.
 - **Verification:** CI pending. The full Android emulator suite must pass before this is considered resolved. A1 remains in progress; tablet and desktop UI remain deferred.
+
+
+### 2026-10-25 — Broaden stopped-state protection for stale renderer URLs
+
+- **CI result:** Build, common/core tests, and iOS compile passed for the previous attempt, but Android emulator instrumentation still failed at the reload-control wait in `stopLoadingControlEndsNavigationAndReloadCanLoadThePage`. The main-frame error test passed. This means the first same-URL-only guard did not fully address the UI race.
+- **Follow-up hypothesis:** A trailing loading callback may carry a stale URL different from the current page URL. Restricting suppression to an exact URL match leaves that callback able to restore a loading state.
+- **Change:** The stopped-state guard now ignores any loading observation while the previous state is `STOPPED` and no explicit navigation is active. Explicit navigate/reload still creates an active navigation and is allowed through. Expanded the common regression test to cover a stale URL callback as well as a same-URL callback.
+- **Commits:** Adapter guard `28dd36ca76952c44dcf006ff36855c4fc4d5c2c3`; regression test `da1fda75f4a2e8de68c46b8b5e7ac440bdb35b69`.
+- **Verification:** CI is pending for this follow-up. Do not mark the stop/reload race resolved until the Android emulator suite passes. Android phone A1 remains in progress; tablet and desktop UI remain deferred.
