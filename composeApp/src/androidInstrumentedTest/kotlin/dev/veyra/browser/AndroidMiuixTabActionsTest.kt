@@ -346,6 +346,40 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun androidSystemBackReturnsToHomeWhenWebViewHasNoHistory() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                composeRule.onNodeWithContentDescription("地址栏").fetchSemanticsNode()
+                findAttachedWebView() != null
+            }.getOrDefault(false)
+        }
+
+        assertTrue(
+            "A newly opened browser surface should have no back history",
+            attachedWebViewState()?.canGoBack == false,
+        )
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+
+        val homeSearch = composeRule.onNodeWithContentDescription("首页搜索栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { homeSearch.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        assertTrue(
+            "System Back with no WebView history should return to the home search surface",
+            runCatching { homeSearch.fetchSemanticsNode(); true }.getOrDefault(false),
+        )
+        assertTrue(
+            "Returning home should remove the browser address bar from the active composition",
+            runCatching {
+                composeRule.onNodeWithContentDescription("地址栏").fetchSemanticsNode()
+                false
+            }.getOrDefault(true),
+        )
+    }
+
+    @Test
     fun androidSystemBackNavigatesWebViewHistoryBeforeReturningHome() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
