@@ -274,8 +274,8 @@ class AndroidMiuixTabActionsTest {
                     val bytes = body.toByteArray(Charsets.UTF_8)
                     val output = socket.getOutputStream()
                     output.write(
-                        ("HTTP/1.1 200 OK\\r\\nContent-Type: text/html; charset=utf-8\\r\\nContent-Length: " +
-                            bytes.size + "\\r\\nConnection: close\\r\\n\\r\\n").toByteArray(Charsets.US_ASCII),
+                        ("HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: " +
+                            bytes.size + "\r\nConnection: close\r\n\r\n").toByteArray(Charsets.US_ASCII),
                     )
                     output.write(bytes)
                     output.flush()
