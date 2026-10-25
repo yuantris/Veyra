@@ -284,9 +284,13 @@ class AndroidMiuixTabActionsTest {
         }.apply { isDaemon = true; start() }
         val targetUrl = "http://127.0.0.1:" + server.localPort + "/stop-loading"
         try {
-            composeRule.activity.runOnUiThread {
-                findAttachedWebViewOnMainThread()?.loadUrl(targetUrl)
+            val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
             }
+            addressBar.performTextReplacement(targetUrl)
+            addressBar.performImeAction()
+
             val stopButton = composeRule.onNodeWithContentDescription("停止加载")
             composeRule.waitUntil(timeoutMillis = 10_000) {
                 runCatching { stopButton.fetchSemanticsNode(); true }.getOrDefault(false)
