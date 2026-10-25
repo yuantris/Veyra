@@ -740,3 +740,14 @@
 - **Verification:** The previous history/lifecycle revision passed Android emulator CI and Build Veyra. For the current change, Browser Core Tests #40110994465 and Build Veyra #40110994451 were still running when this entry was written; no pass is claimed. No local Android emulator run was performed.
 - **Next smallest safe step:** Inspect the current Android instrumentation result and build. If the test fails, read the report and correct the observed semantics/IME/navigation issue without relaxing the assertion. Once green, continue the same phone flow with Back/Forward and reload/stop behavior.
 - **Files touched:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-25 — Wire Android system Back to browser history
+
+- **Goal:** Continue A1 phone acceptance by covering the physical/system Back path, not only the in-browser back button.
+- **Audit finding:** The app already forwarded the visible back control to `BrowserSessionCoordinator.goBack`, but `App.kt` had no system-back handler. On Android, system Back therefore did not follow the active WebView's history before leaving the browser surface.
+- **Implementation:** Added a small platform-specific `PlatformBackHandler` boundary. Android delegates to Activity Compose `BackHandler`; iOS and desktop currently provide no-op actuals because this behavior is Android-specific in the current acceptance scope. In the app, system Back navigates the active tab's history when available, otherwise returns from the browser surface to Home. It does not close tabs or recreate engines.
+- **Regression coverage:** Added `androidSystemBackNavigatesWebViewHistoryBeforeReturningHome`, which loads two deterministic local `data:` pages into the real attached system WebView, dispatches the Android system-back callback, and verifies the first history entry becomes active.
+- **Verification:** This change is committed as a single source/test/log change; CI is pending. No local Android SDK/emulator run was performed in this tool session. Do not mark A1 accepted until Android instrumentation and build workflows pass.
+- **Next step:** Inspect the new commit's Android emulator and build results. If the system-back test fails, read the exact instrumentation report before changing behavior.
+- **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/PlatformBackHandler.kt`, platform actuals under `androidMain`, `iosMain`, and `desktopMain`, `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.

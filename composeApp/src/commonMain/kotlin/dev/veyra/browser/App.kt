@@ -141,6 +141,17 @@ fun App() {
             }
         }
 
+        // Android system Back follows browser history first, then returns to the home surface.
+        // The platform handler is a no-op on targets without an established system-back contract.
+        PlatformBackHandler(enabled = showBrowser) {
+            val tab = activeTab
+            if (tab?.canGoBack == true) {
+                coordinator.goBack(TabId(tab.id))
+            } else {
+                showBrowser = false
+            }
+        }
+
         BrowserScaffold(
             addressBar = {
                 AddressBar(

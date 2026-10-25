@@ -247,6 +247,38 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun androidSystemBackNavigatesWebViewHistoryBeforeReturningHome() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+        val webView = findAttachedWebView()
+            ?: throw AssertionError("Expected the active tab's system WebView to be attached")
+        val firstUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20system%20back%20first%3C/title%3E%3Cp%3Efirst%3C/p%3E"
+        val secondUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20system%20back%20second%3C/title%3E%3Cp%3Esecond%3C/p%3E"
+
+        composeRule.activity.runOnUiThread { webView.loadUrl(firstUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let { it.url == firstUrl && it.title == "Veyra system back first" } == true
+        }
+        composeRule.activity.runOnUiThread { webView.loadUrl(secondUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == secondUrl && it.title == "Veyra system back second" && it.canGoBack
+            } == true
+        }
+
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == firstUrl && it.title == "Veyra system back first"
+            } == true
+        }
+        assertTrue(
+            "Android system Back must navigate WebView history before leaving the browser surface",
+            attachedWebViewState()?.let { it.url == firstUrl && it.title == "Veyra system back first" } == true,
+        )
+    }
+
+    @Test
     fun stopLoadingControlEndsNavigationAndReloadCanLoadThePage() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
