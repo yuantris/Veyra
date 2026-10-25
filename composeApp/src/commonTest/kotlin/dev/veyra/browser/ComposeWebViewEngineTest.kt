@@ -140,6 +140,42 @@ class ComposeWebViewEngineTest {
     }
 
     @Test
+    fun trailingLoadingObservationDoesNotEraseMainFrameFailure() {
+        val tabId = TabId("tab-failed-progress")
+        val targetUrl = "http://127.0.0.1:1/veyra-main-frame-error"
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        engine.navigate(NavigationRequest(tabId, targetUrl))
+        engine.observe(
+            url = targetUrl,
+            title = null,
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+            errorCode = "chromium_webview_-6",
+            errorMessage = "Connection refused",
+        )
+
+        assertEquals(BrowserLoadPhase.FAILED, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.error?.failingUrl)
+
+        // WebChromeClient progress callbacks can arrive after WebViewClient reports failure.
+        // A callback that still says "loading" must not clear a terminal failure; a new
+        // explicit navigate/reload is responsible for clearing the error.
+        engine.observe(
+            url = targetUrl,
+            title = null,
+            isLoading = true,
+            canGoBack = false,
+            canGoForward = false,
+        )
+
+        assertEquals(BrowserLoadPhase.FAILED, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.error?.failingUrl)
+    }
+
+    @Test
     fun navigationBeforeSurfaceAttachmentIsDeliveredWhenSurfaceAttaches() {
         val engine = ComposeWebViewEngine(
             BrowserEngineCreateRequest(
