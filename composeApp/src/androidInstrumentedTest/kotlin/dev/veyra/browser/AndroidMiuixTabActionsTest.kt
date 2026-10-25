@@ -240,6 +240,40 @@ class AndroidMiuixTabActionsTest {
         )
     }
 
+    @Test
+    fun reloadControlReloadsTheCurrentRealWebViewDocument() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+        val webView = findAttachedWebView()
+            ?: throw AssertionError("Expected the active tab's system WebView to be attached")
+        val pageUrl = "data:text/html,%3C!doctype%20html%3E%3Ctitle%3EVeyra%20reload%20baseline%3C/title%3E%3Cp%3Ereload%3C/p%3E"
+
+        composeRule.activity.runOnUiThread { webView.loadUrl(pageUrl) }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == pageUrl && it.title == "Veyra reload baseline"
+            } == true
+        }
+
+        composeRule.activity.runOnUiThread {
+            webView.evaluateJavascript("document.title = 'Veyra changed title'", null)
+        }
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.title == "Veyra changed title"
+        }
+
+        composeRule.onNodeWithContentDescription("重新加载").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.let {
+                it.url == pageUrl && it.title == "Veyra reload baseline" && !it.canGoBack
+            } == true
+        }
+        assertTrue(
+            "Reload must reload the current document in the attached system WebView",
+            attachedWebViewState()?.title == "Veyra reload baseline",
+        )
+    }
+
     private data class AttachedWebViewState(
         val url: String?,
         val title: String?,
