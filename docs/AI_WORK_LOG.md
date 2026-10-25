@@ -832,3 +832,11 @@
 - **Commit:** Android instrumentation test `441f1d69568359c1afebf54295641ea44143fb95`.
 - **Verification:** CI pending. This is a diagnostic test improvement, not a claim that the UI error is fixed. If it still fails, the request-received latch and failing test output will narrow the issue to WebView callback/state projection rather than address-bar routing.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`.
+
+
+### 2026-10-25 — Verify deterministic Android main-frame failure feedback
+
+- **Verified:** The deterministic loopback-server instrumentation change at `441f1d69568359c1afebf54295641ea44143fb95` passed [Browser Core Tests #40170880578](https://github.com/yuantris/Veyra/actions/runs/40170880578), including the Android emulator integration job, and [Build Veyra #40170880565](https://github.com/yuantris/Veyra/actions/runs/40170880565). The follow-up work-log commit also passed [Browser Core Tests #40170895115](https://github.com/yuantris/Veyra/actions/runs/40170895115) and [Build Veyra #40170895104](https://github.com/yuantris/Veyra/actions/runs/40170895104).
+- **Outcome:** The previously recurring `mainFrameLoadFailureIsVisibleInBrowserChrome` failure is now green in the full Android emulator workflow using a real ephemeral loopback endpoint. The test still asserts the accessible browser-chrome error notice; it was not weakened. Android/Desktop build, common test, iOS compile, and emulator jobs all passed for the verified change.
+- **Scope:** This closes that specific regression only. A1 phone acceptance remains in progress; this CI run is not tablet runtime evidence and does not authorize desktop UI work.
+- **Next:** Continue A1 by auditing visible browser controls for misleading placeholder actions and verifying touch/accessibility behavior on compact Android layouts. Tablet validation remains after phone acceptance.
