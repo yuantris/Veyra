@@ -761,3 +761,13 @@
 - **Verification:** CI is pending for this commit; no local emulator run was performed in this tool session. The prior system-back change is verified green in Browser Core Tests run 40166096294 and Build Veyra run 40166096266.
 - **Next step:** Inspect the new Android instrumentation result. If the error notice does not appear, read the actual WebView callback/report and fix the state path rather than weakening the assertion.
 - **Files:** composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt, composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt, docs/AI_WORK_LOG.md.
+
+
+### 2026-10-25 — Preserve visible main-frame navigation failures
+
+- **Goal:** Fix the real Android instrumentation failure in the browser error-feedback path.
+- **Evidence and diagnosis:** Browser Core Tests run [#40166653286](https://github.com/yuantris/Veyra/actions/runs/40166653286) failed only in `AndroidMiuixTabActionsTest.mainFrameLoadFailureIsVisibleInBrowserChrome`; the other 28 instrumentation tests passed, including navigation policy, session ownership, runtime smoke, and downloads. The failing assertion timed out waiting for the accessible error notice. Inspection of the adapter showed that WebView's `onReceivedError` set the page to FAILED, but a trailing `onPageFinished` observation with no error immediately replaced that state with `error = null`.
+- **Completed:** Updated `ComposeWebViewEngineAdapter.observe` to retain the same-URL main-frame error through a trailing non-loading callback. A new navigation/reload still clears the error, and a retained error does not emit duplicate failure events. Commit: `7a3688cf56d08a8a97c9baa1a6e74801bd409c9a`.
+- **Test evidence:** Build Veyra for the previous commit passed; Android emulator integration failed on the newly added error-notice test as described. The fix has not yet been verified by CI.
+- **Next smallest safe step:** Confirm the error-notice instrumentation test and full emulator suite on the fix commit; then continue the Android phone acceptance path. Tablet validation remains after phone acceptance, and desktop UI remains deferred.
+- **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/ComposeWebViewEngineAdapter.kt`, `docs/AI_WORK_LOG.md`.
