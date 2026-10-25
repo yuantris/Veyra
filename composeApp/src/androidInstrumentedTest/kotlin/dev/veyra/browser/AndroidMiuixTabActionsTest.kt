@@ -247,6 +247,28 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun mainFrameLoadFailureIsVisibleInBrowserChrome() {
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
+
+        val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        // Loopback on an unused port exercises the real WebView callback without external DNS.
+        addressBar.performTextReplacement("http://127.0.0.1:1/veyra-main-frame-error")
+        addressBar.performImeAction()
+
+        val errorNotice = composeRule.onNodeWithContentDescription("网页加载失败")
+        composeRule.waitUntil(timeoutMillis = 15_000) {
+            runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        assertTrue(
+            "A main-frame WebView navigation failure must be visible in browser chrome",
+            runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false),
+        )
+    }
+    @Test
     fun androidSystemBackNavigatesWebViewHistoryBeforeReturningHome() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }

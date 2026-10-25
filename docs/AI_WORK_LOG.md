@@ -751,3 +751,13 @@
 - **Verification:** This change is committed as a single source/test/log change; CI is pending. No local Android SDK/emulator run was performed in this tool session. Do not mark A1 accepted until Android instrumentation and build workflows pass.
 - **Next step:** Inspect the new commit's Android emulator and build results. If the system-back test fails, read the exact instrumentation report before changing behavior.
 - **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `composeApp/src/commonMain/kotlin/dev/veyra/browser/PlatformBackHandler.kt`, platform actuals under `androidMain`, `iosMain`, and `desktopMain`, `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-25 — Surface main-frame navigation failures in Android chrome
+
+- **Goal:** Complete the basic Android browsing path by making native main-frame load failures visible to the user.
+- **Finding:** BrowserPageState and the current surface-bound engine already normalize main-frame errors, but App.kt only displayed download status and never observed coordinator.pageStates for user-facing error feedback.
+- **Implementation:** Compose now observes the active tab's BrowserPageState and displays a short localized error notice for the current page error, while preserving download feedback. The notice maps common DNS, connection/offline, TLS, timeout, blocked-scheme and renderer-crash categories to user-readable Chinese messages without exposing native diagnostics.
+- **Regression coverage:** Added an Android instrumentation test that submits a loopback URL on a port with no listener and waits for the real WebView's main-frame failure to appear in browser chrome. This avoids external network/DNS dependency and does not weaken navigation policy.
+- **Verification:** CI is pending for this commit; no local emulator run was performed in this tool session. The prior system-back change is verified green in Browser Core Tests run 40166096294 and Build Veyra run 40166096266.
+- **Next step:** Inspect the new Android instrumentation result. If the error notice does not appear, read the actual WebView callback/report and fix the state path rather than weakening the assertion.
+- **Files:** composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt, composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt, docs/AI_WORK_LOG.md.

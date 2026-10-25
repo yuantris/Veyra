@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.veyra.browser.core.BrowserEvent
+import dev.veyra.browser.core.BrowserErrorCategory
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
@@ -75,9 +76,11 @@ fun App() {
         var downloadStatus by remember { mutableStateOf<String?>(null) }
         val sessionState by coordinator.state.collectAsState()
         val engines by coordinator.engines.collectAsState()
+        val pageStates by coordinator.pageStates.collectAsState()
         var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
         var showBrowser by remember { mutableStateOf(false) }
         val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
+        val activePageState = activeTab?.let { pageStates[TabId(it.id)] }
         val currentTabIds = sessionState.tabs.map { it.id }.toSet()
         val knownTabIds = remember { mutableSetOf<String>() }
 
@@ -254,16 +257,47 @@ fun App() {
                 )
             },
             status = {
-                downloadStatus?.let { status ->
-                    Text(
-                        status,
-                        fontSize = 12.sp,
-                        color = c.error,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(c.surfaceContainer)
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                    )
+                val pageError = activePageState?.error
+                if (pageError != null || downloadStatus != null) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        if (pageError != null) {
+                            val message = when (pageError.category) {
+                                BrowserErrorCategory.DNS -> "无法解析网站地址"
+                                BrowserErrorCategory.CONNECTION,
+                                BrowserErrorCategory.OFFLINE -> "无法连接到网站"
+                                BrowserErrorCategory.TLS -> "安全连接验证失败"
+                                BrowserErrorCategory.TIMEOUT -> "网页连接超时"
+                                BrowserErrorCategory.NAVIGATION_BLOCKED,
+                                BrowserErrorCategory.UNSUPPORTED_SCHEME -> "此网页地址无法打开"
+                                BrowserErrorCategory.CONTENT_PROCESS_CRASHED -> "网页进程意外退出，可尝试重新加载"
+                                else -> "网页加载失败"
+                            }
+                            Text(
+                                message,
+                                fontSize = 12.sp,
+                                color = c.error,
+                                modifier = Modifier
+                                    .semantics { contentDescription = "网页加载失败" }
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(c.surfaceContainer)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                        downloadStatus?.let { status ->
+                            Text(
+                                status,
+                                fontSize = 12.sp,
+                                color = c.error,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(c.surfaceContainer)
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            )
+                        }
+                    }
                 }
             },
         )
