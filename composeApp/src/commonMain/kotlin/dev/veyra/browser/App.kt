@@ -486,8 +486,8 @@ private fun BottomBar(
             enabled = true,
             onClick = onTabs,
         )
-        BarGlyph("☆", "收藏夹", enabled = isBrowsing, onClick = { /* bookmarks: placeholder */ })
-        BarGlyph("≡", "菜单", enabled = true, onClick = { /* menu: placeholder */ })
+        BarGlyph("☆", "收藏夹（暂未开放）", enabled = false, onClick = {})
+        BarGlyph("≡", "菜单（暂未开放）", enabled = false, onClick = {})
     }
 }
 
@@ -538,10 +538,6 @@ private fun HomeScreen(onOpen: (String) -> Unit) {
         Spacer(Modifier.height(22.dp))
         SectionTitle("建议")
         SuggestionsRow(onOpen)
-        Spacer(Modifier.height(22.dp))
-        PrivacyReportCard()
-        Spacer(Modifier.height(18.dp))
-        CustomizeButton()
         Spacer(Modifier.height(24.dp))
         }
     }
