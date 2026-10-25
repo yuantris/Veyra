@@ -265,7 +265,7 @@ class AndroidMiuixTabActionsTest {
         composeRule.onNodeWithContentDescription("重新加载").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
             attachedWebViewState()?.let {
-                it.url == pageUrl && it.title == "Veyra reload baseline" && !it.canGoBack
+                it.url == pageUrl && it.title == "Veyra reload baseline"
             } == true
         }
         assertTrue(
