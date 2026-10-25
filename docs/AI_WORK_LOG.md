@@ -795,3 +795,11 @@
 - **Implementation:** Retain the current failed page state across non-loading observations while no navigation is active. Explicit navigation and reload continue to clear the old error before a new request. Added a common engine regression test where the trailing idle observation reports `about:blank` after the failed URL.
 - **Commits:** Adapter fix `e5304a901e9eef11bf805d3398f78d9f584862bd`; regression test `6596e39c073e5913e34c8fb0a0445a0199690c95`.
 - **Verification:** Pending CI for the adapter fix and regression test. Do not mark Android phone acceptance complete until the emulator suite passes.
+
+
+### 2026-10-25 — Verify stale WebView callback regression fix
+
+- **Verified commit:** `84ed8bed76401399815775e8cf239c1ac1c65f2d`.
+- **CI:** [Browser Core Tests #40168586452](https://github.com/yuantris/Veyra/actions/runs/40168586452) passed, including common tests, iOS compile, and Android emulator integration. [Build Veyra #40168586446](https://github.com/yuantris/Veyra/actions/runs/40168586446) passed Android/Desktop compilation.
+- **Outcome:** The regression test for a stale idle observation after a main-frame failure passes, and the emulator suite including visible error feedback passes. This verifies the observed failure path; it does not complete Android phone/tablet acceptance.
+- **Next:** Continue A1 on the real Android browsing path, focusing on any remaining lifecycle/state gap rather than cosmetic churn. Tablet and desktop UI remain deferred.
