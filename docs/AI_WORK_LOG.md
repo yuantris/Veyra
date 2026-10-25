@@ -787,3 +787,11 @@
 - **Verification:** Source commit `f857cfe6c78b69865010691834d248afca107bf2`. CI is pending; do not mark this behavior verified until the instrumentation and build jobs complete.
 - **Next step:** Inspect the exact CI run for this change. If it fails, diagnose the actual address normalization/IME/native-navigation behavior without weakening the assertion. A1 remains in progress; tablet and desktop UI remain deferred.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-25 — Stabilize main-frame error feedback after stale WebView callbacks
+
+- **Evidence:** Address-bar URL submission and plain-text search routing passed in both emulator runs, but the full instrumentation suite still timed out waiting for `网页加载失败`. The failure remained reproducible after the earlier same-URL retention fix, indicating a trailing idle WebView observation can report a stale/different URL after the main-frame error callback.
+- **Implementation:** Retain the current failed page state across non-loading observations while no navigation is active. Explicit navigation and reload continue to clear the old error before a new request. Added a common engine regression test where the trailing idle observation reports `about:blank` after the failed URL.
+- **Commits:** Adapter fix `e5304a901e9eef11bf805d3398f78d9f584862bd`; regression test `6596e39c073e5913e34c8fb0a0445a0199690c95`.
+- **Verification:** Pending CI for the adapter fix and regression test. Do not mark Android phone acceptance complete until the emulator suite passes.
