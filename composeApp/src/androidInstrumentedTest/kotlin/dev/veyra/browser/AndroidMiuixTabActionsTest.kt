@@ -266,7 +266,7 @@ class AndroidMiuixTabActionsTest {
         val targetUrl = "http://127.0.0.1:" + server.localPort + "/stop-loading"
         try {
             composeRule.activity.runOnUiThread {
-                findAttachedWebView()?.loadUrl(targetUrl)
+                findAttachedWebViewOnMainThread()?.loadUrl(targetUrl)
             }
             val stopButton = composeRule.onNodeWithContentDescription("停止加载")
             composeRule.waitUntil(timeoutMillis = 10_000) {
