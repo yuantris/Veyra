@@ -771,3 +771,10 @@
 - **Test evidence:** Build Veyra for the previous commit passed; Android emulator integration failed on the newly added error-notice test as described. The fix has not yet been verified by CI.
 - **Next smallest safe step:** Confirm the error-notice instrumentation test and full emulator suite on the fix commit; then continue the Android phone acceptance path. Tablet validation remains after phone acceptance, and desktop UI remains deferred.
 - **Files:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/ComposeWebViewEngineAdapter.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-25 — Verify Android main-frame error feedback fix
+
+- **Verified:** The fix commit `7a3688cf56d08a8a97c9baa1a6e74801bd409c9a` passed [Browser Core Tests #40167296827](https://github.com/yuantris/Veyra/actions/runs/40167296827), including the Android emulator integration job, and [Build Veyra #40167296836](https://github.com/yuantris/Veyra/actions/runs/40167296836).
+- **Latest main verification:** Documentation-only follow-up commit `a51070e058d23e0fd2e48613b7640fb4aec9e80e` also passed [Browser Core Tests #40167309623](https://github.com/yuantris/Veyra/actions/runs/40167309623) and [Build Veyra #40167309588](https://github.com/yuantris/Veyra/actions/runs/40167309588). The Android emulator integration, common tests, iOS compile, and Android/Desktop build jobs all completed successfully.
+- **Acceptance status:** This closes the observed main-frame error-feedback regression. It does not by itself mean the full Android phone/tablet acceptance gates A1–A5 are accepted; continue with the next concrete end-to-end gap and gather phone/tablet runtime evidence separately.
