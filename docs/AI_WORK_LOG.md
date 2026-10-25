@@ -778,3 +778,12 @@
 - **Verified:** The fix commit `7a3688cf56d08a8a97c9baa1a6e74801bd409c9a` passed [Browser Core Tests #40167296827](https://github.com/yuantris/Veyra/actions/runs/40167296827), including the Android emulator integration job, and [Build Veyra #40167296836](https://github.com/yuantris/Veyra/actions/runs/40167296836).
 - **Latest main verification:** Documentation-only follow-up commit `a51070e058d23e0fd2e48613b7640fb4aec9e80e` also passed [Browser Core Tests #40167309623](https://github.com/yuantris/Veyra/actions/runs/40167309623) and [Build Veyra #40167309588](https://github.com/yuantris/Veyra/actions/runs/40167309588). The Android emulator integration, common tests, iOS compile, and Android/Desktop build jobs all completed successfully.
 - **Acceptance status:** This closes the observed main-frame error-feedback regression. It does not by itself mean the full Android phone/tablet acceptance gates A1–A5 are accepted; continue with the next concrete end-to-end gap and gather phone/tablet runtime evidence separately.
+
+
+### 2026-10-25 — Cover address-bar search submission on Android
+
+- **Goal:** Close a specific A1 gap: the real Android WebView test covered URL entry, but plain-text search routing was not exercised end to end.
+- **Change:** Added `searchQuerySubmissionRoutesToTheConfiguredSearchEndpoint` to `AndroidMiuixTabActionsTest`. It submits a plain-text query through the real address-bar IME action and asserts the attached system WebView receives the configured Baidu search URL. The assertion stops at the native navigation boundary and does not depend on external DNS or search results.
+- **Verification:** Source commit `f857cfe6c78b69865010691834d248afca107bf2`. CI is pending; do not mark this behavior verified until the instrumentation and build jobs complete.
+- **Next step:** Inspect the exact CI run for this change. If it fails, diagnose the actual address normalization/IME/native-navigation behavior without weakening the assertion. A1 remains in progress; tablet and desktop UI remain deferred.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
