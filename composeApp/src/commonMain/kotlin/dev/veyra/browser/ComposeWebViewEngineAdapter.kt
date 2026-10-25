@@ -309,7 +309,7 @@ internal class ComposeWebViewEngine(
             mutableEvents.tryEmit(BrowserEvent.NavigationStarted(tabId, navigationId, observedUrl))
         }
 
-        val error = if (errorCode != null || errorMessage != null) {
+        val nativeError = if (errorCode != null || errorMessage != null) {
             BrowserError(
                 code = errorCode ?: "webview_error",
                 message = errorMessage ?: "The page could not be loaded.",
@@ -318,6 +318,14 @@ internal class ComposeWebViewEngine(
             )
         } else {
             null
+        }
+        // WebView may deliver onPageFinished after onReceivedError. Keep the main-frame
+        // failure visible for that same failed URL instead of letting the trailing idle
+        // callback immediately erase it. A new navigation clears the error in navigate/reload.
+        val error = nativeError ?: previous.error?.takeIf {
+            previous.loadPhase == BrowserLoadPhase.FAILED &&
+                observedUrl == previous.url &&
+                !isLoading
         }
         // A redirect is a valid commit too. Ignore only the old page URL while a requested
         // navigation is still waiting for its target/redirect to appear.
@@ -361,8 +369,8 @@ internal class ComposeWebViewEngine(
             mutableEvents.tryEmit(BrowserEvent.NavigationCommitted(tabId, navigationId, observedUrl))
         }
 
-        if (error != null) {
-            mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, error))
+        if (nativeError != null) {
+            mutableEvents.tryEmit(BrowserEvent.NavigationFailed(tabId, navigationId, nativeError))
             activeNavigationId = null
             activeNavigationUrl = null
             activeNavigationPreviousUrl = null
