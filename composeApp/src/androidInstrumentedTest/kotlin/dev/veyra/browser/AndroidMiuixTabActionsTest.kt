@@ -79,6 +79,26 @@ class AndroidMiuixTabActionsTest {
     }
 
     @Test
+    fun homeSearchSubmissionOpensBrowserAndReachesTheRealSystemWebView() {
+        val homeSearch = composeRule.onNodeWithContentDescription("首页搜索栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { homeSearch.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+
+        homeSearch.performTextReplacement("veyra home search test")
+        homeSearch.performImeAction()
+
+        val expectedUrl = "https://www.baidu.com/search?q=veyra%20home%20search%20test"
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            attachedWebViewState()?.url == expectedUrl
+        }
+        assertTrue(
+            "Submitting the home search field must open the browser and navigate the real WebView",
+            attachedWebViewState()?.url == expectedUrl,
+        )
+    }
+
+    @Test
     fun addressBarSubmissionReachesTheRealSystemWebView() {
         // Start from the browser surface rather than the home page so this test isolates
         // address submission, not the separate home-to-browser presentation transition.
