@@ -206,6 +206,17 @@ class ComposeWebViewEngineTest {
         assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
         assertEquals(null, engine.pageState.value.progress)
 
+        // Some renderers report a stale URL while draining callbacks after cancellation.
+        engine.observe(
+            url = "http://127.0.0.1:18080/stale-redirect",
+            title = null,
+            isLoading = true,
+            canGoBack = false,
+            canGoForward = false,
+        )
+        assertEquals(BrowserLoadPhase.STOPPED, engine.pageState.value.loadPhase)
+        assertEquals(null, engine.pageState.value.progress)
+
         engine.reload()
         assertEquals(BrowserLoadPhase.STARTING, engine.pageState.value.loadPhase)
     }
