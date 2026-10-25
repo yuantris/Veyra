@@ -867,3 +867,11 @@
 - **Change:** The stopped-state guard now ignores any loading observation while the previous state is `STOPPED` and no explicit navigation is active. Explicit navigate/reload still creates an active navigation and is allowed through. Expanded the common regression test to cover a stale URL callback as well as a same-URL callback.
 - **Commits:** Adapter guard `28dd36ca76952c44dcf006ff36855c4fc4d5c2c3`; regression test `da1fda75f4a2e8de68c46b8b5e7ac440bdb35b69`.
 - **Verification:** CI is pending for this follow-up. Do not mark the stop/reload race resolved until the Android emulator suite passes. Android phone A1 remains in progress; tablet and desktop UI remain deferred.
+
+
+### 2026-10-25 — Latch explicit stop until a new navigation command
+
+- **Further review:** The previous guard depended on the immediately preceding page phase being `STOPPED`. A native idle observation could arrive first and change that phase before a later progress callback, allowing the race to recur. This is a weakness in the guard design even before the current emulator run finishes.
+- **Change:** Added an explicit stop latch. After `stop()`, renderer observations are prevented from creating inferred navigations or changing URL/loading/error state until a user-initiated navigate, reload, back, or forward command clears the latch. This also covers callbacks delivered synchronously from the native stop call. Added a regression sequence with an idle callback between stop and trailing progress, followed by a stale-URL loading observation.
+- **Commits:** Latch fix `c8ddd3c6728792f1ecf0845c562392779c7773a0`; regression test `1cabe5973b25eb244ddc8e0b587999236bf01d62`.
+- **Verification:** CI for the prior guard is still running at the time of this entry; the new latch and test will trigger another full CI run. Do not treat the stop/reload issue as resolved until Android emulator integration passes.
