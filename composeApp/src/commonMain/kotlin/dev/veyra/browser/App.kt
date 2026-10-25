@@ -610,7 +610,9 @@ private fun SearchPill(onOpen: (String) -> Unit) {
         BasicTextField(
             value = query,
             onValueChange = { query = it },
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .semantics { contentDescription = "首页搜索栏" },
             singleLine = true,
             textStyle = TextStyle(color = c.onBackground, fontSize = 15.sp),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
