@@ -849,3 +849,12 @@
 - **Regression coverage:** Updated `tabActionsHaveAccessibleTouchTargetsAndNewTabCanBeClosed` to assert both unfinished bottom-bar actions are disabled and still meet the touch-target baseline.
 - **Commits:** UI `9e21db2dcd991ea8cc874c79aea2ef50c751d9cd`; instrumentation test `d5f285b84b1fc79e77f469b4270522f97c1502ff`.
 - **Verification:** CI pending for the UI and instrumentation commits. Do not mark this change verified until the emulator and build workflows finish. A1 remains in progress; tablet and desktop UI remain deferred.
+
+
+### 2026-10-25 — Preserve stopped navigation against late WebView progress
+
+- **CI diagnosis:** The Android emulator workflow for documentation commit `7131bb8e18306aa0ce70707497123571e9541899` failed in `stopLoadingControlEndsNavigationAndReloadCanLoadThePage`, not in `mainFrameLoadFailureIsVisibleInBrowserChrome`. The uploaded instrumentation XML identifies the timeout at the wait for the `重新加载` control; the main-frame failure test passed in that run. This is a separate intermittent lifecycle race.
+- **Root cause:** After `stop()` sets the engine page state to `STOPPED`, Android WebChromeClient can deliver a late same-URL progress callback with `isLoading=true`. The adapter previously interpreted it as a fresh STARTING/LOADING observation, so browser chrome could continue showing `停止加载` and never expose the reload action.
+- **Fix:** The adapter now preserves `STOPPED` and a null progress value for a late same-URL loading observation when no navigation is active. Explicit navigate/reload still creates a new active navigation and is not blocked. Added common regression test `trailingLoadingObservationDoesNotUndoAnExplicitStop`.
+- **Commits:** Adapter fix `2152b85c9f13790b1b2e6321adad2b917e519576`; common regression test `b94f89f0e2d3431bddc1da34cc3273f36fd3abce`.
+- **Verification:** CI pending. The full Android emulator suite must pass before this is considered resolved. A1 remains in progress; tablet and desktop UI remain deferred.
