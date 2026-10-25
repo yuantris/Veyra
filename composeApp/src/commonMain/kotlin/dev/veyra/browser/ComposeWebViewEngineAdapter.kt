@@ -300,7 +300,14 @@ internal class ComposeWebViewEngine(
         val observedUrl = url?.takeIf { it.isNotBlank() } ?: previous.url
         var navigationId = activeNavigationId
 
-        if (observedUrl != previous.url && navigationId == null) {
+        // An idle callback with a stale URL can arrive after a failed main-frame load.
+        // Do not reinterpret that callback as a new navigation: explicit navigate/reload
+        // clears the failed state and is the authoritative start of the next request.
+        if (
+            observedUrl != previous.url &&
+            navigationId == null &&
+            !(previous.loadPhase == BrowserLoadPhase.FAILED && !isLoading)
+        ) {
             navigationId = NavigationId("${tabId.value}-nav-${++navigationCounter}")
             activeNavigationId = navigationId
             activeNavigationUrl = observedUrl
