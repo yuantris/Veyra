@@ -124,7 +124,23 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                     mainHandler.post { if (!surfaceDestroyed.get()) webView.reload() }
                 }
                 override fun stop() {
-                    mainHandler.post { if (!surfaceDestroyed.get()) webView.stopLoading() }
+                    mainHandler.post {
+                        if (!surfaceDestroyed.get()) {
+                            webView.stopLoading()
+                            // WebView does not guarantee onPageFinished after stopLoading().
+                            // Publish the terminal loading state explicitly so the address-bar
+                            // control cannot remain stuck in its stop action.
+                            binding.observe(
+                                url = webView.url,
+                                title = webView.title,
+                                isLoading = false,
+                                canGoBack = webView.canGoBack(),
+                                canGoForward = webView.canGoForward(),
+                                errorCode = null,
+                                errorMessage = null,
+                            )
+                        }
+                    }
                 }
             }
         }
