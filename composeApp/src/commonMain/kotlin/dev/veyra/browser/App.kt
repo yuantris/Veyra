@@ -115,16 +115,7 @@ fun App() {
             if (activeTab != null) address = activeTab.url
         }
 
-        fun normalizeAddress(raw: String): String? {
-            val value = raw.trim()
-            if (value.isBlank()) return null
-            return when {
-                value.startsWith("https://", true) || value.startsWith("http://", true) -> value
-                value.contains(" ") || !value.contains(".") ->
-                    "https://www.baidu.com/search?q=" + value.replace(" ", "+")
-                else -> "https://$value"
-            }
-        }
+        fun normalizeAddress(raw: String): String? = normalizeBrowserAddress(raw)
 
         fun openAddress(raw: String) {
             val target = normalizeAddress(raw) ?: return
@@ -307,6 +298,41 @@ fun App() {
                 // Closes the coordinator, then the download controller, then cancels the owner scope.
                 session.requestShutdown()
             }
+        }
+    }
+}
+
+
+/**
+ * Converts address-bar input to a navigable URL. Search text is encoded as a single query
+ * component so reserved characters such as &, +, # and non-ASCII text cannot alter the URL.
+ */
+internal fun normalizeBrowserAddress(raw: String): String? {
+    val value = raw.trim()
+    if (value.isBlank()) return null
+    return when {
+        value.startsWith("https://", true) || value.startsWith("http://", true) -> value
+        value.contains(" ") || !value.contains(".") ->
+            "https://www.baidu.com/search?q=" + encodeQueryComponent(value)
+        else -> "https://$value"
+    }
+}
+
+private fun encodeQueryComponent(value: String): String = buildString {
+    val hex = "0123456789ABCDEF"
+    value.encodeToByteArray().forEach { byte ->
+        val unsigned = byte.toInt() and 0xff
+        val unreserved = unsigned in 'a'.code..'z'.code ||
+            unsigned in 'A'.code..'Z'.code ||
+            unsigned in '0'.code..'9'.code ||
+            unsigned == '-'.code || unsigned == '.'.code ||
+            unsigned == '_'.code || unsigned == '~'.code
+        if (unreserved) {
+            append(unsigned.toChar())
+        } else {
+            append('%')
+            append(hex[unsigned ushr 4])
+            append(hex[unsigned and 0x0f])
         }
     }
 }
