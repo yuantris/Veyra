@@ -70,6 +70,41 @@ class ComposeWebViewEngineTest {
     }
 
     @Test
+    fun trailingIdleObservationDoesNotEraseMainFrameFailureWhenUrlIsStale() {
+        val tabId = TabId("tab-failed")
+        val targetUrl = "http://127.0.0.1:1/veyra-main-frame-error"
+        val engine = ComposeWebViewEngine(
+            BrowserEngineCreateRequest(tabId, ProfileId("default")),
+        )
+        engine.navigate(NavigationRequest(tabId, targetUrl))
+        engine.observe(
+            url = targetUrl,
+            title = null,
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+            errorCode = "chromium_webview_-6",
+            errorMessage = "Connection refused",
+        )
+
+        assertEquals(BrowserLoadPhase.FAILED, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.error?.failingUrl)
+
+        // WebChromeClient may send a trailing idle observation with the old URL after
+        // WebViewClient has already reported the main-frame failure.
+        engine.observe(
+            url = "about:blank",
+            title = null,
+            isLoading = false,
+            canGoBack = false,
+            canGoForward = false,
+        )
+
+        assertEquals(BrowserLoadPhase.FAILED, engine.pageState.value.loadPhase)
+        assertEquals(targetUrl, engine.pageState.value.error?.failingUrl)
+    }
+
+    @Test
     fun navigationBeforeSurfaceAttachmentIsDeliveredWhenSurfaceAttaches() {
         val engine = ComposeWebViewEngine(
             BrowserEngineCreateRequest(
