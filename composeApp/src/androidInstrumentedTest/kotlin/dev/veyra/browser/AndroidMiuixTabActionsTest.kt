@@ -275,23 +275,54 @@ class AndroidMiuixTabActionsTest {
         composeRule.onNodeWithContentDescription("标签页").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) { findAttachedWebView() != null }
 
-        val addressBar = composeRule.onNodeWithContentDescription("地址栏")
-        composeRule.waitUntil(timeoutMillis = 10_000) {
-            runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
-        }
-        // Loopback on an unused port exercises the real WebView callback without external DNS.
-        addressBar.performTextReplacement("http://127.0.0.1:1/veyra-main-frame-error")
-        addressBar.performImeAction()
+        // Use a real loopback listener and deliberately close the accepted request without
+        // sending HTTP headers. This deterministically exercises WebView's main-frame error
+        // callback without depending on a hard-coded port or external DNS/network access.
+        val requestAccepted = java.util.concurrent.CountDownLatch(1)
+        val server = ServerSocket(0)
+        val serverThread = Thread {
+            runCatching {
+                server.accept().use { socket ->
+                    socket.soTimeout = 2_000
+                    val reader = socket.getInputStream().bufferedReader()
+                    reader.readLine()
+                    while (reader.readLine().isNotEmpty()) Unit
+                    requestAccepted.countDown()
+                    // Closing without a response causes a deterministic empty-response failure.
+                }
+            }.also {
+                requestAccepted.countDown()
+            }
+        }.apply { isDaemon = true; start() }
+        val targetUrl = "http://127.0.0.1:${server.localPort}/veyra-main-frame-error"
 
-        val errorNotice = composeRule.onNodeWithContentDescription("网页加载失败")
-        composeRule.waitUntil(timeoutMillis = 15_000) {
-            runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false)
+        try {
+            val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                runCatching { addressBar.fetchSemanticsNode(); true }.getOrDefault(false)
+            }
+            addressBar.performTextReplacement(targetUrl)
+            addressBar.performImeAction()
+
+            assertTrue(
+                "The test server must receive the real WebView navigation request",
+                requestAccepted.await(10, java.util.concurrent.TimeUnit.SECONDS),
+            )
+
+            val errorNotice = composeRule.onNodeWithContentDescription("网页加载失败")
+            composeRule.waitUntil(timeoutMillis = 15_000) {
+                runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false)
+            }
+            assertTrue(
+                "A main-frame WebView navigation failure must be visible in browser chrome",
+                runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false),
+            )
+        } finally {
+            server.close()
+            serverThread.join(2_500)
         }
-        assertTrue(
-            "A main-frame WebView navigation failure must be visible in browser chrome",
-            runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false),
-        )
     }
+
     @Test
     fun androidSystemBackNavigatesWebViewHistoryBeforeReturningHome() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
