@@ -487,18 +487,22 @@ private fun AddressBar(
             },
         )
         Spacer(Modifier.width(8.dp))
-        Text(
-            if (isLoading) "■" else "↻",
-            color = c.onBackground.copy(alpha = if (isBrowsing) 1f else 0.35f),
-            fontSize = 18.sp,
+        Box(
             modifier = Modifier
+                .requiredSize(48.dp)
                 .semantics {
                     contentDescription = if (isLoading) "停止加载" else "重新加载"
                     role = Role.Button
                 }
-                .clickable(enabled = isBrowsing, role = Role.Button, onClick = onStopOrReload)
-                .padding(4.dp),
-        )
+                .clickable(enabled = isBrowsing, role = Role.Button, onClick = onStopOrReload),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = if (isLoading) "■" else "↻",
+                color = c.onBackground.copy(alpha = if (isBrowsing) 1f else 0.35f),
+                fontSize = 18.sp,
+            )
+        }
     }
 }
 
