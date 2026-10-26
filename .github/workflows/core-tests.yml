@@ -87,7 +87,18 @@ jobs:
             adb shell wm density 240
             adb shell wm size
             adb shell wm density
+            mkdir -p composeApp/build/reports/compact-phone-smoke
+            set +e
             bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
+            test_result=$?
+            set -e
+            # Capture a reproducible post-test launch frame at the configured 360 dp viewport.
+            # This is evidence for visual review, not an automated visual-acceptance claim.
+            adb shell am force-stop dev.veyra.browser
+            adb shell monkey -p dev.veyra.browser 1
+            sleep 5
+            adb exec-out screencap -p > composeApp/build/reports/compact-phone-smoke/home.png
+            exit "$test_result"
       - name: Dump failing instrumentation tests
         if: failure()
         shell: bash
@@ -116,4 +127,12 @@ jobs:
             composeApp/build/outputs/androidTest-results/
             composeApp/build/reports/androidTests/
           if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload compact phone screenshot for visual review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compact-phone-visual-smoke
+          path: composeApp/build/reports/compact-phone-smoke/home.png
+          if-no-files-found: warn
           retention-days: 7
