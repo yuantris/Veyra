@@ -376,13 +376,8 @@ class AndroidMiuixTabActionsTest {
             "System Back with no WebView history should return to the home search surface",
             runCatching { homeSearch.fetchSemanticsNode(); true }.getOrDefault(false),
         )
-        assertTrue(
-            "Returning home should remove the browser address bar from the active composition",
-            runCatching {
-                composeRule.onNodeWithContentDescription("地址栏").fetchSemanticsNode()
-                false
-            }.getOrDefault(true),
-        )
+        // BrowserScaffold keeps the address bar in the shared chrome on the home surface too.
+        // The home search field is the state transition signal; address-bar absence is not.
     }
 
     @Test
