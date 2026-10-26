@@ -93,11 +93,24 @@ jobs:
             test_result=$?
             set -e
             # Capture a reproducible post-test launch frame at the configured 360 dp viewport.
-            # This is evidence for visual review, not an automated visual-acceptance claim.
+            # Use the declared component directly: the package may not expose a discoverable launcher
+            # activity in the installed test variant, which makes "monkey" fail despite a valid component.
+            # Screenshot collection is best-effort and must never mask the instrumentation result.
+            set +e
             adb shell am force-stop dev.veyra.browser
-            adb shell monkey -p dev.veyra.browser 1
-            sleep 5
-            adb exec-out screencap -p > composeApp/build/reports/compact-phone-smoke/home.png
+            adb shell am start -W -n dev.veyra.browser/dev.veyra.browser.MainActivity
+            launch_result=$?
+            if [ "$launch_result" -eq 0 ]; then
+              sleep 5
+              adb exec-out screencap -p > composeApp/build/reports/compact-phone-smoke/home.png
+              capture_result=$?
+            else
+              capture_result=$launch_result
+            fi
+            set -e
+            if [ "$capture_result" -ne 0 ]; then
+              echo "WARNING: compact-phone screenshot capture failed (exit $capture_result); instrumentation result remains $test_result."
+            fi
             exit "$test_result"
       - name: Dump failing instrumentation tests
         if: failure()
