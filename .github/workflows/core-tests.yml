@@ -82,41 +82,7 @@ jobs:
           target: google_apis
           disable-linux-hw-accel: false
           script: |
-            # Exercise the phone-first layout at a deliberate compact 360 dp width (540x1200 px at 240 dpi).
-            adb shell wm size 540x1200
-            adb shell wm density 240
-            adb shell wm size
-            adb shell wm density
-            mkdir -p composeApp/build/reports/compact-phone-smoke
-            set +e
-            bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
-            test_result=$?
-            set -e
-            # connectedDebugAndroidTest may leave the target app absent on some emulator runs.
-            # Reinstall the already-built debug APK before trying to capture the launch frame.
-            # Screenshot collection is best-effort and must never mask the instrumentation result.
-            set +e
-            adb shell am force-stop dev.veyra.browser
-            adb install -r composeApp/build/outputs/apk/debug/composeApp-debug.apk
-            install_result=$?
-            if [ "$install_result" -eq 0 ]; then
-              adb shell monkey -p dev.veyra.browser 1
-              launch_result=$?
-            else
-              launch_result=$install_result
-            fi
-            if [ "$launch_result" -eq 0 ]; then
-              sleep 5
-              adb exec-out screencap -p > composeApp/build/reports/compact-phone-smoke/home.png
-              capture_result=$?
-            else
-              capture_result=$launch_result
-            fi
-            set -e
-            if [ "$capture_result" -ne 0 ]; then
-              echo "WARNING: compact-phone screenshot capture failed (exit $capture_result); instrumentation result remains $test_result."
-            fi
-            exit "$test_result"
+            bash .github/scripts/android-emulator-integration.sh
       - name: Dump failing instrumentation tests
         if: failure()
         shell: bash
