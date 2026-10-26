@@ -81,7 +81,13 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-linux-hw-accel: false
-          script: bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
+          script: |
+            # Exercise the phone-first layout at a deliberate compact 360 dp width.
+            adb shell wm size 720x1600
+            adb shell wm density 240
+            adb shell wm size
+            adb shell wm density
+            bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
       - name: Dump failing instrumentation tests
         if: failure()
         shell: bash
