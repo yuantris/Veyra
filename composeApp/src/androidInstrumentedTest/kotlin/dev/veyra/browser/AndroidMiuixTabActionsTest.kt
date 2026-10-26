@@ -348,22 +348,24 @@ class AndroidMiuixTabActionsTest {
     @Test
     fun androidSystemBackReturnsToHomeWhenWebViewHasNoHistory() {
         composeRule.onNodeWithContentDescription("标签页").performClick()
+        val newTab = composeRule.onNodeWithContentDescription("新建标签页")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { newTab.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        newTab.performClick()
+
         composeRule.waitUntil(timeoutMillis = 10_000) {
             runCatching {
                 composeRule.onNodeWithContentDescription("地址栏").fetchSemanticsNode()
                 findAttachedWebView() != null
             }.getOrDefault(false)
         }
-
-        val webView = findAttachedWebView()
-            ?: throw AssertionError("Expected the active tab's system WebView to be attached")
-        // Startup can seed a history entry before this UI path is exercised. Establish the
-        // exact precondition under test instead of assuming a fresh WebView has an empty stack.
-        composeRule.activity.runOnUiThread { webView.clearHistory() }
         composeRule.waitUntil(timeoutMillis = 10_000) {
             attachedWebViewState()?.canGoBack == false
         }
 
+        // Use a real newly opened tab rather than mutating WebView history behind the
+        // coordinator's back. The UI and engine now agree that this tab has no history.
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
 
         val homeSearch = composeRule.onNodeWithContentDescription("首页搜索栏")
