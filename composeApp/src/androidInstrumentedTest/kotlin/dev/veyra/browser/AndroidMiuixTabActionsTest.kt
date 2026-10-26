@@ -1,6 +1,8 @@
 package dev.veyra.browser
 
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onRoot
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -76,6 +78,42 @@ class AndroidMiuixTabActionsTest {
             closeTabs.fetchSemanticsNodes().size == originalTabCount
         }
         assertTrue("Closing the new tab must leave the original tab present", originalTabCount >= 1)
+    }
+
+    @Test
+    fun compactPhoneChromeControlsRemainInsideTheViewport() {
+        val density = composeRule.activity.resources.displayMetrics.density
+        val configuredWidthDp = composeRule.activity.resources.configuration.screenWidthDp
+        assertTrue(
+            "Instrumentation must run at a compact 360 dp width, actual=$configuredWidthDp dp",
+            configuredWidthDp in 350..370,
+        )
+        val viewport = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
+        assertTrue("The compact viewport must have a positive width", viewport.width > 0f)
+
+        val homeSearch = composeRule.onNodeWithContentDescription("首页搜索栏")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching { homeSearch.fetchSemanticsNode(); true }.getOrDefault(false)
+        }
+        assertWithinViewport(homeSearch.fetchSemanticsNode().boundsInRoot, viewport, "home-search")
+
+        composeRule.onNodeWithContentDescription("标签页").performClick()
+        val addressBar = composeRule.onNodeWithContentDescription("地址栏")
+        val newTab = composeRule.onNodeWithContentDescription("新建标签页")
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            runCatching {
+                addressBar.fetchSemanticsNode()
+                newTab.fetchSemanticsNode()
+                true
+            }.getOrDefault(false)
+        }
+        assertWithinViewport(addressBar.fetchSemanticsNode().boundsInRoot, viewport, "address-bar")
+        assertWithinViewport(newTab.fetchSemanticsNode().boundsInRoot, viewport, "new-tab")
+
+        listOf("后退", "前进", "标签页").forEach { description ->
+            val control = composeRule.onNodeWithContentDescription(description)
+            assertWithinViewport(control.fetchSemanticsNode().boundsInRoot, viewport, description)
+        }
     }
 
     @Test
@@ -579,6 +617,16 @@ class AndroidMiuixTabActionsTest {
             found = findAttachedWebViewOnMainThread()
         }
         return found
+    }
+
+    private fun assertWithinViewport(bounds: Rect, viewport: Rect, control: String) {
+        assertTrue(
+            "$control must remain within the compact phone viewport: bounds=$bounds viewport=$viewport",
+            bounds.left >= viewport.left &&
+                bounds.top >= viewport.top &&
+                bounds.right <= viewport.right &&
+                bounds.bottom <= viewport.bottom,
+        )
     }
 
     private fun assertAtLeast48Dp(widthPx: Float, density: Float, control: String) {
