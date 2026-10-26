@@ -13,6 +13,15 @@ set +e
 bash gradlew :composeApp:connectedDebugAndroidTest --stacktrace
 test_result=$?
 
+# Pull deterministic browser-state frames captured by instrumentation before the app is reset.
+# A missing optional visual directory must not mask the instrumentation result.
+adb pull /sdcard/Android/data/dev.veyra.browser/files/compact-phone-smoke/. \
+  composeApp/build/reports/compact-phone-smoke/ >/dev/null 2>&1
+visual_pull_result=$?
+if [ "$visual_pull_result" -ne 0 ]; then
+  echo "WARNING: instrumentation browser-state screenshots were not available to pull."
+fi
+
 # connectedDebugAndroidTest may leave the target app absent on some emulator runs.
 # Reinstall the already-built debug APK before launching and capturing the home frame.
 adb shell am force-stop dev.veyra.browser
