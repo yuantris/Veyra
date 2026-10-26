@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase (updated 2026-10-26):** Android phone A1 remains in progress. The compact viewport test now runs at 540×1200 px / 240 dpi and passed in [Browser Core Tests #40255233364](https://github.com/yuantris/Veyra/actions/runs/40255233364), but the full Android instrumentation job failed in `switchingTabsRestoresTheRealWebViewsBackForwardHistory` while closing the newly created tab. Core JVM tests and iOS compilation passed; Build Veyra #40255233311 passed. The failure is under investigation; no A1 acceptance claim. Tablet and desktop UI remain deferred.
+- **Phase (updated 2026-10-26):** Android phone A1 remains in progress. The compact viewport is configured to 540×1200 px / 240 dpi (360×800 dp); `compactPhoneChromeControlsRemainInsideTheViewport` and the full Android instrumentation suite passed in [Browser Core Tests #40255969193](https://github.com/yuantris/Veyra/actions/runs/40255969193), including the repaired `switchingTabsRestoresTheRealWebViewsBackForwardHistory`. [Build Veyra #40255969147](https://github.com/yuantris/Veyra/actions/runs/40255969147) also passed. Automated bounds/runtime checks are green, but a genuine visual smoke review at the compact viewport is still outstanding; A1 is not accepted yet. Tablet and desktop UI remain deferred.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -23,8 +23,8 @@
   - `navigationPolicy` is now `true` (flipped after `AndroidNavigationPolicyWebViewTest` passed on the API 35 system-WebView emulator via `:composeApp:connectedDebugAndroidTest`, CI `android-emulator-integration` job). The test drives the REAL production `createWebView`/`shouldOverrideUrlLoading` path and covers all five gate cases; the capability is now truthful. iOS and Desktop remain `false` (no native delegate/handler path yet).
   - Android currently validates the native WebView path through `AndroidChromiumSurfaceRenderer`; this is not a self-compiled Chromium integration. iOS WKWebView, HarmonyOS ArkWeb and Desktop KCEF adapters are still future work.
 - **Next smallest safe steps:**
-  1. Verify CI for the address-bar search encoding fix and its common tests; fix any compile/test failures before considering the input path stable.
-  2. Continue Android phone A1 runtime checks for the address/search → load → back/forward → stop/reload → tab switch/close path, recording actual emulator evidence and any remaining failures.
+  1. Obtain and inspect a real compact-phone visual smoke pass at 360 dp, covering launch/home, address/search, loaded page, navigation controls, loading/error feedback, and tab switching/closing. Record the actual viewport and observations; do not infer visual acceptance from CI alone.
+  2. If visual review exposes a concrete blocker, fix only that issue and rerun the directly relevant verification; otherwise close the phone A1 gate with the observed evidence and explicitly list any remaining limitations.
   3. Do not begin tablet UI acceptance until the phone baseline passes; do not begin desktop UI work before the Android acceptance gates are met.
 
 ## Session log
@@ -1057,3 +1057,16 @@
 - **Test evidence:** This is a test-targeting correction based on the observed timeout and the actual default tab title from `BrowserSessionCoordinator.openTab`; the new revision is not yet tested by CI.
 - **Next smallest safe step:** Run the complete CI suite. If the targeted close still times out, capture the current WebView URL/title/history state in the failure diagnostics and investigate production lifecycle behavior rather than relaxing the assertion.
 - **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-26 — Confirm compact-phone instrumentation recovery
+
+- **Goal:** Verify the test-target correction against the real Android emulator job and update the A1 status using observed CI results.
+- **Planned:** Check the exact workflows and job conclusions for the current main commit, confirm the previously failing tab-history test and compact viewport test are green, and record the remaining acceptance gate.
+- **Completed:**
+  - [Browser Core Tests #40255969193](https://github.com/yuantris/Veyra/actions/runs/40255969193) completed successfully. Its `android-emulator-integration`, `test`, and `ios-compile` jobs all passed. This confirms the 360 dp compact viewport check and the complete Android instrumentation suite passed after explicitly targeting `关闭 New tab 标签页`; the WebView history-restoration assertion remains enabled.
+  - [Build Veyra #40255969147](https://github.com/yuantris/Veyra/actions/runs/40255969147) completed successfully; its `compile` job passed.
+  - No production behavior was changed in this session. The prior failure is resolved at the test-targeting level based on green rerun evidence; there is still no claim that the compact layout has passed a human visual review.
+- **Test evidence:** Both workflow runs above are completed with conclusion `success`; all listed jobs passed. Compact viewport automated bounds checks are green, while visual smoke acceptance remains open.
+- **Next smallest safe step:** Perform a genuine 360 dp compact-phone visual smoke pass and record the viewport plus observations for home/search, page load, navigation, stop/reload, error feedback, and tab switch/close. If no actual device/session is available to inspect, keep A1 open rather than claiming visual acceptance.
+- **Files:** `docs/AI_WORK_LOG.md`.
