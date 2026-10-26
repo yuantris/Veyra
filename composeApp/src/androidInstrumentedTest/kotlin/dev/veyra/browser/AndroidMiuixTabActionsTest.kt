@@ -268,11 +268,13 @@ class AndroidMiuixTabActionsTest {
         val selectedTabSurface = findAttachedWebView()
             ?: throw AssertionError("New tab did not attach its system WebView")
 
-        val closeNodes = composeRule.onAllNodes(hasContentDescription("关闭", substring = true))
+        // The new tab is created with the stable "New tab" title. Target its close
+        // action by semantics rather than relying on lazy/scrolling tab-strip node order.
+        val closeNewTab = composeRule.onNodeWithContentDescription("关闭 New tab 标签页")
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            closeNodes.fetchSemanticsNodes().size >= 2
+            runCatching { closeNewTab.fetchSemanticsNode(); true }.getOrDefault(false)
         }
-        closeNodes.get(closeNodes.fetchSemanticsNodes().size - 1).performClick()
+        closeNewTab.performClick()
 
         composeRule.waitUntil(timeoutMillis = 10_000) {
             val current = findAttachedWebView()

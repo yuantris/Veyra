@@ -12,7 +12,7 @@
 
 ## Status snapshot
 
-- **Phase (updated 2026-10-26):** Android phone A1 remains in progress. Existing navigation and tab lifecycle instrumentation is green on [Browser Core Tests #40253996543](https://github.com/yuantris/Veyra/actions/runs/40253996543) and build is green on [Build Veyra #40253996555](https://github.com/yuantris/Veyra/actions/runs/40253996555). The first compact-viewport CI attempt failed because the emulator was set to 720×1600 px at 240 dpi, which is 480 dp wide—not 360 dp. The workflow is being corrected to 540×1200 px at 240 dpi; the instrumentation bounds check remains unverified until the corrected CI run completes. This automated bounds check is not a substitute for visual inspection. Tablet and desktop UI remain deferred.
+- **Phase (updated 2026-10-26):** Android phone A1 remains in progress. The compact viewport test now runs at 540×1200 px / 240 dpi and passed in [Browser Core Tests #40255233364](https://github.com/yuantris/Veyra/actions/runs/40255233364), but the full Android instrumentation job failed in `switchingTabsRestoresTheRealWebViewsBackForwardHistory` while closing the newly created tab. Core JVM tests and iOS compilation passed; Build Veyra #40255233311 passed. The failure is under investigation; no A1 acceptance claim. Tablet and desktop UI remain deferred.
 - **Modules:** `:composeApp`, `:browser-core`, `:browser-download`. Logical module map and package layout: `AGENTS.md` §4a.
 - **Recently completed (2026-10-23):** Android download capability verified on the CI emulator and flipped to `downloads = true`; formal C0–C9 gate review with the C7 byte-count and C9 renderer-crash gaps closed; `composeApp` split evaluated (no package split; composition root extracted to `BrowserSessionAssembly.kt`); **C6 closed** with `WebsitePermissionPolicy` (core owns sequence/rules, platform owns prompting; per-profile site settings; distinct grant/deny/cancel/time-out/unsupported outcomes; 15 policy tests); **exit criterion 5 closed** with `docs/SURFACE_OWNERSHIP_REVIEW.md` (two distinct resource axes, teardown chain anchored to code, owner scope wired to App dispose, invariants test-backed). All modules carry a 5-minute per-suite test timeout.
 - **Recently completed (2026-10-23, later):** **miuix 0.9.4 Luna 风格 UI 重写完成**，依赖基线上移（Compose 1.12.2 / Kotlin 2.4.21 / AGP 9.4.1 / Gradle 9.6.0）。移除 `iosX64()` 目标（miuix 不发布该变体，Kotlin 2.4 新解析模型下会整体失败）。`:composeApp:compileDebugKotlinAndroid` + `:composeApp:compileKotlinDesktop` 编译绿（验证 miuix 解析 + App.kt 类型正确）；iOS 原生编译交 CI `ios-compile`（本沙箱无 macOS 工具链）。仅余 AGP 9 弃用警告，非阻塞。
@@ -1045,3 +1045,15 @@
 - **Test evidence:** The prior compact-viewport instrumentation failed on its incorrect setup precondition. Build Veyra #40254692575 succeeded, but Browser Core Tests #40254692573 failed; the corrected configuration has not yet run, so no pass is claimed.
 - **Next smallest safe step:** Confirm the corrected emulator reports 360 dp and that the full instrumentation suite passes; then capture/record a real compact-phone visual smoke check before closing Android phone A1.
 - **Files:** `.github/workflows/core-tests.yml`, `docs/AI_WORK_LOG.md`.
+
+
+### 2026-10-26 — Make tab-history instrumentation target the intended tab
+
+- **Goal:** Investigate the post-viewport Android instrumentation failure without weakening the history-restoration assertion.
+- **Planned:** Read the failing test report and production tab-strip semantics, then remove ambiguity from the test's close action.
+- **Completed:**
+  - [Browser Core Tests #40255233364](https://github.com/yuantris/Veyra/actions/runs/40255233364) confirms `compactPhoneChromeControlsRemainInsideTheViewport` passed at the corrected compact viewport. The only reported failure in `AndroidMiuixTabActionsTest` was `switchingTabsRestoresTheRealWebViewsBackForwardHistory`, timing out after closing a second tab.
+  - Inspection found the test selected the last node among all close buttons. Updated it to select the new tab's stable `关闭 New tab 标签页` semantic action explicitly, while retaining the assertion that the original real WebView and its back history are restored. No production UI behavior changed.
+- **Test evidence:** This is a test-targeting correction based on the observed timeout and the actual default tab title from `BrowserSessionCoordinator.openTab`; the new revision is not yet tested by CI.
+- **Next smallest safe step:** Run the complete CI suite. If the targeted close still times out, capture the current WebView URL/title/history state in the failure diagnostics and investigate production lifecycle behavior rather than relaxing the assertion.
+- **Files:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `docs/AI_WORK_LOG.md`.
