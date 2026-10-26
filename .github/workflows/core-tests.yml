@@ -117,6 +117,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: compact-phone-visual-smoke
-          path: composeApp/build/reports/compact-phone-smoke/home.png
+          path: composeApp/build/reports/compact-phone-smoke/*.png
           if-no-files-found: warn
           retention-days: 7
