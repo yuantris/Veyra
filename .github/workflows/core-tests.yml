@@ -82,8 +82,8 @@ jobs:
           target: google_apis
           disable-linux-hw-accel: false
           script: |
-            # Exercise the phone-first layout at a deliberate compact 360 dp width.
-            adb shell wm size 720x1600
+            # Exercise the phone-first layout at a deliberate compact 360 dp width (540x1200 px at 240 dpi).
+            adb shell wm size 540x1200
             adb shell wm density 240
             adb shell wm size
             adb shell wm density
