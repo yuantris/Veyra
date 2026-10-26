@@ -3,6 +3,7 @@ package dev.veyra.browser
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.onRoot
+import android.graphics.Bitmap
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebView
@@ -17,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.io.File
 import java.net.ServerSocket
 
 /**
@@ -228,6 +230,7 @@ class AndroidMiuixTabActionsTest {
             "Closing the selected tab must detach its WebView and restore the previous tab's surface",
             findAttachedWebView() !== selectedTabSurface,
         )
+        captureCompactPhoneFrame("tab-close")
     }
 
     @Test
@@ -267,6 +270,7 @@ class AndroidMiuixTabActionsTest {
         }
         val selectedTabSurface = findAttachedWebView()
             ?: throw AssertionError("New tab did not attach its system WebView")
+        captureCompactPhoneFrame("tab-switch")
 
         // The new tab is created with the stable "New tab" title. Target its close
         // action by semantics rather than relying on lazy/scrolling tab-strip node order.
@@ -379,6 +383,7 @@ class AndroidMiuixTabActionsTest {
                 "A main-frame WebView navigation failure must be visible in browser chrome",
                 runCatching { errorNotice.fetchSemanticsNode(); true }.getOrDefault(false),
             )
+            captureCompactPhoneFrame("error-visible")
         } finally {
             server.close()
             serverThread.join(2_500)
@@ -501,6 +506,7 @@ class AndroidMiuixTabActionsTest {
             composeRule.waitUntil(timeoutMillis = 10_000) {
                 runCatching { stopButton.fetchSemanticsNode(); true }.getOrDefault(false)
             }
+            captureCompactPhoneFrame("loading")
             stopButton.performClick()
 
             val reloadButton = composeRule.onNodeWithContentDescription("重新加载")
@@ -558,6 +564,7 @@ class AndroidMiuixTabActionsTest {
                 it.url == pageUrl && it.title == "Veyra reload baseline"
             } == true
         }
+        captureCompactPhoneFrame("loaded-page")
 
         composeRule.activity.runOnUiThread {
             webView.evaluateJavascript("document.title = 'Veyra changed title'", null)
@@ -576,6 +583,29 @@ class AndroidMiuixTabActionsTest {
             "Reload must reload the current document in the attached system WebView",
             attachedWebViewState()?.title == "Veyra reload baseline",
         )
+    }
+
+    /**
+     * Capture the real emulator window at a deterministic browser state. The test process writes
+     * to app-specific external storage so CI can pull the PNGs without broad storage permissions.
+     */
+    private fun captureCompactPhoneFrame(name: String) {
+        val instrumentation = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val directory = File(context.getExternalFilesDir(null), "compact-phone-smoke")
+        check(directory.mkdirs() || directory.isDirectory) {
+            "Unable to create compact phone screenshot directory: $directory"
+        }
+        val bitmap = instrumentation.uiAutomation.takeScreenshot()
+        try {
+            File(directory, "$name.png").outputStream().use { output ->
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    "Unable to encode compact phone screenshot: $name"
+                }
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private data class AttachedWebViewState(
