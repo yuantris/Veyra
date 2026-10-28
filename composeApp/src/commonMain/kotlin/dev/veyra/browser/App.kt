@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import dev.veyra.browser.core.BrowserEvent
 import dev.veyra.browser.core.BrowserErrorCategory
+import dev.veyra.browser.core.DownloadPhase
+import dev.veyra.browser.core.DownloadTask
 import dev.veyra.browser.core.NavigationDecision
 import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
@@ -81,6 +83,7 @@ fun App() {
         val pageStates by coordinator.pageStates.collectAsState()
         var address by remember { mutableStateOf(coordinator.activeTab?.url.orEmpty()) }
         var showBrowser by remember { mutableStateOf(false) }
+        var browserPanel by remember { mutableStateOf<BrowserPanel?>(null) }
         val activeTab = sessionState.tabs.firstOrNull { it.id == sessionState.activeTabId }
         val activePageState = activeTab?.let { pageStates[TabId(it.id)] }
         val currentTabIds = sessionState.tabs.map { it.id }.toSet()
@@ -219,6 +222,29 @@ fun App() {
                             HomeScreen(onOpen = ::openAddress, bookmarks = sessionState.bookmarks, history = sessionState.history)
                         }
                     }
+                    browserPanel?.let { panel ->
+                        Box(
+                            Modifier.fillMaxSize().zIndex(5f).background(c.background.copy(alpha = 0.72f)),
+                            contentAlignment = Alignment.BottomCenter,
+                        ) {
+                            BrowserToolsPanel(
+                                panel = panel,
+                                bookmarks = sessionState.bookmarks,
+                                history = sessionState.history,
+                                downloads = session.downloadTasks.value,
+                                onDismiss = { browserPanel = null },
+                                onOpen = { url -> browserPanel = null; openAddress(url) },
+                                onRemoveBookmark = coordinator::removeBookmark,
+                                onClearHistory = coordinator::clearHistory,
+                                onNewTab = { private ->
+                                    browserPanel = null
+                                    showBrowser = true
+                                    session.launchCommand { coordinator.openTab(url = "about:blank", isPrivate = private) }
+                                },
+                                onCancelDownload = { id -> session.launchCommand { coordinator.cancelDownload(id) } },
+                            )
+                        }
+                    }
                 }
             },
             tabStrip = {
@@ -256,7 +282,7 @@ fun App() {
                             }
                         }
                     },
-                    onMenu = { showBrowser = false },
+                    onMenu = { browserPanel = BrowserPanel.MENU },
                 )
             },
             status = {
@@ -515,6 +541,157 @@ private fun AddressBar(
             )
         }
     }
+}
+
+private enum class BrowserPanel {
+    MENU,
+    BOOKMARKS,
+    HISTORY,
+    DOWNLOADS,
+}
+
+@Composable
+private fun BrowserToolsPanel(
+    panel: BrowserPanel,
+    bookmarks: List<Bookmark>,
+    history: List<HistoryEntry>,
+    downloads: List<DownloadTask>,
+    onDismiss: () -> Unit,
+    onOpen: (String) -> Unit,
+    onRemoveBookmark: (String) -> Unit,
+    onClearHistory: () -> Unit,
+    onNewTab: (Boolean) -> Unit,
+    onCancelDownload: (String) -> Unit,
+) {
+    val c = MiuixTheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .widthIn(max = 560.dp)
+            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+            .background(c.surface)
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                when (panel) {
+                    BrowserPanel.MENU -> "浏览器工具"
+                    BrowserPanel.BOOKMARKS -> "书签"
+                    BrowserPanel.HISTORY -> "浏览历史"
+                    BrowserPanel.DOWNLOADS -> "下载任务"
+                },
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = c.onBackground,
+            )
+            BarGlyph("×", "关闭面板", true, onDismiss)
+        }
+        when (panel) {
+            BrowserPanel.MENU -> {
+                ToolPanelAction("新建标签页", "打开一个普通标签页") { onNewTab(false) }
+                ToolPanelAction("新建无痕标签页", "不记录该标签页的访问历史") { onNewTab(true) }
+                ToolPanelAction("书签", "${bookmarks.size} 个已保存网页") { onDismiss(); /* selected below */ }
+                ToolPanelAction("历史记录", "${history.size} 条访问记录") { onDismiss(); /* selected below */ }
+                ToolPanelAction("下载", "${downloads.size} 个下载任务") { onDismiss(); /* selected below */ }
+                ToolPanelAction("清除浏览历史", "清除本次会话记录") { onClearHistory(); onDismiss() }
+            }
+            BrowserPanel.BOOKMARKS -> {
+                if (bookmarks.isEmpty()) PanelEmpty("还没有书签，打开网页后点击底栏 ☆ 收藏。")
+                bookmarks.forEach { bookmark ->
+                    ToolPanelRow(
+                        title = bookmark.title.ifBlank { bookmark.url },
+                        subtitle = bookmark.url,
+                        trailing = "×",
+                        onClick = { onOpen(bookmark.url) },
+                        onTrailing = { onRemoveBookmark(bookmark.url) },
+                    )
+                }
+            }
+            BrowserPanel.HISTORY -> {
+                if (history.isEmpty()) PanelEmpty("暂无浏览历史。")
+                history.take(100).forEach { entry ->
+                    ToolPanelRow(
+                        title = entry.title.ifBlank { entry.url },
+                        subtitle = entry.url,
+                        trailing = "›",
+                        onClick = { onOpen(entry.url) },
+                        onTrailing = { onOpen(entry.url) },
+                    )
+                }
+                if (history.isNotEmpty()) ToolPanelAction("清除全部历史", "移除当前会话中的访问记录") {
+                    onClearHistory()
+                }
+            }
+            BrowserPanel.DOWNLOADS -> {
+                if (downloads.isEmpty()) PanelEmpty("暂无下载任务。网页发起下载并经策略接受后会显示在这里。")
+                downloads.asReversed().forEach { task ->
+                    val total = task.totalBytes?.takeIf { it > 0 }
+                    val progress = if (total != null) " · ${(task.receivedBytes * 100 / total).coerceIn(0, 100)}%" else ""
+                    ToolPanelRow(
+                        title = task.request.suggestedFileName ?: task.request.url.substringAfterLast('/').ifBlank { task.request.url },
+                        subtitle = "${task.phase.name}${progress}",
+                        trailing = if (task.phase == DownloadPhase.RUNNING || task.phase == DownloadPhase.QUEUED) "×" else "›",
+                        onClick = { },
+                        onTrailing = {
+                            if (task.phase == DownloadPhase.RUNNING || task.phase == DownloadPhase.QUEUED) {
+                                onCancelDownload(task.id)
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ToolPanelAction(title: String, subtitle: String, onClick: () -> Unit) {
+    val c = MiuixTheme.colorScheme
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick)
+            .background(c.surfaceContainer).padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = c.onBackground)
+        Text(subtitle, fontSize = 12.sp, color = c.onBackground.copy(alpha = 0.6f))
+    }
+}
+
+@Composable
+private fun ToolPanelRow(
+    title: String,
+    subtitle: String,
+    trailing: String,
+    onClick: () -> Unit,
+    onTrailing: () -> Unit,
+) {
+    val c = MiuixTheme.colorScheme
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.surfaceContainer),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).clickable(onClick = onClick).padding(12.dp)) {
+            Text(title, fontSize = 14.sp, color = c.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, fontSize = 11.sp, color = c.onBackground.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        Box(
+            Modifier.requiredSize(48.dp).clickable(onClick = onTrailing),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(trailing, fontSize = 18.sp, color = c.onBackground.copy(alpha = 0.7f))
+        }
+    }
+}
+
+@Composable
+private fun PanelEmpty(message: String) {
+    val c = MiuixTheme.colorScheme
+    Text(message, fontSize = 13.sp, color = c.onBackground.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 12.dp))
 }
 
 @Composable
