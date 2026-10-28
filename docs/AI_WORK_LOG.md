@@ -1148,3 +1148,15 @@
 - **Verification status:** Changes are committed as `2be116ee`, `f80552e0`, and `f12c5cdc`. No local Android emulator execution was available in this workflow. CI must verify Kotlin/API compilation, instrumentation behavior, the external-storage pull path, and the resulting artifact. Do not consider A1 visually accepted until the uploaded frames are actually inspected.
 - **Next step:** Inspect the newest complete CI run and artifact; fix only evidenced capture/test issues, then review each frame at 360×800 dp and update A1 status based on observations.
 - **Files touched:** `composeApp/src/androidInstrumentedTest/kotlin/dev/veyra/browser/AndroidMiuixTabActionsTest.kt`, `.github/scripts/android-emulator-integration.sh`, `.github/workflows/core-tests.yml`, `docs/AI_WORK_LOG.md`.
+
+### 2026-10-28 — Connect phone bookmark and history surfaces
+
+- **Goal:** Replace the phone browser's inert bookmark/home controls with real session-backed behavior and expose saved browser data on the home surface.
+- **Completed:**
+  - Connected the bottom-bar bookmark action to `BrowserSessionCoordinator.addBookmark(url, title)` for the active non-blank page.
+  - Replaced the inert menu placeholder with a working Home action.
+  - Home favorites now render the coordinator's saved bookmarks when any exist; the default quick links remain as the empty-state fallback.
+  - Added a recent-history section backed by `BrowserSessionState.history`, showing up to eight recent visits and reopening a selected URL.
+- **Verification status:** GitHub source read-back confirms the expected changes and removal of the two inert placeholder labels. No Android build, instrumentation run, or emulator visual inspection was executed in this session; these changes are not claimed as compiled or runtime-verified. This is a focused functional increment, not completion of all phone-browser capabilities or A1 acceptance.
+- **Next:** Continue the remaining phone A1 gap review in one grouped implementation batch, then run compile/instrumentation and inspect all compact-phone screenshots. Prioritize state restoration, keyboard/system-back behavior, and narrow-width clipping before tablet work.
+- **Files touched:** `composeApp/src/commonMain/kotlin/dev/veyra/browser/App.kt`, `docs/AI_WORK_LOG.md`.
