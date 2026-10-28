@@ -28,7 +28,7 @@ Compose remains the presentation layer. Browser session, tab metadata, navigatio
 
 ### A4 — Miuix visual and touch refinement
 - Align surfaces, colors, shapes, typography, icons, pressed/disabled states, and spacing with the current Miuix Luna theme.
-- Remove misleading placeholder controls or make their unsupported status explicit; do not imply that unimplemented bookmarks, privacy reports, or menus work.
+- Remove misleading placeholder controls or make their unsupported status explicit. Bookmarks, history, downloads, and find-in-page now have functional panel wiring; durable persistence, private-profile isolation, site-settings UI, and other listed gaps must remain explicitly unsupported until implemented and verified.
 - Verify scrolling, keyboard visibility, system bars, touch targets, and content insets on phone and tablet.
 - Acceptance: no known blocking visual/interaction defects remain in the agreed Android configurations.
 
