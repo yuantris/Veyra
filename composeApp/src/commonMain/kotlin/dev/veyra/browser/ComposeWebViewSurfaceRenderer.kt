@@ -86,6 +86,8 @@ private fun ComposeWebViewSurface(
             override fun goForward() { navigator.navigateForward() }
             override fun reload() { navigator.reload() }
             override fun stop() { navigator.stopLoading() }
+            override fun findInPage(query: String) = Unit
+            override fun clearFindInPage() = Unit
         }
     }
 
