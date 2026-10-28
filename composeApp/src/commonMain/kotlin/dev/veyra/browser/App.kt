@@ -246,6 +246,15 @@ fun App() {
                     onBack = { activeTab?.let { coordinator.goBack(TabId(it.id)) } },
                     onForward = { activeTab?.let { coordinator.goForward(TabId(it.id)) } },
                     onTabs = { showBrowser = !showBrowser },
+                    onBookmark = {
+                        activeTab?.let { tab ->
+                            if (tab.url.isNotBlank() && tab.url != "about:blank") {
+                                coordinator.addBookmark(tab.url, tab.title)
+                                downloadStatus = "已收藏当前网页"
+                            }
+                        }
+                    },
+                    onMenu = { showBrowser = false },
                 )
             },
             status = {
@@ -515,6 +524,8 @@ private fun BottomBar(
     onBack: () -> Unit,
     onForward: () -> Unit,
     onTabs: () -> Unit,
+    onBookmark: () -> Unit,
+    onMenu: () -> Unit,
 ) {
     val c = MiuixTheme.colorScheme
     val shape = RoundedCornerShape(22.dp)
@@ -535,8 +546,8 @@ private fun BottomBar(
             enabled = true,
             onClick = onTabs,
         )
-        BarGlyph("☆", "收藏夹（暂未开放）", enabled = false, onClick = {})
-        BarGlyph("≡", "菜单（暂未开放）", enabled = false, onClick = {})
+        BarGlyph("☆", "收藏当前网页", enabled = isBrowsing, onClick = onBookmark)
+        BarGlyph("⌂", "首页", enabled = true, onClick = onMenu)
     }
 }
 
