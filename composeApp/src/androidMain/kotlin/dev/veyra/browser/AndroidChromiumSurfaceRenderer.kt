@@ -145,6 +145,16 @@ internal object AndroidChromiumSurfaceRenderer : BrowserSurfaceRenderer {
                         }
                     }
                 }
+                override fun findInPage(query: String) {
+                    mainHandler.post {
+                        if (!surfaceDestroyed.get()) {
+                            if (query.isBlank()) webView.clearMatches() else webView.findAllAsync(query)
+                        }
+                    }
+                }
+                override fun clearFindInPage() {
+                    mainHandler.post { if (!surfaceDestroyed.get()) webView.clearMatches() }
+                }
                 override fun stop() {
                     mainHandler.post {
                         if (!surfaceDestroyed.get()) {
