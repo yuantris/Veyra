@@ -5,6 +5,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import dev.veyra.browser.core.DownloadTask
+import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.session.BrowserSessionCoordinator
 import dev.veyra.browser.download.DefaultDownloadController
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,18 @@ class BrowserSession(
      */
     fun launchCommand(block: suspend CoroutineScope.() -> Unit) {
         controllerScope.launch(block = block)
+    }
+
+    /** Routes find-in-page through the active tab's surface adapter, never through UI-owned WebView state. */
+    fun findInPage(query: String) {
+        val tab = coordinator.activeTab ?: return
+        val surface = coordinator.engines.value[TabId(tab.id)] as? BrowserSurfaceBinding ?: return
+        if (query.isBlank()) surface.clearFindInPage() else surface.findInPage(query)
+    }
+
+    fun clearFindInPage() {
+        val tab = coordinator.activeTab ?: return
+        (coordinator.engines.value[TabId(tab.id)] as? BrowserSurfaceBinding)?.clearFindInPage()
     }
 }
 
