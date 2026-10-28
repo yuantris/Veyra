@@ -142,12 +142,16 @@ fun App() {
 
         // Android system Back follows browser history first, then returns to the home surface.
         // The platform handler is a no-op on targets without an established system-back contract.
-        PlatformBackHandler(enabled = showBrowser) {
-            val tab = activeTab
-            if (tab?.canGoBack == true) {
-                coordinator.goBack(TabId(tab.id))
+        PlatformBackHandler(enabled = showBrowser || browserPanel != null) {
+            if (browserPanel != null) {
+                browserPanel = null
             } else {
-                showBrowser = false
+                val tab = activeTab
+                if (tab?.canGoBack == true) {
+                    coordinator.goBack(TabId(tab.id))
+                } else {
+                    showBrowser = false
+                }
             }
         }
 
@@ -237,10 +241,10 @@ fun App() {
                                 onOpen = { url -> browserPanel = null; openAddress(url) },
                                 onRemoveBookmark = coordinator::removeBookmark,
                                 onClearHistory = coordinator::clearHistory,
-                                onNewTab = { private ->
+                                onNewTab = {
                                     browserPanel = null
                                     showBrowser = true
-                                    session.launchCommand { coordinator.openTab(url = "about:blank", isPrivate = private) }
+                                    session.launchCommand { coordinator.openTab(url = "about:blank") }
                                 },
                                 onCancelDownload = { id -> session.launchCommand { coordinator.cancelDownload(id) } },
                             )
@@ -562,7 +566,7 @@ private fun BrowserToolsPanel(
     onOpen: (String) -> Unit,
     onRemoveBookmark: (String) -> Unit,
     onClearHistory: () -> Unit,
-    onNewTab: (Boolean) -> Unit,
+    onNewTab: () -> Unit,
     onCancelDownload: (String) -> Unit,
 ) {
     val c = MiuixTheme.colorScheme
@@ -596,8 +600,7 @@ private fun BrowserToolsPanel(
         }
         when (panel) {
             BrowserPanel.MENU -> {
-                ToolPanelAction("新建标签页", "打开一个普通标签页") { onNewTab(false) }
-                ToolPanelAction("新建无痕标签页", "不记录该标签页的访问历史") { onNewTab(true) }
+                ToolPanelAction("新建标签页", "打开一个新标签页") { onNewTab() }
                 ToolPanelAction("书签", "${bookmarks.size} 个已保存网页") { onShowPanel(BrowserPanel.BOOKMARKS) }
                 ToolPanelAction("历史记录", "${history.size} 条访问记录") { onShowPanel(BrowserPanel.HISTORY) }
                 ToolPanelAction("下载", "${downloads.size} 个下载任务") { onShowPanel(BrowserPanel.DOWNLOADS) }
@@ -728,7 +731,7 @@ private fun BottomBar(
             onClick = onTabs,
         )
         BarGlyph("☆", "收藏当前网页", enabled = isBrowsing, onClick = onBookmark)
-        BarGlyph("⌂", "首页", enabled = true, onClick = onMenu)
+        BarGlyph("≡", "浏览器菜单", enabled = true, onClick = onMenu)
     }
 }
 
