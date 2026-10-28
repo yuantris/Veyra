@@ -58,6 +58,7 @@ import dev.veyra.browser.core.NavigationRequest
 import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.session.BrowserTab
+import dev.veyra.browser.core.session.Bookmark
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -214,7 +215,7 @@ fun App() {
                     }
                     if (!showBrowser) {
                         Box(Modifier.fillMaxSize().zIndex(2f)) {
-                            HomeScreen(onOpen = ::openAddress)
+                            HomeScreen(onOpen = ::openAddress, bookmarks = sessionState.bookmarks)
                         }
                     }
                 }
@@ -579,7 +580,7 @@ private fun BarGlyph(
 }
 
 @Composable
-private fun HomeScreen(onOpen: (String) -> Unit) {
+private fun HomeScreen(onOpen: (String) -> Unit, bookmarks: List<Bookmark>) {
     val scroll = rememberScrollState()
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -594,7 +595,7 @@ private fun HomeScreen(onOpen: (String) -> Unit) {
         SearchPill(onOpen)
         Spacer(Modifier.height(26.dp))
         SectionTitle("收藏")
-        FavoritesRow(onOpen)
+        FavoritesRow(onOpen, bookmarks)
         Spacer(Modifier.height(22.dp))
         SectionTitle("建议")
         SuggestionsRow(onOpen)
@@ -651,14 +652,21 @@ private fun SectionTitle(title: String) {
 }
 
 @Composable
-private fun FavoritesRow(onOpen: (String) -> Unit) {
+private fun FavoritesRow(onOpen: (String) -> Unit, bookmarks: List<Bookmark>) {
     val c = MiuixTheme.colorScheme
-    val favorites = listOf(
-        Favorite("百", "百度", "https://www.baidu.com"),
-        Favorite("G", "Google", "https://www.google.com"),
-        Favorite("B", "Bing", "https://www.bing.com"),
-        Favorite("Gh", "GitHub", "https://github.com"),
-    )
+    val favorites = if (bookmarks.isNotEmpty()) {
+        bookmarks.map { bookmark ->
+            val host = bookmark.url.removePrefix("https://").removePrefix("http://").substringBefore("/")
+            Favorite(host.take(2).uppercase(), bookmark.title, bookmark.url)
+        }
+    } else {
+        listOf(
+            Favorite("百", "百度", "https://www.baidu.com"),
+            Favorite("G", "Google", "https://www.google.com"),
+            Favorite("B", "Bing", "https://www.bing.com"),
+            Favorite("Gh", "GitHub", "https://github.com"),
+        )
+    }
     Row(
         Modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
