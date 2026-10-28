@@ -685,7 +685,7 @@ private fun FindInPageForm(onFind: (String) -> Unit, onClear: () -> Unit) {
                 inner()
             },
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ToolPanelAction("查找", "查找当前输入内容") { onFind(query) }
             ToolPanelAction("清除匹配", "移除页面高亮") { query = ""; onClear() }
         }
