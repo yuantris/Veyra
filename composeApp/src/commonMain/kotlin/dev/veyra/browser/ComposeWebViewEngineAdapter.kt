@@ -32,6 +32,8 @@ internal interface BrowserSurfacePort {
     fun goForward()
     fun reload()
     fun stop()
+    fun findInPage(query: String)
+    fun clearFindInPage()
 }
 
 /**
@@ -46,6 +48,8 @@ internal interface BrowserSurfaceBinding {
 
     fun attachSurface(surface: BrowserSurfacePort)
     fun detachSurface(surface: BrowserSurfacePort)
+    fun findInPage(query: String)
+    fun clearFindInPage()
     fun observe(
         url: String?,
         title: String?,
@@ -158,6 +162,14 @@ internal class ComposeWebViewEngine(
 
     override fun detachSurface(surface: BrowserSurfacePort) {
         if (this.surface === surface) this.surface = null
+    }
+
+    override fun findInPage(query: String) {
+        if (!closed) surface?.findInPage(query)
+    }
+
+    override fun clearFindInPage() {
+        if (!closed) surface?.clearFindInPage()
     }
 
     override fun navigate(request: NavigationRequest) {
