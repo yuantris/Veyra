@@ -233,6 +233,7 @@ fun App() {
                                 history = sessionState.history,
                                 downloads = session.downloadTasks.value,
                                 onDismiss = { browserPanel = null },
+                                onShowPanel = { browserPanel = it },
                                 onOpen = { url -> browserPanel = null; openAddress(url) },
                                 onRemoveBookmark = coordinator::removeBookmark,
                                 onClearHistory = coordinator::clearHistory,
@@ -557,6 +558,7 @@ private fun BrowserToolsPanel(
     history: List<HistoryEntry>,
     downloads: List<DownloadTask>,
     onDismiss: () -> Unit,
+    onShowPanel: (BrowserPanel) -> Unit,
     onOpen: (String) -> Unit,
     onRemoveBookmark: (String) -> Unit,
     onClearHistory: () -> Unit,
@@ -596,9 +598,9 @@ private fun BrowserToolsPanel(
             BrowserPanel.MENU -> {
                 ToolPanelAction("新建标签页", "打开一个普通标签页") { onNewTab(false) }
                 ToolPanelAction("新建无痕标签页", "不记录该标签页的访问历史") { onNewTab(true) }
-                ToolPanelAction("书签", "${bookmarks.size} 个已保存网页") { onDismiss(); /* selected below */ }
-                ToolPanelAction("历史记录", "${history.size} 条访问记录") { onDismiss(); /* selected below */ }
-                ToolPanelAction("下载", "${downloads.size} 个下载任务") { onDismiss(); /* selected below */ }
+                ToolPanelAction("书签", "${bookmarks.size} 个已保存网页") { onShowPanel(BrowserPanel.BOOKMARKS) }
+                ToolPanelAction("历史记录", "${history.size} 条访问记录") { onShowPanel(BrowserPanel.HISTORY) }
+                ToolPanelAction("下载", "${downloads.size} 个下载任务") { onShowPanel(BrowserPanel.DOWNLOADS) }
                 ToolPanelAction("清除浏览历史", "清除本次会话记录") { onClearHistory(); onDismiss() }
             }
             BrowserPanel.BOOKMARKS -> {
