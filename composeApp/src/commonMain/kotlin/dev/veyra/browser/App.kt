@@ -238,6 +238,8 @@ fun App() {
                                 downloads = session.downloadTasks.value,
                                 onDismiss = { browserPanel = null },
                                 onShowPanel = { browserPanel = it },
+                                onFindInPage = session::findInPage,
+                                onClearFindInPage = session::clearFindInPage,
                                 onOpen = { url -> browserPanel = null; openAddress(url) },
                                 onRemoveBookmark = coordinator::removeBookmark,
                                 onClearHistory = coordinator::clearHistory,
@@ -550,6 +552,7 @@ private fun AddressBar(
 
 private enum class BrowserPanel {
     MENU,
+    FIND,
     BOOKMARKS,
     HISTORY,
     DOWNLOADS,
@@ -563,6 +566,8 @@ private fun BrowserToolsPanel(
     downloads: List<DownloadTask>,
     onDismiss: () -> Unit,
     onShowPanel: (BrowserPanel) -> Unit,
+    onFindInPage: (String) -> Unit,
+    onClearFindInPage: () -> Unit,
     onOpen: (String) -> Unit,
     onRemoveBookmark: (String) -> Unit,
     onClearHistory: () -> Unit,
@@ -588,6 +593,7 @@ private fun BrowserToolsPanel(
             Text(
                 when (panel) {
                     BrowserPanel.MENU -> "浏览器工具"
+                    BrowserPanel.FIND -> "网页内查找"
                     BrowserPanel.BOOKMARKS -> "书签"
                     BrowserPanel.HISTORY -> "浏览历史"
                     BrowserPanel.DOWNLOADS -> "下载任务"
@@ -601,10 +607,14 @@ private fun BrowserToolsPanel(
         when (panel) {
             BrowserPanel.MENU -> {
                 ToolPanelAction("新建标签页", "打开一个新标签页") { onNewTab() }
+                ToolPanelAction("网页内查找", "在当前网页中查找文字") { onShowPanel(BrowserPanel.FIND) }
                 ToolPanelAction("书签", "${bookmarks.size} 个已保存网页") { onShowPanel(BrowserPanel.BOOKMARKS) }
                 ToolPanelAction("历史记录", "${history.size} 条访问记录") { onShowPanel(BrowserPanel.HISTORY) }
                 ToolPanelAction("下载", "${downloads.size} 个下载任务") { onShowPanel(BrowserPanel.DOWNLOADS) }
                 ToolPanelAction("清除浏览历史", "清除本次会话记录") { onClearHistory(); onDismiss() }
+            }
+            BrowserPanel.FIND -> {
+                FindInPageForm(onFindInPage, onClearFindInPage)
             }
             BrowserPanel.BOOKMARKS -> {
                 if (bookmarks.isEmpty()) PanelEmpty("还没有书签，打开网页后点击底栏 ☆ 收藏。")
@@ -651,6 +661,33 @@ private fun BrowserToolsPanel(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FindInPageForm(onFind: (String) -> Unit, onClear: () -> Unit) {
+    val c = MiuixTheme.colorScheme
+    var query by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        BasicTextField(
+            value = query,
+            onValueChange = { query = it; onFind(it) },
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                .background(c.surfaceContainer).padding(14.dp)
+                .semantics { contentDescription = "网页内查找" },
+            singleLine = true,
+            textStyle = TextStyle(color = c.onBackground, fontSize = 15.sp),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onFind(query) }),
+            decorationBox = { inner ->
+                if (query.isEmpty()) Text("输入要查找的文字", color = c.onBackground.copy(alpha = 0.45f), fontSize = 14.sp)
+                inner()
+            },
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolPanelAction("查找", "查找当前输入内容") { onFind(query) }
+            ToolPanelAction("清除匹配", "移除页面高亮") { query = ""; onClear() }
         }
     }
 }
