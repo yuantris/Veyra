@@ -59,6 +59,7 @@ import dev.veyra.browser.core.NavigationSource
 import dev.veyra.browser.core.TabId
 import dev.veyra.browser.core.session.BrowserTab
 import dev.veyra.browser.core.session.Bookmark
+import dev.veyra.browser.core.session.HistoryEntry
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import top.yukonga.miuix.kmp.theme.lightColorScheme
@@ -215,7 +216,7 @@ fun App() {
                     }
                     if (!showBrowser) {
                         Box(Modifier.fillMaxSize().zIndex(2f)) {
-                            HomeScreen(onOpen = ::openAddress, bookmarks = sessionState.bookmarks)
+                            HomeScreen(onOpen = ::openAddress, bookmarks = sessionState.bookmarks, history = sessionState.history)
                         }
                     }
                 }
@@ -580,7 +581,11 @@ private fun BarGlyph(
 }
 
 @Composable
-private fun HomeScreen(onOpen: (String) -> Unit, bookmarks: List<Bookmark>) {
+private fun HomeScreen(
+    onOpen: (String) -> Unit,
+    bookmarks: List<Bookmark>,
+    history: List<HistoryEntry>,
+) {
     val scroll = rememberScrollState()
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -596,10 +601,46 @@ private fun HomeScreen(onOpen: (String) -> Unit, bookmarks: List<Bookmark>) {
         Spacer(Modifier.height(26.dp))
         SectionTitle("收藏")
         FavoritesRow(onOpen, bookmarks)
+        if (history.isNotEmpty()) {
+            Spacer(Modifier.height(22.dp))
+            SectionTitle("最近访问")
+            HistoryList(history = history.take(8), onOpen = onOpen)
+        }
         Spacer(Modifier.height(22.dp))
         SectionTitle("建议")
         SuggestionsRow(onOpen)
         Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun HistoryList(history: List<HistoryEntry>, onOpen: (String) -> Unit) {
+    val c = MiuixTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        history.forEach { entry ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpen(entry.url) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    entry.title.ifBlank { entry.url },
+                    color = c.onBackground,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    entry.url,
+                    color = c.onBackground.copy(alpha = 0.5f),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
